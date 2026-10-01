@@ -1,15 +1,18 @@
 import { provideHttpClient, withFetch } from '@angular/common/http';
-import { ApplicationConfig, provideZonelessChangeDetection } from '@angular/core';
-import { provideRouter, withEnabledBlockingInitialNavigation, withInMemoryScrolling } from '@angular/router';
+import { ApplicationConfig } from '@angular/core'; // เอา provideZonelessChangeDetection ออก
+import { provideRouter, withInMemoryScrolling } from '@angular/router';
 import Aura from '@primeuix/themes/aura';
 import { providePrimeNG } from 'primeng/config';
 import { appRoutes } from './app.routes';
 
 export const appConfig: ApplicationConfig = {
     providers: [
-        provideRouter(appRoutes, withInMemoryScrolling({ anchorScrolling: 'enabled', scrollPositionRestoration: 'enabled' }), withEnabledBlockingInitialNavigation()),
+        provideRouter(
+            appRoutes, 
+            withInMemoryScrolling({ anchorScrolling: 'enabled', scrollPositionRestoration: 'enabled' })
+        ),
         provideHttpClient(withFetch()),
-        provideZonelessChangeDetection(),
+        // เอา provideZonelessChangeDetection() ออก และให้ Angular ใช้ Zone.js ตามปกติ
         providePrimeNG({ theme: { preset: Aura, options: { darkModeSelector: '.app-dark' } } })
     ]
 };

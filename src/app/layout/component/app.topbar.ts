@@ -16,7 +16,7 @@ import { LayoutService } from '@/app/layout/service/layout.service';
                 <i class="pi pi-bars"></i>
             </button>
             <a class="layout-topbar-logo" routerLink="/">
-                <svg viewBox="0 0 54 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <svg viewBox="0 0 54 40" fill="none" xmlns="http://www.w3.org/2000/svg" style="display: none">
                     <path
                         fill-rule="evenodd"
                         clip-rule="evenodd"
@@ -33,7 +33,8 @@ import { LayoutService } from '@/app/layout/service/layout.service';
                         />
                     </g>
                 </svg>
-                <span>SAKAI</span>
+                <img src="/pp-prime-logo.svg" alt="PP Prime Construction" width="44" height="31" style="flex: 0 0 auto; object-fit: contain" />
+                <span>PP Prime Construction</span>
             </a>
         </div>
 

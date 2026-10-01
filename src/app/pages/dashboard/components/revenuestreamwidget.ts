@@ -35,9 +35,9 @@ export class RevenueStreamWidget {
 
     initChart() {
         const documentStyle = getComputedStyle(document.documentElement);
-        const textColor = documentStyle.getPropertyValue('--text-color');
-        const borderColor = documentStyle.getPropertyValue('--surface-border');
-        const textMutedColor = documentStyle.getPropertyValue('--text-color-secondary');
+        const textColor = documentStyle.getPropertyValue('--p-text-color');
+        const borderColor = documentStyle.getPropertyValue('--p-content-border-color');
+        const textMutedColor = documentStyle.getPropertyValue('--p-text-muted-color');
 
         this.chartData.set({
             labels: ['Q1', 'Q2', 'Q3', 'Q4'],

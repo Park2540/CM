@@ -19,148 +19,185 @@ import { AppMenuitem } from './app.menuitem';
     </ul> `,
 })
 export class AppMenu {
-    model: MenuItem[] = [];
+    model: (MenuItem & { sectionOnly?: boolean })[] = [];
 
     ngOnInit() {
         this.model = [
             {
-                label: 'Home',
-                items: [{ label: 'Dashboard', icon: 'pi pi-fw pi-home', routerLink: ['/'] }]
-            },
-            {
-                label: 'UI Components',
+                label: 'หลัก',
                 items: [
-                    { label: 'Form Layout', icon: 'pi pi-fw pi-id-card', routerLink: ['/uikit/formlayout'] },
-                    { label: 'Input', icon: 'pi pi-fw pi-check-square', routerLink: ['/uikit/input'] },
-                    { label: 'Button', icon: 'pi pi-fw pi-mobile', class: 'rotated-icon', routerLink: ['/uikit/button'] },
-                    { label: 'Table', icon: 'pi pi-fw pi-table', routerLink: ['/uikit/table'] },
-                    { label: 'List', icon: 'pi pi-fw pi-list', routerLink: ['/uikit/list'] },
-                    { label: 'Tree', icon: 'pi pi-fw pi-share-alt', routerLink: ['/uikit/tree'] },
-                    { label: 'Panel', icon: 'pi pi-fw pi-tablet', routerLink: ['/uikit/panel'] },
-                    { label: 'Overlay', icon: 'pi pi-fw pi-clone', routerLink: ['/uikit/overlay'] },
-                    { label: 'Media', icon: 'pi pi-fw pi-image', routerLink: ['/uikit/media'] },
-                    { label: 'Menu', icon: 'pi pi-fw pi-bars', routerLink: ['/uikit/menu'] },
-                    { label: 'Message', icon: 'pi pi-fw pi-comment', routerLink: ['/uikit/message'] },
-                    { label: 'File', icon: 'pi pi-fw pi-file', routerLink: ['/uikit/file'] },
-                    { label: 'Chart', icon: 'pi pi-fw pi-chart-bar', routerLink: ['/uikit/charts'] },
-                    { label: 'Timeline', icon: 'pi pi-fw pi-calendar', routerLink: ['/uikit/timeline'] },
-                    { label: 'Misc', icon: 'pi pi-fw pi-circle', routerLink: ['/uikit/misc'] }
+                    { label: 'Dashboard', icon: 'pi pi-fw pi-home', routerLink: ['/dashboard'] },
+                    { label: 'งานของฉัน', icon: 'pi pi-fw pi-briefcase' },
+                    {
+                        label: 'ระบบแจ้งเตือน',
+                        icon: 'pi pi-fw pi-bell',
+                        path: '/notifications',
+                        items: [
+                            { label: 'ทั้งหมด', icon: 'pi pi-fw pi-inbox' },
+                            { label: 'รออนุมัติ', icon: 'pi pi-fw pi-clock' },
+                            { label: 'ใกล้ครบกำหนด', icon: 'pi pi-fw pi-calendar' },
+                            { label: 'ล่าช้า', icon: 'pi pi-fw pi-exclamation-triangle' }
+                        ]
+                    }
                 ]
             },
             {
-                label: 'Pages',
-                icon: 'pi pi-fw pi-briefcase',
-                path: '/pages',
+                label: 'โครงการ',
                 items: [
                     {
-                        label: 'Landing',
-                        icon: 'pi pi-fw pi-globe',
-                        routerLink: ['/landing']
+                        label: 'ภาพรวมโครงการ',
+                        icon: 'pi pi-fw pi-folder',
+                        path: '/projects',
+                        items: [
+                            { label: 'โครงการรวม', icon: 'pi pi-fw pi-list', routerLink: ['/projects'] },
+                            { label: 'เปิดโครงการ', icon: 'pi pi-fw pi-plus-circle' },
+                            { label: 'การเงินรวม', icon: 'pi pi-fw pi-wallet' },
+                            { label: 'โครงการที่ต้องติดตาม', icon: 'pi pi-fw pi-exclamation-circle' },
+                            { label: 'โครงการที่ปิดแล้ว', icon: 'pi pi-fw pi-check-circle' }
+                        ]
+                    },
+                    { label: 'คุณภาพและความปลอดภัย', icon: 'pi pi-fw pi-shield' }
+                ]
+            },
+            {
+                label: 'การเงินและจัดซื้อ',
+                items: [
+                    {
+                        label: 'ระบบบัญชีและการเงิน',
+                        icon: 'pi pi-fw pi-wallet',
+                        path: '/finance',
+                        items: [
+                            { label: 'ลูกหนี้', icon: 'pi pi-fw pi-arrow-down-left' },
+                            { label: 'เจ้าหนี้', icon: 'pi pi-fw pi-arrow-up-right' },
+                            { label: 'เงินประกัน', icon: 'pi pi-fw pi-lock' },
+                            { label: 'กระแสเงินสด', icon: 'pi pi-fw pi-chart-line' },
+                            { label: 'เงินสดย่อย', icon: 'pi pi-fw pi-money-bill' },
+                            { label: 'ภาษี', icon: 'pi pi-fw pi-file' },
+                            { label: 'ค่าใช้จ่ายส่วนกลาง', icon: 'pi pi-fw pi-building' }
+                        ]
                     },
                     {
-                        label: 'Auth',
+                        label: 'ระบบจัดซื้อ',
+                        icon: 'pi pi-fw pi-shopping-cart',
+                        path: '/procurement',
+                        items: [
+                            { label: 'ใบขอซื้อ', icon: 'pi pi-fw pi-file-edit' },
+                            { label: 'ขอราคา/เปรียบเทียบ', icon: 'pi pi-fw pi-tags' },
+                            { label: 'ใบสั่งซื้อ', icon: 'pi pi-fw pi-shopping-cart' },
+                            { label: 'สัญญาและงวดผู้รับเหมาช่วง', icon: 'pi pi-fw pi-briefcase' },
+                            { label: 'รับสินค้า/รับงาน', icon: 'pi pi-fw pi-inbox' }
+                        ]
+                    }
+                ]
+            },
+            {
+                label: 'วัสดุและทรัพย์สิน',
+                items: [
+                    {
+                        label: 'วัสดุและคลัง',
+                        icon: 'pi pi-fw pi-box',
+                        path: '/inventory',
+                        items: [
+                            { label: 'คลัง', icon: 'pi pi-fw pi-warehouse' },
+                            { label: 'เบิก', icon: 'pi pi-fw pi-sign-out' },
+                            { label: 'คืน', icon: 'pi pi-fw pi-replay' },
+                            { label: 'โอน', icon: 'pi pi-fw pi-arrow-right-arrow-left' },
+                            { label: 'ตรวจนับ', icon: 'pi pi-fw pi-list-check' }
+                        ]
+                    },
+                    {
+                        label: 'ทรัพย์สิน/ครุภัณฑ์',
+                        icon: 'pi pi-fw pi-wrench',
+                        path: '/assets',
+                        items: [
+                            { label: 'ทะเบียน', icon: 'pi pi-fw pi-book' },
+                            { label: 'เบิก-ยืม', icon: 'pi pi-fw pi-sign-out' },
+                            { label: 'ซ่อมบำรุง', icon: 'pi pi-fw pi-cog' },
+                            { label: 'ตัดจำหน่าย', icon: 'pi pi-fw pi-trash' }
+                        ]
+                    }
+                ]
+            },
+            {
+                label: 'หลังส่งมอบ',
+                items: [
+                    {
+                        label: 'ระบบรับประกัน',
+                        icon: 'pi pi-fw pi-verified',
+                        path: '/warranty',
+                        items: [
+                            { label: 'โครงการที่รับประกัน', icon: 'pi pi-fw pi-shield' },
+                            { label: 'รายการแจ้งซ่อม', icon: 'pi pi-fw pi-wrench' }
+                        ]
+                    }
+                ]
+            },
+            {
+                label: 'เอกสาร',
+                items: [
+                    {
+                        label: 'ศูนย์เอกสารบริษัท (พร้อมแจ้งเตือนหมดอายุ)',
+                        icon: 'pi pi-fw pi-folder-open'
+                    },
+                    {
+                        label: 'แม่แบบเอกสาร',
+                        icon: 'pi pi-fw pi-copy'
+                    }
+                ]
+            },
+            {
+                label: 'ข้อมูลหลัก',
+                items: [
+                    {
+                        label: 'บุคคลากร',
+                        icon: 'pi pi-fw pi-users',
+                        path: '/master/personnel',
+                        items: [
+                            { label: 'ข้อมูลบุคคลากรรวม', icon: 'pi pi-fw pi-list', routerLink: ['/master/personnel'] },
+                            { label: 'เพิ่มบุคคลากร', icon: 'pi pi-fw pi-user-plus', routerLink: ['/master/personnel/new'] }
+                        ]
+                    },
+                    {
+                        label: 'ลูกค้า',
                         icon: 'pi pi-fw pi-user',
-                        path: '/auth',
+                        path: '/master/customers',
                         items: [
-                            {
-                                label: 'Login',
-                                icon: 'pi pi-fw pi-sign-in',
-                                routerLink: ['/auth/login']
-                            },
-                            {
-                                label: 'Error',
-                                icon: 'pi pi-fw pi-times-circle',
-                                routerLink: ['/auth/error']
-                            },
-                            {
-                                label: 'Access Denied',
-                                icon: 'pi pi-fw pi-lock',
-                                routerLink: ['/auth/access']
-                            }
+                            { label: 'ข้อมูลลูกค้ารวม', icon: 'pi pi-fw pi-list' },
+                            { label: 'เพิ่มลูกค้า', icon: 'pi pi-fw pi-user-plus' }
                         ]
                     },
                     {
-                        label: 'Crud',
-                        icon: 'pi pi-fw pi-pencil',
-                        routerLink: ['/pages/crud']
+                        label: 'ผู้รับเหมาช่วง',
+                        icon: 'pi pi-fw pi-briefcase',
+                        path: '/master/subcontractors',
+                        items: [
+                            { label: 'ข้อมูลผู้รับเหมาช่วง', icon: 'pi pi-fw pi-list' },
+                            { label: 'เพิ่มผู้รับเหมาช่วง', icon: 'pi pi-fw pi-plus' }
+                        ]
                     },
                     {
-                        label: 'Not Found',
-                        icon: 'pi pi-fw pi-exclamation-circle',
-                        routerLink: ['/pages/notfound']
+                        label: 'ซัพพลายเออร์',
+                        icon: 'pi pi-fw pi-truck',
+                        path: '/master/suppliers',
+                        items: [
+                            { label: 'ข้อมูลซัพพลายเออร์', icon: 'pi pi-fw pi-list' },
+                            { label: 'เพิ่มซัพพลายเออร์', icon: 'pi pi-fw pi-plus' }
+                        ]
                     },
-                    {
-                        label: 'Empty',
-                        icon: 'pi pi-fw pi-circle-off',
-                        routerLink: ['/pages/empty']
-                    }
+                    { label: 'รายการวัสดุ/ราคามาตรฐาน', icon: 'pi pi-fw pi-database' }
                 ]
             },
+            { label: 'รายงานและวิเคราะห์', sectionOnly: true },
             {
-                label: 'Hierarchy',
-                path: '/hierarchy',
+                label: 'ระบบ',
                 items: [
-                    {
-                        label: 'Submenu 1',
-                        icon: 'pi pi-fw pi-bookmark',
-                        path: '/hierarchy/submenu_1',
-                        items: [
-                            {
-                                label: 'Submenu 1.1',
-                                icon: 'pi pi-fw pi-bookmark',
-                                path: '/hierarchy/submenu_1/submenu_1_1',
-                                items: [
-                                    { label: 'Submenu 1.1.1', icon: 'pi pi-fw pi-bookmark' },
-                                    { label: 'Submenu 1.1.2', icon: 'pi pi-fw pi-bookmark' },
-                                    { label: 'Submenu 1.1.3', icon: 'pi pi-fw pi-bookmark' }
-                                ]
-                            },
-                            {
-                                label: 'Submenu 1.2',
-                                icon: 'pi pi-fw pi-bookmark',
-                                path: '/hierarchy/submenu_1/submenu_1_2',
-                                items: [{ label: 'Submenu 1.2.1', icon: 'pi pi-fw pi-bookmark' }]
-                            }
-                        ]
-                    },
-                    {
-                        label: 'Submenu 2',
-                        icon: 'pi pi-fw pi-bookmark',
-                        path: '/hierarchy/submenu_2',
-                        items: [
-                            {
-                                label: 'Submenu 2.1',
-                                icon: 'pi pi-fw pi-bookmark',
-                                path: '/hierarchy/submenu_2/submenu_2_1',
-                                items: [
-                                    { label: 'Submenu 2.1.1', icon: 'pi pi-fw pi-bookmark' },
-                                    { label: 'Submenu 2.1.2', icon: 'pi pi-fw pi-bookmark' }
-                                ]
-                            },
-                            {
-                                label: 'Submenu 2.2',
-                                icon: 'pi pi-fw pi-bookmark',
-                                path: '/hierarchy/submenu_2/submenu_2_2',
-                                items: [{ label: 'Submenu 2.2.1', icon: 'pi pi-fw pi-bookmark' }]
-                            }
-                        ]
-                    }
-                ]
-            },
-            {
-                label: 'Get Started',
-                items: [
-                    {
-                        label: 'Documentation',
-                        icon: 'pi pi-fw pi-book',
-                        routerLink: ['/documentation']
-                    },
-                    {
-                        label: 'View Source',
-                        icon: 'pi pi-fw pi-github',
-                        url: 'https://github.com/primefaces/sakai-ng',
-                        target: '_blank'
-                    }
+                    { label: 'ผู้ใช้งาน', icon: 'pi pi-fw pi-users' },
+                    { label: 'บทบาทและสิทธิ์', icon: 'pi pi-fw pi-key' },
+                    { label: 'ตั้งค่าโครงการ', icon: 'pi pi-fw pi-sliders-h' },
+                    { label: 'ตั้งค่าระบบ', icon: 'pi pi-fw pi-cog' },
+                    { label: 'ตั้งค่าการอนุมัติ', icon: 'pi pi-fw pi-check-square' },
+                    { label: 'ตั้งค่าบริษัท', icon: 'pi pi-fw pi-building' },
+                    { label: 'Audit Log', icon: 'pi pi-fw pi-history' }
                 ]
             }
         ];

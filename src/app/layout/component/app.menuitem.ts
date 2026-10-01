@@ -12,8 +12,18 @@ import { filter } from 'rxjs/operators';
         @if (root() && isVisible()) {
             <div class="layout-menuitem-root-text">{{ item().label }}</div>
         }
-        @if ((!hasRouterLink() || hasChildren()) && isVisible()) {
-            <a [attr.href]="item().url" (click)="itemClick($event)" [ngClass]="item().class" [attr.target]="item().target" tabindex="0" pRipple>
+        @if ((!hasRouterLink() || hasChildren()) && isVisible() && !item().sectionOnly && !root()) {
+            <a
+                [attr.href]="item().url"
+                (click)="itemClick($event)"
+                (keydown)="onMenuKeydown($event)"
+                [ngClass]="item().class"
+                [attr.target]="item().target"
+                [attr.role]="hasChildren() ? 'button' : null"
+                [attr.aria-expanded]="hasChildren() ? isActive() : null"
+                tabindex="0"
+                pRipple
+            >
                 <i [ngClass]="item().icon" class="layout-menuitem-icon"></i>
                 <span class="layout-menuitem-text">{{ item().label }}</span>
                 @if (hasChildren()) {
@@ -111,20 +121,14 @@ export class AppMenuitem {
 
     fullPath = computed(() => {
         const itemPath = this.item()?.path;
-        if (!itemPath) return this.parentPath();
-        const parent = this.parentPath();
-        if (parent && !itemPath.startsWith(parent)) {
-            return parent + itemPath;
-        }
-        return itemPath;
+        return itemPath || this.parentPath();
     });
 
     isActive = computed(() => {
         const activePath = this.layoutService.layoutState().activePath;
-        if (this.item()?.path) {
-            return activePath?.startsWith(this.fullPath() ?? '') ?? false;
-        }
-        return false;
+        const path = this.fullPath();
+
+        return !!path && !!activePath && (activePath === path || activePath.startsWith(`${path}/`));
     });
 
     initialized = signal<boolean>(false);
@@ -168,6 +172,13 @@ export class AppMenuitem {
                     activePath: parentPath
                 }));
             }
+        }
+    }
+
+    onMenuKeydown(event: KeyboardEvent) {
+        if (this.hasChildren() && (event.key === 'Enter' || event.key === ' ')) {
+            event.preventDefault();
+            this.itemClick(event);
         }
     }
 

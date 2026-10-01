@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, ElementRef, ViewChild } from '@angular/core';
+import { Component, ElementRef, ViewChild, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { ButtonModule } from 'primeng/button';
 import { IconFieldModule } from 'primeng/iconfield';
@@ -8,10 +8,10 @@ import { InputTextModule } from 'primeng/inputtext';
 import { ProgressBarModule } from 'primeng/progressbar';
 import { Table, TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
-import { Project, ProjectService } from '@/app/pages/service/project.service';
+import { Project, ProjectService, getProjectSeverity } from '@/app/pages/service/project.service';
 
 @Component({
-    selector: 'app-table-demo',
+    selector: 'app-project-list',
     standalone: true,
     imports: [CommonModule, ButtonModule, IconFieldModule, InputIconModule, InputTextModule, ProgressBarModule, TableModule, TagModule],
     template: `
@@ -73,17 +73,14 @@ import { Project, ProjectService } from '@/app/pages/service/project.service';
         </div>
     `
 })
-export class TableDemo {
-    projects: Project[];
+export class ProjectList {
+    private readonly projectService = inject(ProjectService);
+    private readonly router = inject(Router);
 
     @ViewChild('filter') filter!: ElementRef<HTMLInputElement>;
 
-    constructor(
-        private projectService: ProjectService,
-        private router: Router
-    ) {
-        this.projects = this.projectService.projects;
-    }
+    readonly projects: Project[] = this.projectService.projects;
+    readonly getProjectSeverity = getProjectSeverity;
 
     onGlobalFilter(table: Table, event: Event) {
         table.filterGlobal((event.target as HTMLInputElement).value, 'contains');
@@ -96,18 +93,5 @@ export class TableDemo {
 
     openProject(project: Project) {
         this.router.navigate(['/projects', project.code]);
-    }
-
-    getProjectSeverity(status: string) {
-        switch (status) {
-            case 'เสร็จสิ้น':
-                return 'success';
-            case 'ล่าช้า':
-                return 'danger';
-            case 'รอดำเนินการ':
-                return 'warn';
-            default:
-                return 'info';
-        }
     }
 }
