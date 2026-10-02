@@ -7,7 +7,11 @@ import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
 import { ProgressBarModule } from 'primeng/progressbar';
 import { TagModule } from 'primeng/tag';
-import { PersonnelRecord, PersonnelService } from '@/app/pages/service/personnel.service';
+import { HttpErrorResponse } from '@angular/common/http';
+import { problemMessage } from '@/app/api/api';
+import { AuthService } from '@/app/pages/service/auth.service';
+import { FileUploadService, UploadedFile } from '@/app/pages/service/file-upload.service';
+import { LicenseAlert, PersonnelRecord, PersonnelService, blankPersonnel, isProfessionalLicenseValid } from '@/app/pages/service/personnel.service';
 
 @Component({
     selector: 'app-personnel-detail',
@@ -32,7 +36,7 @@ import { PersonnelRecord, PersonnelService } from '@/app/pages/service/personnel
                     <a pButton routerLink="/master/personnel" icon="pi pi-arrow-left" label="กลับรายชื่อ" class="p-button-outlined"></a>
                     @if (isEditing) {
                         <button pButton type="button" label="ยกเลิก" icon="pi pi-times" class="p-button-outlined" (click)="cancelEdit()"></button>
-                        <button pButton type="button" label="บันทึกข้อมูล" icon="pi pi-save" (click)="save(person)"></button>
+                        <button pButton type="button" label="บันทึกข้อมูล" icon="pi pi-save" [loading]="saving" [disabled]="uploading" (click)="save(person)"></button>
                     } @else {
                         <button pButton type="button" label="แก้ไขข้อมูล" icon="pi pi-pencil" (click)="beginEdit()"></button>
                     }
@@ -50,7 +54,7 @@ import { PersonnelRecord, PersonnelService } from '@/app/pages/service/personnel
                 <div class="border border-orange-300 bg-orange-50 text-orange-950 rounded p-4 mb-5" role="status">
                     <div class="font-semibold mb-2"><i class="pi pi-exclamation-triangle mr-2"></i>ใบอนุญาตหรือเอกสารหมดอายุ/ใกล้หมดอายุ</div>
                     @for (alert of expiryAlerts; track alert.license + alert.expiresAt) {
-                        <div>{{ alert.license }} หมดอายุวันที่ {{ alert.expiresAt | date: 'dd/MM/yyyy' }}</div>
+                        <div>{{ alert.license }} {{ alert.expired ? 'หมดอายุแล้วเมื่อ' : 'หมดอายุวันที่' }} {{ alert.expiresAt | date: 'dd/MM/yyyy' }}</div>
                     }
                 </div>
             }
@@ -73,7 +77,7 @@ import { PersonnelRecord, PersonnelService } from '@/app/pages/service/personnel
                     <label class="flex flex-col gap-2">
                         <span>รูปบุคลากร</span>
                         @if (isEditing) {
-                            <input type="file" accept="image/*" (change)="onPhotoSelected($event, person)" />
+                            <input type="file" accept="image/jpeg,image/png,image/webp" (change)="onPhotoSelected($event, person)" [disabled]="uploading" />
                         }
                         @if (person.photoUrl) {
                             <img [src]="person.photoUrl" alt="ตัวอย่างรูปบุคลากร" class="w-24 h-24 rounded object-cover" />
@@ -81,7 +85,7 @@ import { PersonnelRecord, PersonnelService } from '@/app/pages/service/personnel
                             <span class="text-color-secondary">ยังไม่ได้เพิ่มรูป</span>
                         }
                     </label>
-                    <label class="flex flex-col gap-2"><span>รหัสบุคลากร</span><input pInputText [(ngModel)]="person.employeeCode" [readonly]="!isEditing" /></label>
+                    <label class="flex flex-col gap-2"><span>รหัสบุคลากร</span><input pInputText [value]="person.employeeCode" readonly placeholder="ออกให้อัตโนมัติเมื่อบันทึก" /></label>
                     <label class="flex flex-col gap-2"><span>ชื่อ-นามสกุล</span><input pInputText [(ngModel)]="person.fullName" [readonly]="!isEditing" /></label>
                     <label class="flex flex-col gap-2"><span>เลขบัตรประชาชน</span><input pInputText [(ngModel)]="person.nationalId" [readonly]="!isEditing" /></label>
                     <label class="flex flex-col gap-2"><span>เลขใบประกอบวิชาชีพ</span><input pInputText [(ngModel)]="person.professionalLicenseNumber" [readonly]="!isEditing" /></label>
@@ -187,7 +191,7 @@ import { PersonnelRecord, PersonnelService } from '@/app/pages/service/personnel
                     <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 items-end mb-4">
                         <label class="flex flex-col gap-2"><span>ประเภทเอกสาร</span><input pInputText [(ngModel)]="newDocumentType" placeholder="เช่น สำเนาบัตรประชาชน" /></label>
                         <label class="flex flex-col gap-2"><span>วันหมดอายุ (ถ้ามี)</span><input pInputText type="date" [(ngModel)]="newDocumentExpiresAt" /></label>
-                        <label class="flex flex-col gap-2"><span>เลือกไฟล์</span><input type="file" accept=".pdf,image/*" (change)="addDocument($event, person)" /></label>
+                        <label class="flex flex-col gap-2"><span>เลือกไฟล์ (PDF หรือรูป)</span><input type="file" accept="application/pdf,image/jpeg,image/png,image/webp" (change)="addDocument($event, person)" [disabled]="uploading" /></label>
                     </div>
                 }
                 @if (person.documents.length) {
@@ -206,8 +210,8 @@ import { PersonnelRecord, PersonnelService } from '@/app/pages/service/personnel
                                     <tr class="border-b border-surface">
                                         <td class="p-3">{{ document.type }}</td>
                                         <td class="p-3">
-                                            @if (document.dataUrl) {
-                                                <a [href]="document.dataUrl" [download]="document.fileName">{{ document.fileName }}</a>
+                                            @if (document.url) {
+                                                <a [href]="document.url" target="_blank" rel="noopener">{{ document.fileName }}</a>
                                             } @else {
                                                 {{ document.fileName }}
                                             }
@@ -295,6 +299,13 @@ import { PersonnelRecord, PersonnelService } from '@/app/pages/service/personnel
                     <p class="text-color-secondary mt-4"><i class="pi pi-lock mr-2"></i>ข้อมูลประเมินผลงานจำกัดสิทธิ์สำหรับผู้บริหาร</p>
                 }
             </section>
+        } @else if (loading) {
+            <div class="card text-center text-muted-color py-12"><i class="pi pi-spin pi-spinner mr-2"></i>กำลังโหลดข้อมูลบุคลากร...</div>
+        } @else if (loadError) {
+            <div class="card flex flex-wrap items-center justify-between gap-3" role="alert">
+                <span class="text-red-700 dark:text-red-300"><i class="pi pi-exclamation-triangle mr-2"></i>{{ loadError }}</span>
+                <button pButton type="button" [outlined]="true" icon="pi pi-refresh" label="ลองใหม่" (click)="reload()"></button>
+            </div>
         } @else {
             <div class="border border-surface rounded p-6">
                 <h1 class="font-semibold text-2xl mt-0">ไม่พบข้อมูลบุคลากร</h1>
@@ -307,41 +318,89 @@ export class PersonnelDetail {
     private readonly route = inject(ActivatedRoute);
     private readonly router = inject(Router);
     private readonly personnelService = inject(PersonnelService);
-
+    private readonly files = inject(FileUploadService);
+    private readonly auth = inject(AuthService);
     private readonly cdr = inject(ChangeDetectorRef);
 
-    readonly canViewSensitiveData = false;
     isNew = false;
     personnel: PersonnelRecord | null = null;
     isEditing = false;
+    loading = false;
+    loadError = '';
+    saving = false;
+    uploading = false;
     saveMessage = '';
     saveError = '';
     newDocumentType = '';
     newDocumentExpiresAt = '';
+    expiryAlerts: LicenseAlert[] = [];
+    private currentId = '';
     private originalRecord: PersonnelRecord | null = null;
+
+    /** หลังบ้านส่งข้อมูลอ่อนไหวมาเฉพาะผู้มีสิทธิ์ */
+    get canViewSensitiveData() {
+        return !!this.personnel?.hasSensitive;
+    }
 
     constructor() {
         // Component is reused when only :id changes (e.g. detail -> "new"), so react to param updates.
         this.route.paramMap.pipe(takeUntilDestroyed()).subscribe((params) => this.load(params.get('id') ?? ''));
     }
 
-    private load(id: string) {
-        // After saving a new record we navigate to its id; keep the current state and save message.
-        if (id !== 'new' && this.personnel?.id === id) return;
+    reload() {
+        this.load(this.currentId, true);
+    }
 
+    private load(id: string, force = false) {
+        // After saving a new record we navigate to its id; keep the current state and save message.
+        if (!force && id !== 'new' && this.personnel?.id === id) return;
+
+        this.currentId = id;
         this.isNew = id === 'new';
-        this.personnel = this.isNew ? this.personnelService.createBlank() : (this.personnelService.getById(id) ?? null);
         this.isEditing = this.isNew;
         this.saveMessage = '';
         this.saveError = '';
+        this.loadError = '';
         this.newDocumentType = '';
         this.newDocumentExpiresAt = '';
         this.originalRecord = null;
+        this.expiryAlerts = [];
+
+        if (this.isNew) {
+            // ฟอร์มใหม่เปิดช่องข้อมูลอ่อนไหวตามสิทธิ์ ข้อมูลที่โหลดมาใช้ตามที่หลังบ้านส่ง
+            this.personnel = blankPersonnel(this.auth.can('personnel.sensitive'));
+            this.loading = false;
+            this.cdr.markForCheck();
+            return;
+        }
+
+        this.personnel = null;
+        this.loading = true;
         this.cdr.markForCheck();
+        this.personnelService.get(id).subscribe({
+            next: (record) => {
+                this.personnel = record;
+                this.loading = false;
+                this.loadAlerts(record.id);
+                this.cdr.markForCheck();
+            },
+            error: (error) => {
+                this.loading = false;
+                // 404 falls through to the "not found" state.
+                this.loadError = error instanceof HttpErrorResponse && error.status === 404 ? '' : problemMessage(error, 'โหลดข้อมูลไม่สำเร็จ');
+                this.cdr.markForCheck();
+            }
+        });
     }
 
-    get expiryAlerts() {
-        return this.personnel ? this.personnelService.getExpiringLicenses().filter((item) => item.record.id === this.personnel?.id) : [];
+    private loadAlerts(id: string) {
+        this.personnelService.licenseAlerts().subscribe({
+            next: (alerts) => {
+                this.expiryAlerts = alerts.filter((alert) => alert.personnelId === id);
+                this.cdr.markForCheck();
+            },
+            error: () => {}
+        });
     }
 
     beginEdit() {
@@ -364,55 +423,75 @@ export class PersonnelDetail {
     }
 
     save(personnel: PersonnelRecord) {
-        if (!personnel.employeeCode.trim() || !personnel.fullName.trim()) {
-            this.saveError = 'กรุณาระบุรหัสบุคลากรและชื่อ-นามสกุล';
+        if (!personnel.fullName.trim()) {
+            this.saveError = 'กรุณาระบุชื่อ-นามสกุล';
             return;
         }
 
-        this.personnel = this.personnelService.save(personnel);
-        this.isEditing = false;
-        this.isNew = false;
-        this.originalRecord = structuredClone(this.personnel);
-        this.saveMessage = 'บันทึกข้อมูลบุคลากรแล้ว';
+        this.saving = true;
         this.saveError = '';
-        this.router.navigate(['/master/personnel', this.personnel.id], { replaceUrl: true });
+        this.personnelService.save(personnel).subscribe({
+            next: (saved) => {
+                this.personnel = saved;
+                this.saving = false;
+                this.isEditing = false;
+                this.isNew = false;
+                this.originalRecord = structuredClone(saved);
+                this.saveMessage = `บันทึกข้อมูลบุคลากรแล้ว (${saved.employeeCode})`;
+                this.loadAlerts(saved.id);
+                this.cdr.markForCheck();
+                this.router.navigate(['/master/personnel', saved.id], { replaceUrl: true });
+            },
+            error: (error) => {
+                this.saving = false;
+                this.saveError = problemMessage(error, 'บันทึกไม่สำเร็จ');
+                this.cdr.markForCheck();
+            }
+        });
     }
 
     onPhotoSelected(event: Event, personnel: PersonnelRecord) {
-        const file = (event.target as HTMLInputElement).files?.[0];
+        const input = event.target as HTMLInputElement;
+        const file = input.files?.[0];
+        input.value = '';
         if (!file) return;
-
-        const reader = new FileReader();
-        reader.onload = () => {
-            personnel.photoUrl = String(reader.result ?? '');
-            // FileReader callbacks run outside Angular's template events, so refresh the view explicitly (app is zoneless).
-            this.cdr.markForCheck();
-        };
-        reader.readAsDataURL(file);
+        this.upload(file, (uploaded) => (personnel.photoUrl = uploaded.url));
     }
 
     addDocument(event: Event, personnel: PersonnelRecord) {
-        const file = (event.target as HTMLInputElement).files?.[0];
-        if (!file || !this.newDocumentType.trim()) {
+        const input = event.target as HTMLInputElement;
+        const file = input.files?.[0];
+        input.value = '';
+        if (!file) return;
+        if (!this.newDocumentType.trim()) {
             this.saveError = 'กรุณาระบุประเภทเอกสารก่อนเลือกไฟล์';
             return;
         }
-
-        const reader = new FileReader();
-        reader.onload = () => {
-            personnel.documents.push({
-                type: this.newDocumentType.trim(),
-                fileName: file.name,
-                expiresAt: this.newDocumentExpiresAt,
-                uploadedBy: 'ผู้ใช้งานปัจจุบัน',
-                dataUrl: String(reader.result ?? '')
-            });
+        const type = this.newDocumentType.trim();
+        const expiresAt = this.newDocumentExpiresAt;
+        this.upload(file, (uploaded) => {
+            personnel.documents.push({ type, fileName: uploaded.name, url: uploaded.url, expiresAt, uploadedBy: this.auth.currentUser()?.name ?? '' });
             this.newDocumentType = '';
             this.newDocumentExpiresAt = '';
-            this.saveError = '';
-            this.cdr.markForCheck();
-        };
-        reader.readAsDataURL(file);
+        });
+    }
+
+    /** อัปโหลดผ่าน POST /uploads แล้วนำ url มาใส่ในข้อมูล (บันทึกจริงเมื่อกด "บันทึกข้อมูล") */
+    private upload(file: File, apply: (uploaded: UploadedFile) => void) {
+        this.uploading = true;
+        this.saveError = '';
+        this.files.upload(file).subscribe({
+            next: (uploaded) => {
+                this.uploading = false;
+                apply(uploaded);
+                this.cdr.markForCheck();
+            },
+            error: (error) => {
+                this.uploading = false;
+                this.saveError = `${file.name}: ${problemMessage(error, 'อัปโหลดไม่สำเร็จ')}`;
+                this.cdr.markForCheck();
+            }
+        });
     }
 
     getInitials(fullName: string): string {
@@ -427,7 +506,7 @@ export class PersonnelDetail {
 
     professionalLicenseValid(personnel: PersonnelRecord): boolean {
         if (!personnel.professionalLicenseType && !personnel.professionalLicenseNumber) return true;
-        return this.personnelService.isProfessionalLicenseValid(personnel);
+        return isProfessionalLicenseValid(personnel);
     }
 
     professionalLicenseStatus(personnel: PersonnelRecord): string {

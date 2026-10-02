@@ -3,11 +3,13 @@ import { TimelineStatus } from '@/app/pages/service/project-timeline.service';
 import { InstallmentStatus } from '@/app/pages/service/project-records.service';
 import { ThaiDatePipe } from '../thai-date.pipe';
 
-export type ProjectTab = 'overview' | 'timeline' | 'plan' | 'photos' | 'payments' | 'documents';
+export type ProjectTab = 'overview' | 'timeline' | 'updates' | 'team' | 'plan' | 'photos' | 'payments' | 'documents';
 
 export const PROJECT_TABS: Array<{ value: ProjectTab; label: string; icon: string }> = [
     { value: 'overview', label: 'ภาพรวม', icon: 'pi pi-home' },
     { value: 'timeline', label: 'ไทม์ไลน์', icon: 'pi pi-calendar' },
+    { value: 'updates', label: 'บันทึกหน้างาน', icon: 'pi pi-book' },
+    { value: 'team', label: 'ทีมงานและผู้รับเหมา', icon: 'pi pi-users' },
     { value: 'plan', label: 'แบบบ้าน', icon: 'pi pi-building' },
     { value: 'photos', label: 'ภาพถ่ายหน้างาน', icon: 'pi pi-images' },
     { value: 'payments', label: 'งวดงานและการชำระ', icon: 'pi pi-wallet' },

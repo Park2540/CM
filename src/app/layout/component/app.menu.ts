@@ -16,7 +16,7 @@ import { AppMenuitem } from './app.menuitem';
                 <li class="menu-separator"></li>
             }
         }
-    </ul> `,
+    </ul> `
 })
 export class AppMenu {
     model: (MenuItem & { sectionOnly?: boolean })[] = [];
@@ -27,6 +27,7 @@ export class AppMenu {
                 label: 'หลัก',
                 items: [
                     { label: 'Dashboard', icon: 'pi pi-fw pi-home', routerLink: ['/dashboard'] },
+                    { label: 'ศูนย์อนุมัติ', icon: 'pi pi-fw pi-check-square', routerLink: ['/approvals'] },
                     { label: 'งานของฉัน', icon: 'pi pi-fw pi-briefcase' },
                     {
                         label: 'ระบบแจ้งเตือน',
@@ -34,7 +35,7 @@ export class AppMenu {
                         path: '/notifications',
                         items: [
                             { label: 'ทั้งหมด', icon: 'pi pi-fw pi-inbox' },
-                            { label: 'รออนุมัติ', icon: 'pi pi-fw pi-clock' },
+                            { label: 'รออนุมัติ', icon: 'pi pi-fw pi-clock', routerLink: ['/approvals'] },
                             { label: 'ใกล้ครบกำหนด', icon: 'pi pi-fw pi-calendar' },
                             { label: 'ล่าช้า', icon: 'pi pi-fw pi-exclamation-triangle' }
                         ]
@@ -50,7 +51,7 @@ export class AppMenu {
                         path: '/projects',
                         items: [
                             { label: 'โครงการรวม', icon: 'pi pi-fw pi-list', routerLink: ['/projects'] },
-                            { label: 'เปิดโครงการ', icon: 'pi pi-fw pi-plus-circle' },
+                            { label: 'เปิดโครงการ', icon: 'pi pi-fw pi-plus-circle', routerLink: ['/projects/new'] },
                             { label: 'การเงินรวม', icon: 'pi pi-fw pi-wallet' },
                             { label: 'โครงการที่ต้องติดตาม', icon: 'pi pi-fw pi-exclamation-circle' },
                             { label: 'โครงการที่ปิดแล้ว', icon: 'pi pi-fw pi-check-circle' }
@@ -171,8 +172,8 @@ export class AppMenu {
                         icon: 'pi pi-fw pi-briefcase',
                         path: '/master/subcontractors',
                         items: [
-                            { label: 'ข้อมูลผู้รับเหมาช่วง', icon: 'pi pi-fw pi-list' },
-                            { label: 'เพิ่มผู้รับเหมาช่วง', icon: 'pi pi-fw pi-plus' }
+                            { label: 'ข้อมูลผู้รับเหมาช่วง', icon: 'pi pi-fw pi-list', routerLink: ['/master/subcontractors'] },
+                            { label: 'เพิ่มผู้รับเหมาช่วง', icon: 'pi pi-fw pi-plus', routerLink: ['/master/subcontractors'], queryParams: { new: 1 } }
                         ]
                     },
                     {
@@ -192,12 +193,12 @@ export class AppMenu {
                 label: 'ระบบ',
                 items: [
                     { label: 'ผู้ใช้งาน', icon: 'pi pi-fw pi-users' },
-                    { label: 'บทบาทและสิทธิ์', icon: 'pi pi-fw pi-key' },
+                    { label: 'บทบาทและสิทธิ์', icon: 'pi pi-fw pi-key', routerLink: ['/system/roles'] },
                     { label: 'ตั้งค่าโครงการ', icon: 'pi pi-fw pi-sliders-h' },
                     { label: 'ตั้งค่าระบบ', icon: 'pi pi-fw pi-cog' },
                     { label: 'ตั้งค่าการอนุมัติ', icon: 'pi pi-fw pi-check-square' },
                     { label: 'ตั้งค่าบริษัท', icon: 'pi pi-fw pi-building' },
-                    { label: 'Audit Log', icon: 'pi pi-fw pi-history' }
+                    { label: 'Audit Log', icon: 'pi pi-fw pi-history', routerLink: ['/system/audit-log'] }
                 ]
             }
         ];

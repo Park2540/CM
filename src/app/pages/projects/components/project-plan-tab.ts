@@ -90,7 +90,9 @@ import { PhotoPlaceholder } from './project-ui';
 
             <div class="flex flex-wrap justify-between items-center gap-3 mt-6 pt-4 border-t border-surface">
                 <span class="text-sm text-muted-color"><i class="pi pi-info-circle mr-1"></i>แปลนแสดงสัดส่วนโดยประมาณเพื่อประกอบการติดตามงาน ขนาดจริงให้อ้างอิงแบบก่อสร้าง</span>
-                <button pButton type="button" [outlined]="true" icon="pi pi-folder-open" label="ดูแบบก่อสร้างฉบับเต็ม" (click)="openDocuments.emit()"></button>
+                @if (showDocumentsLink()) {
+                    <button pButton type="button" [outlined]="true" icon="pi pi-folder-open" label="ดูแบบก่อสร้างฉบับเต็ม" (click)="openDocuments.emit()"></button>
+                }
             </div>
         </div>
 
@@ -184,6 +186,8 @@ import { PhotoPlaceholder } from './project-ui';
 export class ProjectPlanTab {
     readonly plan = input.required<HousePlan>();
     readonly openDocuments = output<void>();
+    /** ซ่อนลิงก์แท็บเอกสาร (โครงการที่ยังไม่บันทึกสัญญายังไม่มีแท็บเอกสาร) */
+    readonly showDocumentsLink = input(true);
 
     readonly media = signal<'model' | 'render'>('model');
     readonly selectedFloor = signal<number | null>(null);

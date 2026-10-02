@@ -1,6 +1,6 @@
 import { NgClass } from '@angular/common';
-import { Component, Injector, afterNextRender, computed, inject, input, linkedSignal, signal } from '@angular/core';
-import { TimelinePhase, TimelineStatus } from '@/app/pages/service/project-timeline.service';
+import { Component, Injector, afterNextRender, computed, inject, input, linkedSignal, output, signal } from '@angular/core';
+import { TimelinePhase, TimelineStatus, TimelineTask } from '@/app/pages/service/project-timeline.service';
 import { ThaiDatePipe } from '../thai-date.pipe';
 import { STATUS_LABEL, STATUS_PILL_CLASS } from './project-ui';
 
@@ -145,6 +145,16 @@ type PhaseFilter = 'all' | TimelineStatus;
                                                         เริ่ม {{ task.start | thaiDate: 'dayMonth' }}
                                                     }
                                                 }
+                                                @if (canUpdate() && task.status !== 'done' && !task.isMilestone) {
+                                                    <button
+                                                        type="button"
+                                                        class="flex items-center gap-1 mt-1 ml-auto px-2 py-1 rounded-md border border-surface bg-transparent text-xs font-normal text-color cursor-pointer hover:border-primary hover:text-primary"
+                                                        [attr.aria-label]="(task.isHoldPoint ? 'บันทึกผลตรวจ ' : 'อัปเดต ') + task.name"
+                                                        (click)="task.isHoldPoint ? inspectTask.emit(task) : updateTask.emit(task.code)"
+                                                    >
+                                                        <i class="pi" [ngClass]="task.isHoldPoint ? 'pi-shield' : 'pi-pencil'" style="font-size: 0.7rem"></i>{{ task.isHoldPoint ? 'บันทึกผลตรวจ' : 'อัปเดต' }}
+                                                    </button>
+                                                }
                                             </span>
                                         </li>
                                     }
@@ -163,6 +173,10 @@ export class ProjectTimelineTab {
     private readonly injector = inject(Injector);
 
     readonly phases = input.required<TimelinePhase[]>();
+    /** แสดงปุ่มอัปเดต/บันทึกผลตรวจ ตามสิทธิ์ของผู้ใช้ */
+    readonly canUpdate = input(false);
+    readonly updateTask = output<string>();
+    readonly inspectTask = output<TimelineTask>();
 
     readonly statusLabel = STATUS_LABEL;
     readonly pillClass = STATUS_PILL_CLASS;

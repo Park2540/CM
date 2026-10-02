@@ -1,0 +1,1996 @@
+openapi: 3.1.0
+info:
+    title: PP Prime Construction API
+    version: 0.1.0
+    description: |
+        สัญญา API ระหว่างหน้าบ้าน (Angular) และหลังบ้านของระบบบริหารงานก่อสร้าง PP Prime Construction
+
+        หลักการ
+        - เงินเป็นบาท (number) ทศนิยมได้ 2 ตำแหน่ง
+        - วันที่ตามแผนใช้ `date` (YYYY-MM-DD) เวลาที่เกิดเหตุการณ์ใช้ `date-time` (ISO 8601 พร้อมเขตเวลา)
+        - สถานะ/ประเภทเป็นรหัสภาษาอังกฤษ หน้าบ้านแปลเป็นข้อความไทยเอง
+        - ข้อผิดพลาดตอบเป็น `application/problem+json` (RFC 9457)
+        - การคำนวณทางธุรกิจ (ระดับผู้อนุมัติ กำไร-ขาดทุน ไทม์ไลน์ สถานะงวด) ทำที่หลังบ้าน
+        - ทุกการเปลี่ยนแปลงข้อมูล หลังบ้านต้องบันทึก Audit Log เอง (หน้าบ้านไม่มี API เขียน Audit Log)
+        - สิทธิ์การเข้าถึงตรวจที่หลังบ้านตามบทบาทใน `GET /roles`; ข้อมูลที่บทบาทนั้นไม่มีสิทธิ์เห็นต้องไม่ถูกส่งมา
+servers:
+    - url: /api
+      description: ค่าเริ่มต้น (หน้าบ้านตั้ง apiBaseUrl ได้)
+security:
+    - bearerAuth: []
+tags:
+    - name: auth
+      description: ผู้ใช้และสิทธิ์
+    - name: settings
+    - name: projects
+    - name: personnel
+    - name: subcontractors
+      description: ทะเบียนผู้รับเหมาช่วงและการมอบหมายรายโครงการ
+    - name: approvals
+    - name: audit
+    - name: dashboard
+
+paths:
+    /auth/me:
+        get:
+            tags: [auth]
+            summary: ผู้ใช้ที่ล็อกอินอยู่
+            operationId: getCurrentUser
+            responses:
+                '200':
+                    description: OK
+                    content:
+                        application/json:
+                            schema: { $ref: '#/components/schemas/CurrentUser' }
+                '401': { $ref: '#/components/responses/Unauthorized' }
+
+    /auth/logout:
+        post:
+            tags: [auth]
+            summary: ออกจากระบบ (ยกเลิก token ปัจจุบัน)
+            operationId: logout
+            responses:
+                '204':
+                    description: ออกจากระบบแล้ว
+
+    /users:
+        get:
+            tags: [auth]
+            summary: รายชื่อผู้ใช้ (ใช้ในตัวกรอง)
+            operationId: listUsers
+            responses:
+                '200':
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                type: array
+                                items: { $ref: '#/components/schemas/UserRef' }
+                '401': { $ref: '#/components/responses/Unauthorized' }
+
+    /roles:
+        get:
+            tags: [auth]
+            summary: บทบาทและสิทธิ์ทั้งหมด
+            operationId: listRoles
+            responses:
+                '200':
+                    description: OK
+                    content:
+                        application/json:
+                            schema: { $ref: '#/components/schemas/RoleCatalog' }
+
+    /settings/approval:
+        get:
+            tags: [settings]
+            summary: เกณฑ์การอนุมัติ
+            operationId: getApprovalSettings
+            responses:
+                '200':
+                    description: OK
+                    content:
+                        application/json:
+                            schema: { $ref: '#/components/schemas/ApprovalSettings' }
+        put:
+            tags: [settings]
+            summary: แก้ไขเกณฑ์การอนุมัติ (แอดมิน/เจ้าของบริษัท)
+            operationId: updateApprovalSettings
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema: { $ref: '#/components/schemas/ApprovalSettings' }
+            responses:
+                '200':
+                    description: OK
+                    content:
+                        application/json:
+                            schema: { $ref: '#/components/schemas/ApprovalSettings' }
+                '403': { $ref: '#/components/responses/Forbidden' }
+                '422': { $ref: '#/components/responses/ValidationError' }
+
+    /projects:
+        get:
+            tags: [projects]
+            summary: รายการโครงการที่ผู้ใช้มีสิทธิ์เห็น
+            operationId: listProjects
+            parameters:
+                - { name: status, in: query, schema: { $ref: '#/components/schemas/ProjectStatus' } }
+                - { name: group, in: query, description: กลุ่มโครงการ (ดู ProjectGroup), schema: { $ref: '#/components/schemas/ProjectGroup' } }
+                - { name: q, in: query, description: ค้นหารหัส ชื่อลูกค้า ผู้รับผิดชอบ, schema: { type: string } }
+            responses:
+                '200':
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                type: array
+                                items: { $ref: '#/components/schemas/Project' }
+        post:
+            tags: [projects]
+            summary: เปิดโครงการใหม่ (ต้องมีสิทธิ์ project.create)
+            description: |
+                หลังบ้านออกรหัสโครงการ (รหัสภูมิภาค + ปี พ.ศ. 2 หลัก + ลำดับ 4 หลัก เช่น CR690003) และบันทึก Audit Log
+                โครงการใหม่มีสถานะ pending-contract (ยังไม่มีมูลค่า วันที่ และแผนงาน จนกว่าจะบันทึกสัญญาและตั้งค่างานก่อสร้าง)
+            operationId: createProject
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema: { $ref: '#/components/schemas/ProjectInput' }
+            responses:
+                '201':
+                    description: เปิดโครงการแล้ว
+                    content:
+                        application/json:
+                            schema: { $ref: '#/components/schemas/Project' }
+                '403': { $ref: '#/components/responses/Forbidden' }
+                '422': { $ref: '#/components/responses/ValidationError' }
+
+    /settings/project-regions:
+        get:
+            tags: [settings]
+            summary: รหัสภูมิภาคที่ใช้ขึ้นต้นรหัสโครงการ
+            operationId: listProjectRegions
+            responses:
+                '200':
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                type: array
+                                items: { $ref: '#/components/schemas/ProjectRegion' }
+
+    /settings/construction-options:
+        get:
+            tags: [settings]
+            summary: ตัวเลือกในหน้าตั้งค่างานก่อสร้าง (ประเภทอาคาร ฐานราก ระบบพิเศษ ฯลฯ)
+            description: |
+                หน้าบ้านสร้างฟอร์มจากรายการนี้ทั้งหมด เพิ่มตัวเลือกใหม่ที่หลังบ้านได้โดยไม่ต้องแก้หน้าบ้าน
+                งานที่ต้องทำของแต่ละตัวเลือกกำหนดที่หลังบ้าน (แม่แบบแผนงาน)
+            operationId: listConstructionOptions
+            responses:
+                '200':
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                type: array
+                                items: { $ref: '#/components/schemas/ConstructionOptionGroup' }
+
+    /house-plans:
+        get:
+            tags: [projects]
+            summary: แบบบ้านทั้งหมดที่เลือกได้ตอนเปิดโครงการ
+            operationId: listHousePlans
+            responses:
+                '200':
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                type: array
+                                items: { $ref: '#/components/schemas/HousePlan' }
+
+    /projects/{code}:
+        parameters:
+            - $ref: '#/components/parameters/ProjectCode'
+        get:
+            tags: [projects]
+            operationId: getProject
+            responses:
+                '200':
+                    description: OK
+                    content:
+                        application/json:
+                            schema: { $ref: '#/components/schemas/Project' }
+                '404': { $ref: '#/components/responses/NotFound' }
+
+    /projects/{code}/contract:
+        parameters:
+            - $ref: '#/components/parameters/ProjectCode'
+        post:
+            tags: [projects]
+            summary: บันทึกสัญญาและเริ่มแผนงาน (ต้องมีสิทธิ์ project.manage)
+            description: |
+                ใช้กับโครงการสถานะ pending-contract เท่านั้น
+                หลังบ้านบันทึกมูลค่า/วันที่ สร้างแผนงานจากแม่แบบให้พอดีกับวันเริ่ม-วันส่งมอบ สร้างงวดงาน เปลี่ยนสถานะเป็น planning และบันทึก Audit Log
+                ไทม์ไลน์ยังไม่ถูกสร้างจนกว่าจะตั้งค่างานก่อสร้าง (PUT /projects/{code}/setup)
+                endpoint ข้อมูลรายโครงการ (timeline, installments, photos, documents, team, updates, inspection) ตอบ 409 จนกว่าจะบันทึกสัญญาและตั้งค่างานก่อสร้าง
+            operationId: recordProjectContract
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema: { $ref: '#/components/schemas/ContractInput' }
+            responses:
+                '200':
+                    description: บันทึกแล้ว
+                    content:
+                        application/json:
+                            schema: { $ref: '#/components/schemas/Project' }
+                '403': { $ref: '#/components/responses/Forbidden' }
+                '404': { $ref: '#/components/responses/NotFound' }
+                '409': { $ref: '#/components/responses/Conflict' }
+                '422': { $ref: '#/components/responses/ValidationError' }
+
+    /projects/{code}/setup:
+        parameters:
+            - $ref: '#/components/parameters/ProjectCode'
+        get:
+            tags: [projects]
+            summary: การตั้งค่างานก่อสร้างของโครงการ
+            description: ยังไม่ตั้งค่า → configured = false และ options เป็นค่าเริ่มต้น; 409 ถ้ายังไม่บันทึกสัญญา
+            operationId: getProjectSetup
+            responses:
+                '200':
+                    description: OK
+                    content:
+                        application/json:
+                            schema: { $ref: '#/components/schemas/ProjectSetup' }
+                '404': { $ref: '#/components/responses/NotFound' }
+                '409': { $ref: '#/components/responses/Conflict' }
+        put:
+            tags: [projects]
+            summary: บันทึกการตั้งค่างานก่อสร้างและสร้างไทม์ไลน์ (ต้องมีสิทธิ์ project.manage)
+            description: |
+                หลังบ้านคัดงานจากแม่แบบตามตัวเลือก จัดวันที่ให้พอดีกับระยะสัญญา สร้างไทม์ไลน์และงวดงานใหม่ และบันทึก Audit Log
+                ตัวเลือกที่ถูกซ่อน (visibleWhen ไม่ตรง) หลังบ้านปรับเป็นค่าเริ่มต้นเอง
+                409 ถ้ายังไม่บันทึกสัญญา หรือเริ่มรายงานความคืบหน้าแล้ว (locked)
+            operationId: saveProjectSetup
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema: { $ref: '#/components/schemas/ProjectSetupInput' }
+            responses:
+                '200':
+                    description: บันทึกแล้ว
+                    content:
+                        application/json:
+                            schema: { $ref: '#/components/schemas/ProjectSetup' }
+                '403': { $ref: '#/components/responses/Forbidden' }
+                '404': { $ref: '#/components/responses/NotFound' }
+                '409': { $ref: '#/components/responses/Conflict' }
+                '422': { $ref: '#/components/responses/ValidationError' }
+
+    /projects/{code}/setup/preview:
+        parameters:
+            - $ref: '#/components/parameters/ProjectCode'
+        post:
+            tags: [projects]
+            summary: ดูตัวอย่างงานที่จะเกิดขึ้นจากตัวเลือก (ไม่บันทึก)
+            operationId: previewProjectSetup
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema: { $ref: '#/components/schemas/ProjectSetupInput' }
+            responses:
+                '200':
+                    description: OK
+                    content:
+                        application/json:
+                            schema: { $ref: '#/components/schemas/SetupPreview' }
+                '404': { $ref: '#/components/responses/NotFound' }
+                '409': { $ref: '#/components/responses/Conflict' }
+                '422': { $ref: '#/components/responses/ValidationError' }
+
+    /projects/{code}/timeline:
+        parameters:
+            - $ref: '#/components/parameters/ProjectCode'
+        get:
+            tags: [projects]
+            summary: ไทม์ไลน์ตามแผนงานพร้อมความคืบหน้ารายงาน
+            operationId: getProjectTimeline
+            responses:
+                '200':
+                    description: OK
+                    content:
+                        application/json:
+                            schema: { $ref: '#/components/schemas/ProjectTimeline' }
+                '404': { $ref: '#/components/responses/NotFound' }
+
+    /projects/{code}/updates:
+        parameters:
+            - $ref: '#/components/parameters/ProjectCode'
+        get:
+            tags: [projects]
+            summary: บันทึกหน้างาน/ประวัติการอัปเดตความคืบหน้า (ล่าสุดก่อน)
+            operationId: listProgressUpdates
+            parameters:
+                - $ref: '#/components/parameters/Page'
+                - $ref: '#/components/parameters/PageSize'
+            responses:
+                '200':
+                    description: OK
+                    content:
+                        application/json:
+                            schema: { $ref: '#/components/schemas/ProgressUpdatePage' }
+                '404': { $ref: '#/components/responses/NotFound' }
+        post:
+            tags: [projects]
+            summary: บันทึกความคืบหน้าประจำวัน
+            description: |
+                หลังบ้านปรับ % ของงานที่ระบุ แล้วคำนวณ % ของขั้นตอนและภาพรวมโครงการใหม่ (ถ่วงน้ำหนักตามจำนวนวันของงาน)
+                หมุดหมาย (milestone) เสร็จอัตโนมัติเมื่องานอื่นในขั้นตอนเสร็จครบ
+                งานที่เป็นจุดตรวจ (Hold Point) อัปเดตผ่าน endpoint นี้ไม่ได้ ต้องใช้ /inspection
+                การลด % ต้องระบุเหตุผลใน note
+            operationId: createProgressUpdate
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema: { $ref: '#/components/schemas/ProgressUpdateInput' }
+            responses:
+                '201':
+                    description: บันทึกแล้ว
+                    content:
+                        application/json:
+                            schema: { $ref: '#/components/schemas/ProgressUpdate' }
+                '403': { $ref: '#/components/responses/Forbidden' }
+                '404': { $ref: '#/components/responses/NotFound' }
+                '422': { $ref: '#/components/responses/ValidationError' }
+
+    /projects/{code}/tasks/{taskCode}/inspection:
+        parameters:
+            - $ref: '#/components/parameters/ProjectCode'
+            - { name: taskCode, in: path, required: true, schema: { type: string, examples: ['05.04'] } }
+        post:
+            tags: [projects]
+            summary: บันทึกผลตรวจจุด Hold Point (ผ่าน = งานเสร็จ, ไม่ผ่าน = ต้องแก้ไขและตรวจใหม่)
+            operationId: recordInspection
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema: { $ref: '#/components/schemas/InspectionInput' }
+            responses:
+                '201':
+                    description: บันทึกแล้ว (คืนรายการบันทึกหน้างานที่สร้างขึ้น)
+                    content:
+                        application/json:
+                            schema: { $ref: '#/components/schemas/ProgressUpdate' }
+                '403': { $ref: '#/components/responses/Forbidden' }
+                '404': { $ref: '#/components/responses/NotFound' }
+                '409': { $ref: '#/components/responses/Conflict' }
+                '422': { $ref: '#/components/responses/ValidationError' }
+
+    /uploads:
+        post:
+            tags: [projects]
+            summary: อัปโหลดไฟล์ (รูปหน้างาน) แล้วนำ id ไปอ้างอิงในบันทึก
+            operationId: uploadFile
+            requestBody:
+                required: true
+                content:
+                    multipart/form-data:
+                        schema:
+                            type: object
+                            required: [file]
+                            properties:
+                                file: { type: string, format: binary, description: 'ไม่เกิน 10 MB — รูป (JPG/PNG/WebP) หรือเอกสาร (PDF, Excel, Word, DWG) รูปหน้างาน (photoIds) ต้องเป็นรูปเท่านั้น' }
+            responses:
+                '201':
+                    description: อัปโหลดแล้ว
+                    content:
+                        application/json:
+                            schema: { $ref: '#/components/schemas/UploadedFile' }
+                '413': { $ref: '#/components/responses/ValidationError' }
+                '422': { $ref: '#/components/responses/ValidationError' }
+
+    /projects/{code}/installments:
+        parameters:
+            - $ref: '#/components/parameters/ProjectCode'
+        get:
+            tags: [projects]
+            summary: งวดงานและการชำระเงินของลูกค้า
+            operationId: listProjectInstallments
+            responses:
+                '200':
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                type: array
+                                items: { $ref: '#/components/schemas/Installment' }
+                '404': { $ref: '#/components/responses/NotFound' }
+
+    /projects/{code}/photos:
+        parameters:
+            - $ref: '#/components/parameters/ProjectCode'
+        get:
+            tags: [projects]
+            summary: ภาพถ่ายหน้างาน (ล่าสุดก่อน)
+            operationId: listProjectPhotos
+            parameters:
+                - { name: phaseCode, in: query, schema: { type: string } }
+                - $ref: '#/components/parameters/Page'
+                - $ref: '#/components/parameters/PageSize'
+            responses:
+                '200':
+                    description: OK
+                    content:
+                        application/json:
+                            schema: { $ref: '#/components/schemas/SitePhotoPage' }
+                '404': { $ref: '#/components/responses/NotFound' }
+
+    /projects/{code}/documents:
+        parameters:
+            - $ref: '#/components/parameters/ProjectCode'
+        get:
+            tags: [projects]
+            operationId: listProjectDocuments
+            parameters:
+                - { name: category, in: query, schema: { $ref: '#/components/schemas/DocumentCategory' } }
+                - { name: q, in: query, schema: { type: string } }
+            responses:
+                '200':
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                type: array
+                                items: { $ref: '#/components/schemas/ProjectDocument' }
+                '404': { $ref: '#/components/responses/NotFound' }
+
+    /projects/{code}/assignments:
+        parameters:
+            - $ref: '#/components/parameters/ProjectCode'
+        get:
+            tags: [subcontractors]
+            summary: ผู้รับผิดชอบ (บุคลากร) และผู้รับเหมาช่วงของโครงการ
+            description: ความคืบหน้า/สถานะของผู้รับเหมาช่วง หลังบ้านคำนวณจากขั้นตอนที่มอบหมายในไทม์ไลน์; contractValue ส่งเฉพาะผู้มีสิทธิ์ project.manage
+            operationId: getProjectAssignments
+            responses:
+                '200':
+                    description: OK
+                    content:
+                        application/json:
+                            schema: { $ref: '#/components/schemas/ProjectAssignments' }
+                '404': { $ref: '#/components/responses/NotFound' }
+                '409': { $ref: '#/components/responses/Conflict' }
+
+    /projects/{code}/staff:
+        parameters:
+            - $ref: '#/components/parameters/ProjectCode'
+        post:
+            tags: [subcontractors]
+            summary: มอบหมายบุคลากรเป็นผู้รับผิดชอบในโครงการ (ต้องมีสิทธิ์ project.manage)
+            description: ผู้จัดการโครงการคนแรกในรายการคือ responsibleName ของโครงการ (หลังบ้านอัปเดตให้); คนเดิมซ้ำในบทบาทเดิมตอบ 409
+            operationId: addProjectStaff
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema: { $ref: '#/components/schemas/StaffAssignmentInput' }
+            responses:
+                '201':
+                    description: เพิ่มแล้ว
+                    content:
+                        application/json:
+                            schema: { $ref: '#/components/schemas/StaffAssignment' }
+                '403': { $ref: '#/components/responses/Forbidden' }
+                '404': { $ref: '#/components/responses/NotFound' }
+                '409': { $ref: '#/components/responses/Conflict' }
+                '422': { $ref: '#/components/responses/ValidationError' }
+
+    /projects/{code}/staff/{assignmentId}:
+        parameters:
+            - $ref: '#/components/parameters/ProjectCode'
+            - { name: assignmentId, in: path, required: true, schema: { type: string } }
+        put:
+            tags: [subcontractors]
+            summary: แก้บทบาท/หมายเหตุของผู้รับผิดชอบ
+            operationId: updateProjectStaff
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema: { $ref: '#/components/schemas/StaffAssignmentInput' }
+            responses:
+                '200':
+                    description: บันทึกแล้ว
+                    content:
+                        application/json:
+                            schema: { $ref: '#/components/schemas/StaffAssignment' }
+                '403': { $ref: '#/components/responses/Forbidden' }
+                '404': { $ref: '#/components/responses/NotFound' }
+                '409': { $ref: '#/components/responses/Conflict' }
+                '422': { $ref: '#/components/responses/ValidationError' }
+        delete:
+            tags: [subcontractors]
+            summary: นำผู้รับผิดชอบออกจากโครงการ — โครงการต้องมีผู้จัดการโครงการอย่างน้อย 1 คน (409)
+            operationId: removeProjectStaff
+            responses:
+                '204': { description: นำออกแล้ว }
+                '403': { $ref: '#/components/responses/Forbidden' }
+                '404': { $ref: '#/components/responses/NotFound' }
+                '409': { $ref: '#/components/responses/Conflict' }
+
+    /projects/{code}/subcontractors:
+        parameters:
+            - $ref: '#/components/parameters/ProjectCode'
+        post:
+            tags: [subcontractors]
+            summary: มอบหมายผู้รับเหมาช่วงตามขั้นตอนงาน (ต้องมีสิทธิ์ project.manage)
+            description: ต้องตั้งค่างานก่อสร้างแล้ว (ใช้ขั้นตอนจากไทม์ไลน์); ผู้รับเหมาที่ปิดใช้งานมอบหมายไม่ได้ (422); ผู้รับเหมารายเดิมซ้ำในโครงการเดียวกันตอบ 409 (ให้แก้ไขรายการเดิม)
+            operationId: addProjectSubcontractor
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema: { $ref: '#/components/schemas/SubcontractorAssignmentInput' }
+            responses:
+                '201':
+                    description: มอบหมายแล้ว
+                    content:
+                        application/json:
+                            schema: { $ref: '#/components/schemas/SubcontractorAssignment' }
+                '403': { $ref: '#/components/responses/Forbidden' }
+                '404': { $ref: '#/components/responses/NotFound' }
+                '409': { $ref: '#/components/responses/Conflict' }
+                '422': { $ref: '#/components/responses/ValidationError' }
+
+    /projects/{code}/subcontractors/{assignmentId}:
+        parameters:
+            - $ref: '#/components/parameters/ProjectCode'
+            - { name: assignmentId, in: path, required: true, schema: { type: string } }
+        put:
+            tags: [subcontractors]
+            summary: แก้ขอบเขตงาน ขั้นตอน มูลค่าจ้าง
+            operationId: updateProjectSubcontractor
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema: { $ref: '#/components/schemas/SubcontractorAssignmentInput' }
+            responses:
+                '200':
+                    description: บันทึกแล้ว
+                    content:
+                        application/json:
+                            schema: { $ref: '#/components/schemas/SubcontractorAssignment' }
+                '403': { $ref: '#/components/responses/Forbidden' }
+                '404': { $ref: '#/components/responses/NotFound' }
+                '409': { $ref: '#/components/responses/Conflict' }
+                '422': { $ref: '#/components/responses/ValidationError' }
+        delete:
+            tags: [subcontractors]
+            summary: ยกเลิกการมอบหมาย — ลบไม่ได้เมื่อขั้นตอนที่รับผิดชอบเริ่มงานแล้ว (409) ให้แก้ไขแทน
+            operationId: removeProjectSubcontractor
+            responses:
+                '204': { description: ยกเลิกแล้ว }
+                '403': { $ref: '#/components/responses/Forbidden' }
+                '404': { $ref: '#/components/responses/NotFound' }
+                '409': { $ref: '#/components/responses/Conflict' }
+
+    /subcontractors:
+        get:
+            tags: [subcontractors]
+            summary: ทะเบียนผู้รับเหมาช่วง
+            operationId: listSubcontractors
+            parameters:
+                - { name: q, in: query, description: ค้นหาชื่อ รหัส ผู้ติดต่อ, schema: { type: string } }
+                - { name: trade, in: query, schema: { $ref: '#/components/schemas/SubcontractorTrade' } }
+                - { name: status, in: query, schema: { type: string, enum: [active, inactive] } }
+            responses:
+                '200':
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                type: array
+                                items: { $ref: '#/components/schemas/Subcontractor' }
+        post:
+            tags: [subcontractors]
+            summary: เพิ่มผู้รับเหมาช่วง (ต้องมีสิทธิ์ project.manage) — หลังบ้านออกรหัส SUB-xxx
+            operationId: createSubcontractor
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema: { $ref: '#/components/schemas/SubcontractorInput' }
+            responses:
+                '201':
+                    description: เพิ่มแล้ว
+                    content:
+                        application/json:
+                            schema: { $ref: '#/components/schemas/Subcontractor' }
+                '403': { $ref: '#/components/responses/Forbidden' }
+                '409': { $ref: '#/components/responses/Conflict' }
+                '422': { $ref: '#/components/responses/ValidationError' }
+
+    /subcontractors/{id}:
+        parameters:
+            - { name: id, in: path, required: true, schema: { type: string } }
+        put:
+            tags: [subcontractors]
+            summary: แก้ไขข้อมูลผู้รับเหมาช่วง / เปิด-ปิดใช้งาน
+            operationId: updateSubcontractor
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema: { $ref: '#/components/schemas/SubcontractorInput' }
+            responses:
+                '200':
+                    description: บันทึกแล้ว
+                    content:
+                        application/json:
+                            schema: { $ref: '#/components/schemas/Subcontractor' }
+                '403': { $ref: '#/components/responses/Forbidden' }
+                '404': { $ref: '#/components/responses/NotFound' }
+                '409': { $ref: '#/components/responses/Conflict' }
+                '422': { $ref: '#/components/responses/ValidationError' }
+
+    /projects/{code}/team:
+        parameters:
+            - $ref: '#/components/parameters/ProjectCode'
+        get:
+            tags: [projects]
+            summary: รายชื่อติดต่อทีมงานโครงการ (สร้างจากผู้รับผิดชอบที่มอบหมายใน /assignments)
+            operationId: listProjectTeam
+            responses:
+                '200':
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                type: array
+                                items: { $ref: '#/components/schemas/TeamMember' }
+                '404': { $ref: '#/components/responses/NotFound' }
+
+    /house-plans/{code}:
+        parameters:
+            - { name: code, in: path, required: true, schema: { type: string } }
+        get:
+            tags: [projects]
+            summary: แบบบ้าน แปลนรายชั้น และไฟล์โมเดล 3D
+            operationId: getHousePlan
+            responses:
+                '200':
+                    description: OK
+                    content:
+                        application/json:
+                            schema: { $ref: '#/components/schemas/HousePlan' }
+                '404': { $ref: '#/components/responses/NotFound' }
+
+    /personnel:
+        get:
+            tags: [personnel]
+            operationId: listPersonnel
+            parameters:
+                - { name: q, in: query, schema: { type: string } }
+            responses:
+                '200':
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                type: array
+                                items: { $ref: '#/components/schemas/Personnel' }
+        post:
+            tags: [personnel]
+            summary: เพิ่มบุคลากร (หลังบ้านออกรหัสบุคลากร)
+            operationId: createPersonnel
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema: { $ref: '#/components/schemas/PersonnelInput' }
+            responses:
+                '201':
+                    description: Created
+                    content:
+                        application/json:
+                            schema: { $ref: '#/components/schemas/Personnel' }
+                '422': { $ref: '#/components/responses/ValidationError' }
+
+    /personnel/{id}:
+        parameters:
+            - { name: id, in: path, required: true, schema: { type: string } }
+        get:
+            tags: [personnel]
+            operationId: getPersonnel
+            responses:
+                '200':
+                    description: OK
+                    content:
+                        application/json:
+                            schema: { $ref: '#/components/schemas/Personnel' }
+                '404': { $ref: '#/components/responses/NotFound' }
+        put:
+            tags: [personnel]
+            operationId: updatePersonnel
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema: { $ref: '#/components/schemas/PersonnelInput' }
+            responses:
+                '200':
+                    description: OK
+                    content:
+                        application/json:
+                            schema: { $ref: '#/components/schemas/Personnel' }
+                '404': { $ref: '#/components/responses/NotFound' }
+                '422': { $ref: '#/components/responses/ValidationError' }
+
+    /personnel/license-alerts:
+        get:
+            tags: [personnel]
+            summary: ใบอนุญาต/เอกสารที่หมดอายุหรือใกล้หมดอายุ
+            operationId: listLicenseAlerts
+            parameters:
+                - { name: withinDays, in: query, schema: { type: integer, default: 90, minimum: 1 } }
+            responses:
+                '200':
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                type: array
+                                items: { $ref: '#/components/schemas/LicenseAlert' }
+
+    /approvals:
+        get:
+            tags: [approvals]
+            summary: คำขออนุมัติที่ผู้ใช้มีสิทธิ์เห็น (ล่าสุดก่อน)
+            operationId: listApprovals
+            parameters:
+                - { name: status, in: query, schema: { $ref: '#/components/schemas/ApprovalStatus' } }
+                - { name: type, in: query, schema: { $ref: '#/components/schemas/ApprovalType' } }
+                - { name: projectCode, in: query, schema: { type: string } }
+                - { name: q, in: query, description: ค้นหาเลขที่ รายการ ผู้ขอ, schema: { type: string } }
+                - name: sort
+                  in: query
+                  description: '`priority` = รายการที่ต้องให้เจ้าของอนุมัติและยอดสูงก่อน'
+                  schema: { type: string, enum: [newest, priority], default: newest }
+                - $ref: '#/components/parameters/Page'
+                - $ref: '#/components/parameters/PageSize'
+            responses:
+                '200':
+                    description: OK
+                    content:
+                        application/json:
+                            schema: { $ref: '#/components/schemas/ApprovalPage' }
+
+    /approvals/summary:
+        get:
+            tags: [approvals]
+            summary: ตัวเลขสรุป (ใช้กับแถบแจ้งเตือนและการ์ดสรุป)
+            operationId: getApprovalSummary
+            responses:
+                '200':
+                    description: OK
+                    content:
+                        application/json:
+                            schema: { $ref: '#/components/schemas/ApprovalSummary' }
+
+    /approvals/{id}:
+        parameters:
+            - $ref: '#/components/parameters/ApprovalId'
+        get:
+            tags: [approvals]
+            operationId: getApproval
+            responses:
+                '200':
+                    description: OK
+                    content:
+                        application/json:
+                            schema: { $ref: '#/components/schemas/Approval' }
+                '404': { $ref: '#/components/responses/NotFound' }
+
+    /approvals/{id}/approve:
+        parameters:
+            - $ref: '#/components/parameters/ApprovalId'
+        post:
+            tags: [approvals]
+            operationId: approveApproval
+            requestBody:
+                content:
+                    application/json:
+                        schema: { $ref: '#/components/schemas/DecisionInput' }
+            responses:
+                '200':
+                    description: อนุมัติแล้ว
+                    content:
+                        application/json:
+                            schema: { $ref: '#/components/schemas/Approval' }
+                '403': { $ref: '#/components/responses/Forbidden' }
+                '404': { $ref: '#/components/responses/NotFound' }
+                '409': { $ref: '#/components/responses/Conflict' }
+
+    /approvals/{id}/reject:
+        parameters:
+            - $ref: '#/components/parameters/ApprovalId'
+        post:
+            tags: [approvals]
+            operationId: rejectApproval
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema: { $ref: '#/components/schemas/RejectInput' }
+            responses:
+                '200':
+                    description: ไม่อนุมัติแล้ว
+                    content:
+                        application/json:
+                            schema: { $ref: '#/components/schemas/Approval' }
+                '403': { $ref: '#/components/responses/Forbidden' }
+                '404': { $ref: '#/components/responses/NotFound' }
+                '409': { $ref: '#/components/responses/Conflict' }
+                '422': { $ref: '#/components/responses/ValidationError' }
+
+    /approvals/bulk-approve:
+        post:
+            tags: [approvals]
+            summary: อนุมัติหลายรายการ (รายการที่ทำไม่ได้จะอยู่ใน skipped)
+            operationId: bulkApprove
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required: [ids]
+                            properties:
+                                ids:
+                                    type: array
+                                    minItems: 1
+                                    items: { type: string }
+                                note: { type: string, maxLength: 500 }
+            responses:
+                '200':
+                    description: OK
+                    content:
+                        application/json:
+                            schema: { $ref: '#/components/schemas/BulkApproveResult' }
+                '422': { $ref: '#/components/responses/ValidationError' }
+
+    /audit-logs:
+        get:
+            tags: [audit]
+            summary: บันทึกการกระทำ (ล่าสุดก่อน, อ่านอย่างเดียว)
+            operationId: listAuditLogs
+            parameters:
+                - { name: module, in: query, schema: { $ref: '#/components/schemas/AuditModule' } }
+                - { name: userId, in: query, schema: { type: string } }
+                - { name: q, in: query, description: ค้นหาการกระทำ รายการ รายละเอียด, schema: { type: string } }
+                - { name: from, in: query, schema: { type: string, format: date-time } }
+                - { name: to, in: query, schema: { type: string, format: date-time } }
+                - $ref: '#/components/parameters/Page'
+                - $ref: '#/components/parameters/PageSize'
+            responses:
+                '200':
+                    description: OK
+                    content:
+                        application/json:
+                            schema: { $ref: '#/components/schemas/AuditLogPage' }
+                '403': { $ref: '#/components/responses/Forbidden' }
+
+    /audit-logs/export:
+        get:
+            tags: [audit]
+            summary: ส่งออก CSV ตามตัวกรองเดียวกับ /audit-logs (UTF-8 พร้อม BOM)
+            operationId: exportAuditLogs
+            parameters:
+                - { name: module, in: query, schema: { $ref: '#/components/schemas/AuditModule' } }
+                - { name: userId, in: query, schema: { type: string } }
+                - { name: q, in: query, schema: { type: string } }
+            responses:
+                '200':
+                    description: ไฟล์ CSV
+                    content:
+                        text/csv:
+                            schema: { type: string }
+                '403': { $ref: '#/components/responses/Forbidden' }
+
+    /dashboard/summary:
+        get:
+            tags: [dashboard]
+            summary: กำไร-ขาดทุนรายโครงการและยอดรวมบริษัท (เจ้าของบริษัท)
+            operationId: getDashboardSummary
+            responses:
+                '200':
+                    description: OK
+                    content:
+                        application/json:
+                            schema: { $ref: '#/components/schemas/DashboardSummary' }
+                '403': { $ref: '#/components/responses/Forbidden' }
+
+    /dashboard/projects:
+        get:
+            tags: [dashboard]
+            summary: จำนวนโครงการตามสถานะ (ในมือ เสร็จแล้ว กำลังดำเนินการ รอทำสัญญา อยู่ในประกัน)
+            description: inHandValue ส่งเฉพาะผู้มีสิทธิ์ finance.company
+            operationId: getProjectPortfolio
+            responses:
+                '200':
+                    description: OK
+                    content:
+                        application/json:
+                            schema: { $ref: '#/components/schemas/ProjectPortfolio' }
+
+    /dashboard/cash-flow:
+        get:
+            tags: [dashboard]
+            summary: เงินรับ-เงินจ่ายรายเดือน (เดือนล่าสุดนับถึงวันนี้)
+            operationId: getCashFlow
+            parameters:
+                - { name: months, in: query, schema: { type: integer, default: 6, minimum: 1, maximum: 24 } }
+            responses:
+                '200':
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                type: array
+                                items: { $ref: '#/components/schemas/MonthlyCashFlow' }
+                '403': { $ref: '#/components/responses/Forbidden' }
+
+components:
+    securitySchemes:
+        bearerAuth:
+            type: http
+            scheme: bearer
+            bearerFormat: JWT
+
+    parameters:
+        ProjectCode:
+            name: code
+            in: path
+            required: true
+            schema: { type: string, examples: [CR690001] }
+        ApprovalId:
+            name: id
+            in: path
+            required: true
+            schema: { type: string, examples: [PR-6910-0036] }
+        Page:
+            name: page
+            in: query
+            description: เริ่มที่ 1
+            schema: { type: integer, minimum: 1, default: 1 }
+        PageSize:
+            name: pageSize
+            in: query
+            schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+
+    responses:
+        Unauthorized:
+            description: ยังไม่ได้ล็อกอินหรือ token หมดอายุ
+            content:
+                application/problem+json:
+                    schema: { $ref: '#/components/schemas/Problem' }
+        Forbidden:
+            description: บทบาทนี้ไม่มีสิทธิ์
+            content:
+                application/problem+json:
+                    schema: { $ref: '#/components/schemas/Problem' }
+        NotFound:
+            description: ไม่พบข้อมูล
+            content:
+                application/problem+json:
+                    schema: { $ref: '#/components/schemas/Problem' }
+        Conflict:
+            description: สถานะข้อมูลเปลี่ยนไปแล้ว เช่น คำขอถูกตัดสินไปก่อนหน้า
+            content:
+                application/problem+json:
+                    schema: { $ref: '#/components/schemas/Problem' }
+        ValidationError:
+            description: ข้อมูลไม่ถูกต้อง
+            content:
+                application/problem+json:
+                    schema: { $ref: '#/components/schemas/Problem' }
+
+    schemas:
+        Problem:
+            type: object
+            required: [title, status]
+            properties:
+                type: { type: string, format: uri, default: about:blank }
+                title: { type: string, description: ข้อความสั้นสำหรับแสดงผู้ใช้ (ภาษาไทย) }
+                status: { type: integer }
+                detail: { type: string }
+                errors:
+                    type: object
+                    description: ข้อผิดพลาดรายช่อง (ชื่อช่อง → ข้อความ)
+                    additionalProperties: { type: string }
+
+        PageMeta:
+            type: object
+            required: [page, pageSize, total]
+            properties:
+                page: { type: integer }
+                pageSize: { type: integer }
+                total: { type: integer }
+
+        # ---------- ผู้ใช้และสิทธิ์ ----------
+        RoleId:
+            type: string
+            enum: [admin, owner, admin-staff, accounting, procurement, storekeeper, auditor, project-manager, engineer, architect, foreman, safety-officer, subcontractor, client, supplier]
+        UserRef:
+            type: object
+            required: [id, name, roleLabel]
+            properties:
+                id: { type: string }
+                name: { type: string }
+                roleLabel: { type: string, description: ชื่อบทบาท ณ เวลาที่เกิดเหตุการณ์ }
+        Permission:
+            type: string
+            description: |
+                สิทธิ์ที่หน้าบ้านใช้ตัดสินว่าจะแสดงปุ่ม/ส่วนใด (หลังบ้านต้องตรวจสิทธิ์ซ้ำทุกคำขอ)
+                - progress.update: บันทึกความคืบหน้าและผลตรวจ
+                - personnel.sensitive: ดู/แก้ข้อมูลอ่อนไหวของบุคลากร
+                - finance.company: ดูการเงินระดับบริษัท (Dashboard กำไร-ขาดทุน)
+                - approval.any: อนุมัติได้ทุกยอด
+                - project.create: เปิดโครงการใหม่
+                - project.manage: จัดการโครงการ เช่น บันทึกสัญญาและเริ่มแผนงาน
+            enum: [progress.update, personnel.sensitive, finance.company, approval.any, project.create, project.manage]
+        CurrentUser:
+            type: object
+            required: [id, name, roleId, roleLabel, projectCodes, email, lastLoginAt, permissions]
+            properties:
+                id: { type: string }
+                name: { type: string }
+                roleId: { $ref: '#/components/schemas/RoleId' }
+                roleLabel: { type: string }
+                projectCodes:
+                    type: array
+                    description: โครงการที่เป็นสมาชิก (ว่าง = ทุกโครงการสำหรับทีมภายใน)
+                    items: { type: string }
+                email: { type: string, format: email }
+                phone: { type: string }
+                position: { type: string, description: ตำแหน่งงาน }
+                department: { type: string }
+                employeeCode: { type: string, description: รหัสบุคลากร (ไม่มีสำหรับบุคคลภายนอก) }
+                avatarUrl: { type: string, format: uri }
+                lastLoginAt: { type: string, format: date-time, description: เวลาเข้าสู่ระบบครั้งก่อนหน้า }
+                permissions:
+                    type: array
+                    items: { $ref: '#/components/schemas/Permission' }
+        RoleCatalog:
+            type: object
+            required: [groups, roles]
+            properties:
+                groups:
+                    type: array
+                    items:
+                        type: object
+                        required: [id, label, scope]
+                        properties:
+                            id: { type: string, enum: [internal, project, external] }
+                            label: { type: string }
+                            scope: { type: string }
+                roles:
+                    type: array
+                    items:
+                        type: object
+                        required: [id, group, label, access, restriction]
+                        properties:
+                            id: { $ref: '#/components/schemas/RoleId' }
+                            group: { type: string, enum: [internal, project, external] }
+                            label: { type: string }
+                            access: { type: string }
+                            restriction: { type: string }
+                            suggested: { type: boolean }
+                            optional: { type: boolean }
+
+        ApprovalSettings:
+            type: object
+            required: [projectManagerLimit, changeOrderRequiresOwner]
+            properties:
+                projectManagerLimit: { type: number, minimum: 0, description: วงเงินที่ผู้จัดการโครงการอนุมัติได้ต่อรายการ (บาท) }
+                changeOrderRequiresOwner: { type: boolean, description: งานเพิ่ม-ลดต้องให้เจ้าของอนุมัติทุกยอด }
+
+        # ---------- โครงการ ----------
+        ProjectRegion:
+            type: object
+            required: [code, province]
+            properties:
+                code: { type: string, description: รหัสขึ้นต้นโครงการ, examples: [CR] }
+                province: { type: string, examples: [เชียงราย] }
+        ProjectInput:
+            type: object
+            description: ข้อมูลเบื้องต้นตอนเปิดโครงการ (ก่อนเซ็นสัญญา) — มูลค่าและวันที่บันทึกภายหลังที่ POST /projects/{code}/contract
+            required: [name, regionCode, customerName, phone, responsibleName, housePlanName]
+            properties:
+                name: { type: string, minLength: 1, maxLength: 200, description: ชื่อโครงการ (ผู้ใช้ตั้งเอง) }
+                regionCode: { type: string, description: จังหวัดที่ตั้งโครงการ ใช้ออกรหัส (GET /settings/project-regions) }
+                customerName: { type: string, minLength: 1 }
+                phone: { type: string, description: เบอร์โทรลูกค้า 9-10 หลัก }
+                customerEmail: { type: string }
+                customerLineId: { type: string }
+                customerAddress: { type: string, description: ที่อยู่ติดต่อลูกค้า }
+                responsibleName: { type: string, minLength: 1, description: ผู้รับผิดชอบโครงการ }
+                housePlanName: { type: string, minLength: 1, maxLength: 200, description: แบบบ้านที่ลูกค้าต้องการ (พิมพ์เองได้) }
+                housePlanCode: { type: string, description: ถ้าเลือกจากคลังแบบบ้าน (GET /house-plans) จะแสดงแปลนและโมเดล 3D ได้ }
+                requirements: { type: string, maxLength: 2000, description: ความต้องการเพิ่มเติมของลูกค้า }
+        ContractInput:
+            type: object
+            description: บันทึกเมื่อได้งาน/เซ็นสัญญาแล้ว หลังบ้านจะสร้างแผนงานจากแม่แบบและงวดงาน
+            required: [value, signedDate, startDate, deliveryDate, location]
+            properties:
+                value: { type: number, exclusiveMinimum: 0, description: มูลค่าสัญญา (บาท) }
+                signedDate: { type: string, format: date, description: วันที่เซ็นสัญญา (ไม่เกินวันนี้) }
+                startDate: { type: string, format: date, description: วันเริ่มงาน (ไม่ก่อนวันเซ็นสัญญา) }
+                deliveryDate: { type: string, format: date, description: ต้องห่างจากวันเริ่มอย่างน้อย 30 วัน }
+                location: { type: string, minLength: 1, description: ที่ตั้งหน้างาน (เลขที่/ตำบล/อำเภอ) }
+        ProjectStatus:
+            type: string
+            description: pending-contract = เปิดโครงการแล้วแต่ยังไม่ได้บันทึกสัญญา (ยังไม่มีแผนงาน งวดงาน ภาพ เอกสาร)
+            enum: [pending-contract, planning, in-progress, near-handover, completed, delayed]
+        Project:
+            type: object
+            required: [code, name, location, housePlanName, customerName, phone, responsibleName, value, startDate, deliveryDate, contractSignedAt, progress, status, createdAt]
+            properties:
+                code: { type: string, examples: [CR690001] }
+                name: { type: string }
+                location: { type: [string, 'null'], description: ที่ตั้งหน้างาน (null จนกว่าจะบันทึกสัญญา) }
+                housePlanName: { type: string }
+                housePlanCode: { type: string }
+                requirements: { type: string }
+                customerName: { type: string }
+                phone: { type: string }
+                customerEmail: { type: string }
+                customerLineId: { type: string }
+                customerAddress: { type: string }
+                responsibleName: { type: string }
+                value: { type: [number, 'null'], description: มูลค่าสัญญา (null จนกว่าจะบันทึกสัญญา) }
+                startDate: { type: [string, 'null'], format: date }
+                deliveryDate: { type: [string, 'null'], format: date }
+                contractSignedAt: { type: [string, 'null'], format: date }
+                progress: { type: integer, minimum: 0, maximum: 100 }
+                status: { $ref: '#/components/schemas/ProjectStatus' }
+                createdAt: { type: string, format: date-time, description: วันที่เปิดโครงการ }
+                setupConfiguredAt: { type: [string, 'null'], format: date-time, description: เวลาที่ตั้งค่างานก่อสร้าง (null = ยังไม่ตั้งค่า ยังไม่มีไทม์ไลน์) }
+                handedOverAt: { type: [string, 'null'], format: date, description: วันที่ส่งมอบงานจริง (null = ยังไม่ส่งมอบ) }
+                warrantyUntil: { type: [string, 'null'], format: date, description: วันสิ้นสุดการรับประกันผลงาน (หลังบ้านคำนวณจากวันส่งมอบ + ระยะประกัน) }
+
+        ConstructionOptionValue:
+            description: single = รหัสตัวเลือก, multiple = รายการรหัส, boolean = true/false
+            anyOf:
+                - { type: string }
+                - { type: boolean }
+                - { type: array, items: { type: string } }
+        ConstructionOptionChoice:
+            type: object
+            required: [value, label]
+            properties:
+                value: { type: string }
+                label: { type: string }
+                description: { type: string }
+        ConstructionOptionGroup:
+            type: object
+            required: [key, section, label, type, choices, default, affectsPhases]
+            properties:
+                key: { type: string, examples: [foundation] }
+                section: { type: string, description: หัวข้อที่ใช้จัดกลุ่มในฟอร์ม เช่น งานฐานราก }
+                label: { type: string }
+                description: { type: string }
+                type: { type: string, enum: [single, multiple, boolean] }
+                choices:
+                    type: array
+                    description: ว่างเมื่อ type = boolean
+                    items: { $ref: '#/components/schemas/ConstructionOptionChoice' }
+                default: { $ref: '#/components/schemas/ConstructionOptionValue' }
+                affectsPhases:
+                    type: array
+                    description: ขั้นตอนในแผนงานที่ตัวเลือกนี้เพิ่ม/เปลี่ยนงาน (หลังบ้านคำนวณจากแม่แบบ)
+                    items:
+                        type: object
+                        required: [code, shortName]
+                        properties:
+                            code: { type: string }
+                            shortName: { type: string }
+                visibleWhen:
+                    type: object
+                    description: แสดงเฉพาะเมื่อตัวเลือก key มีค่าอยู่ใน values
+                    required: [key, values]
+                    properties:
+                        key: { type: string }
+                        values: { type: array, items: { type: string } }
+        ConstructionSetupOptions:
+            type: object
+            description: ค่าของแต่ละตัวเลือก (key → ค่า) ตาม GET /settings/construction-options
+            additionalProperties: { $ref: '#/components/schemas/ConstructionOptionValue' }
+        CustomTaskInput:
+            type: object
+            description: งานย่อยที่เพิ่มเองในโครงการนี้ (นอกแม่แบบ)
+            required: [id, phaseCode, name, durationDays]
+            properties:
+                id: { type: string, description: รหัสที่หน้าบ้านสร้าง ใช้อ้างอิงตอนแก้ไข/ลบ }
+                phaseCode: { type: string, examples: ['05'] }
+                name: { type: string, minLength: 1, maxLength: 200 }
+                team: { type: string, description: ไม่ระบุ = ผู้รับเหมา }
+                afterCode: { type: string, description: ทำต่อจากงานรหัสนี้ในขั้นตอนเดียวกัน (ไม่ระบุ = ต่อท้ายงานสุดท้ายของขั้นตอน) }
+                durationDays: { type: integer, minimum: 1, maximum: 120 }
+                isHoldPoint: { type: boolean, default: false, description: เป็นจุดตรวจที่ต้องผ่านก่อนทำงานถัดไป }
+        ProjectSetupInput:
+            type: object
+            required: [options]
+            properties:
+                options: { $ref: '#/components/schemas/ConstructionSetupOptions' }
+                excludedTasks:
+                    type: array
+                    description: รหัสงานย่อยที่ไม่ต้องทำในโครงการนี้ — ตัดจุดตรวจ (Hold Point) และหมุดหมาย (Milestone) ไม่ได้ (422); รหัสที่ไม่อยู่ในแผนตามตัวเลือก หลังบ้านตัดทิ้ง
+                    items: { type: string }
+                customTasks:
+                    type: array
+                    maxItems: 50
+                    items: { $ref: '#/components/schemas/CustomTaskInput' }
+        ProjectSetup:
+            type: object
+            required: [configured, locked, configuredAt, configuredBy, options, excludedTasks, customTasks]
+            properties:
+                configured: { type: boolean }
+                locked: { type: boolean, description: true เมื่อเริ่มรายงานความคืบหน้าแล้ว แก้การตั้งค่าไม่ได้ }
+                lockedReason: { type: string }
+                configuredAt: { type: [string, 'null'], format: date-time }
+                configuredBy: { type: [string, 'null'] }
+                options: { $ref: '#/components/schemas/ConstructionSetupOptions' }
+                excludedTasks: { type: array, items: { type: string } }
+                customTasks: { type: array, items: { $ref: '#/components/schemas/CustomTaskInput' } }
+        SetupPreviewTask:
+            type: object
+            description: งานย่อยในแผน รวมงานที่ถูกตัดออก (included = false) เพื่อให้เลือกกลับได้
+            required: [code, name, team, start, end, isHoldPoint, isMilestone, optional, included, required, custom]
+            properties:
+                code: { type: string }
+                name: { type: string }
+                team: { type: string }
+                start: { type: string, format: date }
+                end: { type: string, format: date }
+                isHoldPoint: { type: boolean }
+                isMilestone: { type: boolean }
+                optional: { type: boolean, description: งานที่มีเพราะตัวเลือกที่เลือก (ไม่ใช่งานพื้นฐาน) }
+                included: { type: boolean, description: false = ตัดออกจากโครงการนี้ (ไม่อยู่ในไทม์ไลน์) }
+                required: { type: boolean, description: จุดตรวจ/หมุดหมาย ตัดออกไม่ได้ }
+                custom: { type: boolean, description: งานที่เพิ่มเอง }
+                customId: { type: string, description: id ของ CustomTaskInput (เฉพาะงานที่เพิ่มเอง) }
+        SetupPreview:
+            type: object
+            required: [taskCount, holdPointCount, milestoneCount, optionalTaskCount, excludedCount, customCount, phases]
+            properties:
+                taskCount: { type: integer, description: งานที่ทำจริง (ไม่รวมหมุดหมายและงานที่ตัดออก) }
+                excludedCount: { type: integer }
+                customCount: { type: integer }
+                holdPointCount: { type: integer }
+                milestoneCount: { type: integer }
+                optionalTaskCount: { type: integer }
+                phases:
+                    type: array
+                    items:
+                        type: object
+                        required: [step, code, name, shortName, start, end, tasks]
+                        properties:
+                            step: { type: integer }
+                            code: { type: string }
+                            name: { type: string }
+                            shortName: { type: string }
+                            start: { type: string, format: date }
+                            end: { type: string, format: date }
+                            tasks:
+                                type: array
+                                items: { $ref: '#/components/schemas/SetupPreviewTask' }
+
+        TimelineStatus:
+            type: string
+            enum: [done, active, pending]
+        TimelineTask:
+            type: object
+            required: [code, name, team, start, end, progress, status, isHoldPoint, isMilestone, isPaymentMilestone, involvesOwner]
+            properties:
+                code: { type: string }
+                name: { type: string }
+                team: { type: string }
+                note: { type: string }
+                start: { type: string, format: date }
+                end: { type: string, format: date }
+                progress: { type: integer, minimum: 0, maximum: 100 }
+                status: { $ref: '#/components/schemas/TimelineStatus' }
+                isHoldPoint: { type: boolean }
+                isMilestone: { type: boolean }
+                isPaymentMilestone: { type: boolean }
+                involvesOwner: { type: boolean }
+        TimelinePhase:
+            type: object
+            required: [step, code, name, shortName, summary, start, end, progress, status, tasks, holdPoints]
+            properties:
+                step: { type: integer }
+                code: { type: string }
+                name: { type: string }
+                shortName: { type: string }
+                summary: { type: string }
+                start: { type: string, format: date }
+                end: { type: string, format: date }
+                progress: { type: integer, minimum: 0, maximum: 100 }
+                status: { $ref: '#/components/schemas/TimelineStatus' }
+                tasks:
+                    type: array
+                    items: { $ref: '#/components/schemas/TimelineTask' }
+                holdPoints:
+                    type: object
+                    required: [passed, total]
+                    properties:
+                        passed: { type: integer }
+                        total: { type: integer }
+        ProjectTimeline:
+            type: object
+            required: [progress, phases]
+            properties:
+                progress: { type: integer, minimum: 0, maximum: 100 }
+                phases:
+                    type: array
+                    items: { $ref: '#/components/schemas/TimelinePhase' }
+
+        UploadedFile:
+            type: object
+            required: [id, url, name, sizeKb, contentType]
+            properties:
+                id: { type: string }
+                url: { type: string, format: uri }
+                name: { type: string }
+                sizeKb: { type: integer }
+                contentType: { type: string }
+        Weather:
+            type: string
+            enum: [sunny, cloudy, light-rain, heavy-rain]
+        IssueSeverity:
+            type: string
+            enum: [low, medium, high]
+        SiteIssue:
+            type: object
+            required: [title, severity]
+            properties:
+                title: { type: string, minLength: 1, maxLength: 200 }
+                severity: { $ref: '#/components/schemas/IssueSeverity' }
+        TaskProgressInput:
+            type: object
+            required: [taskCode, progress]
+            properties:
+                taskCode: { type: string }
+                progress: { type: integer, minimum: 0, maximum: 100 }
+        ProgressUpdateInput:
+            type: object
+            description: ต้องมีอย่างน้อย 1 อย่าง ได้แก่ taskChanges, note หรือ documents
+            required: [reportDate, weather, workers]
+            properties:
+                reportDate: { type: string, format: date, description: วันที่ทำงาน (ไม่เกินวันนี้) }
+                weather: { $ref: '#/components/schemas/Weather' }
+                workers: { type: integer, minimum: 0, description: จำนวนแรงงานในวันนั้น }
+                note: { type: string, maxLength: 2000 }
+                taskChanges:
+                    type: array
+                    items: { $ref: '#/components/schemas/TaskProgressInput' }
+                issues:
+                    type: array
+                    items: { $ref: '#/components/schemas/SiteIssue' }
+                photoIds:
+                    type: array
+                    description: id จาก POST /uploads (ต้องเป็นไฟล์รูป)
+                    items: { type: string }
+                documents:
+                    type: array
+                    description: เอกสารแนบ จะถูกเพิ่มในเอกสารของโครงการ (GET /projects/{code}/documents)
+                    items: { $ref: '#/components/schemas/DocumentAttachmentInput' }
+        DocumentAttachmentInput:
+            type: object
+            required: [fileId, category]
+            properties:
+                fileId: { type: string, description: id จาก POST /uploads }
+                category: { $ref: '#/components/schemas/DocumentCategory' }
+                name: { type: string, maxLength: 200, description: ชื่อเอกสาร (ไม่ระบุ = ใช้ชื่อไฟล์) }
+        InspectionInput:
+            type: object
+            required: [result]
+            properties:
+                result: { type: string, enum: [passed, failed] }
+                note: { type: string, maxLength: 2000, description: จำเป็นเมื่อไม่ผ่าน }
+                photoIds:
+                    type: array
+                    items: { type: string }
+                documents:
+                    type: array
+                    description: เช่น รายงานผลตรวจ ผลทดสอบ
+                    items: { $ref: '#/components/schemas/DocumentAttachmentInput' }
+        ProgressUpdate:
+            type: object
+            required: [id, projectCode, reportDate, createdAt, author, weather, workers, taskChanges, issues, photos, documents, overallProgress]
+            properties:
+                id: { type: string }
+                projectCode: { type: string }
+                reportDate: { type: string, format: date }
+                createdAt: { type: string, format: date-time }
+                author: { $ref: '#/components/schemas/UserRef' }
+                weather: { $ref: '#/components/schemas/Weather' }
+                workers: { type: integer }
+                note: { type: string }
+                taskChanges:
+                    type: array
+                    items:
+                        type: object
+                        required: [taskCode, taskName, phaseStep, from, to]
+                        properties:
+                            taskCode: { type: string }
+                            taskName: { type: string }
+                            phaseStep: { type: integer }
+                            from: { type: integer }
+                            to: { type: integer }
+                inspection:
+                    type: object
+                    required: [taskCode, taskName, result]
+                    properties:
+                        taskCode: { type: string }
+                        taskName: { type: string }
+                        result: { type: string, enum: [passed, failed] }
+                issues:
+                    type: array
+                    items: { $ref: '#/components/schemas/SiteIssue' }
+                photos:
+                    type: array
+                    items: { $ref: '#/components/schemas/UploadedFile' }
+                documents:
+                    type: array
+                    description: เอกสารที่แนบกับบันทึกนี้
+                    items: { $ref: '#/components/schemas/ProjectDocument' }
+                overallProgress: { type: integer, description: '% ภาพรวมโครงการหลังบันทึกนี้' }
+        ProgressUpdatePage:
+            allOf:
+                - $ref: '#/components/schemas/PageMeta'
+                - type: object
+                  required: [items]
+                  properties:
+                      items:
+                          type: array
+                          items: { $ref: '#/components/schemas/ProgressUpdate' }
+
+        InstallmentStatus:
+            type: string
+            enum: [paid, due, working, upcoming]
+        Installment:
+            type: object
+            required: [no, title, phaseSteps, percent, amount, status, dueDate]
+            properties:
+                no: { type: integer }
+                title: { type: string }
+                phaseSteps:
+                    type: array
+                    items: { type: integer }
+                percent: { type: number }
+                amount: { type: number }
+                status: { $ref: '#/components/schemas/InstallmentStatus' }
+                dueDate: { type: string, format: date }
+                paidDate: { type: [string, 'null'], format: date }
+
+        SitePhoto:
+            type: object
+            required: [id, url, thumbnailUrl, takenAt, caption, phaseCode, phaseStep, phaseShortName]
+            properties:
+                id: { type: string }
+                url: { type: string, format: uri }
+                thumbnailUrl: { type: string, format: uri }
+                takenAt: { type: string, format: date-time }
+                caption: { type: string }
+                phaseCode: { type: string }
+                phaseStep: { type: integer }
+                phaseShortName: { type: string }
+        SitePhotoPage:
+            allOf:
+                - $ref: '#/components/schemas/PageMeta'
+                - type: object
+                  required: [items, phases]
+                  properties:
+                      items:
+                          type: array
+                          items: { $ref: '#/components/schemas/SitePhoto' }
+                      phases:
+                          type: array
+                          description: จำนวนภาพแยกตามขั้นตอน (ไม่ขึ้นกับตัวกรอง phaseCode) ใช้ทำตัวกรอง
+                          items:
+                              type: object
+                              required: [phaseCode, phaseStep, phaseShortName, count]
+                              properties:
+                                  phaseCode: { type: string }
+                                  phaseStep: { type: integer }
+                                  phaseShortName: { type: string }
+                                  count: { type: integer }
+
+        DocumentCategory:
+            type: string
+            enum: [contract, drawing, permit, inspection, billing, handover]
+        ProjectDocument:
+            type: object
+            required: [id, category, name, date, fileType, sizeKb, downloadUrl]
+            properties:
+                id: { type: string }
+                category: { $ref: '#/components/schemas/DocumentCategory' }
+                name: { type: string }
+                date: { type: string, format: date }
+                fileType: { type: string, enum: [pdf, dwg, xlsx, docx, image] }
+                sizeKb: { type: integer }
+                downloadUrl: { type: string, format: uri, description: ลิงก์ชั่วคราว (signed URL) }
+                uploadedBy: { type: string, description: ผู้แนบเอกสาร (เอกสารที่ระบบสร้างเองไม่มีฟิลด์นี้) }
+                updateId: { type: string, description: บันทึกหน้างานที่แนบเอกสารนี้ (ถ้ามี) }
+
+        SubcontractorTrade:
+            type: string
+            description: สาขางานของผู้รับเหมาช่วง (หน้าบ้านแปลเป็นข้อความไทย)
+            enum: [piling, structure, masonry, roofing, waterproofing, electrical, plumbing, hvac, aluminium, tiling, ceiling, painting, carpentry, landscape, solar, pool, lift, fire, other]
+        SubcontractorInput:
+            type: object
+            required: [name, trades, contactName, phone]
+            properties:
+                name: { type: string, minLength: 1, description: ชื่อบริษัท/ทีมช่าง }
+                trades: { type: array, minItems: 1, items: { $ref: '#/components/schemas/SubcontractorTrade' } }
+                contactName: { type: string, minLength: 1 }
+                phone: { type: string, description: ตัวเลข 9-10 หลัก ขึ้นต้นด้วย 0 }
+                email: { type: string }
+                lineId: { type: string }
+                taxId: { type: string, description: เลขประจำตัวผู้เสียภาษี 13 หลัก (ซ้ำกับรายอื่นไม่ได้ 409) }
+                address: { type: string }
+                note: { type: string }
+                status: { type: string, enum: [active, inactive], default: active, description: inactive = ไม่ใช้งานแล้ว มอบหมายงานใหม่ไม่ได้ }
+        Subcontractor:
+            allOf:
+                - $ref: '#/components/schemas/SubcontractorInput'
+                - type: object
+                  required: [id, code, status, activeProjects]
+                  properties:
+                      id: { type: string }
+                      code: { type: string, examples: [SUB-001] }
+                      activeProjects: { type: integer, description: จำนวนโครงการที่ยังไม่ส่งมอบที่มอบหมายอยู่ }
+        StaffRole:
+            type: string
+            enum: [project-manager, engineer, site-supervisor, architect, foreman, safety-officer, purchasing, accounting]
+        StaffAssignmentInput:
+            type: object
+            required: [personnelId, role]
+            properties:
+                personnelId: { type: string }
+                role: { $ref: '#/components/schemas/StaffRole' }
+                note: { type: string, description: เช่น หน้าที่เฉพาะในโครงการนี้ }
+        StaffAssignment:
+            type: object
+            required: [id, personnelId, name, role]
+            properties:
+                id: { type: string }
+                personnelId: { type: string }
+                name: { type: string }
+                position: { type: string }
+                phone: { type: string }
+                role: { $ref: '#/components/schemas/StaffRole' }
+                note: { type: string }
+        SubcontractorAssignmentInput:
+            type: object
+            required: [subcontractorId, scope, phaseCodes]
+            properties:
+                subcontractorId: { type: string }
+                scope: { type: string, minLength: 1, description: ขอบเขตงานที่จ้าง }
+                phaseCodes: { type: array, minItems: 1, items: { type: string }, description: ขั้นตอนในไทม์ไลน์ที่รับผิดชอบ }
+                contractValue: { type: number, minimum: 0, description: มูลค่าจ้าง (บาท) }
+                note: { type: string }
+        SubcontractorAssignment:
+            type: object
+            required: [id, subcontractor, scope, phaseCodes, start, end, progress, status]
+            properties:
+                id: { type: string }
+                subcontractor:
+                    type: object
+                    required: [id, code, name, contactName, phone, trades]
+                    properties:
+                        id: { type: string }
+                        code: { type: string }
+                        name: { type: string }
+                        contactName: { type: string }
+                        phone: { type: string }
+                        trades: { type: array, items: { $ref: '#/components/schemas/SubcontractorTrade' } }
+                scope: { type: string }
+                phaseCodes: { type: array, items: { type: string } }
+                contractValue: { type: number, description: ส่งเฉพาะผู้มีสิทธิ์ project.manage }
+                note: { type: string }
+                start: { type: string, format: date, description: วันเริ่มของขั้นตอนแรกที่รับผิดชอบ }
+                end: { type: string, format: date }
+                progress: { type: integer, minimum: 0, maximum: 100, description: ความคืบหน้าของขั้นตอนที่รับผิดชอบ (ถ่วงตามระยะเวลา) }
+                status: { type: string, enum: [upcoming, working, done] }
+        ProjectAssignments:
+            type: object
+            required: [staff, subcontractors]
+            properties:
+                staff: { type: array, items: { $ref: '#/components/schemas/StaffAssignment' } }
+                subcontractors: { type: array, items: { $ref: '#/components/schemas/SubcontractorAssignment' } }
+        TeamMember:
+            type: object
+            required: [name, role, phone]
+            properties:
+                name: { type: string }
+                role: { type: string }
+                phone: { type: string }
+
+        RoomKind:
+            type: string
+            enum: [bedroom, bathroom, living, dining, kitchen, garage, stair, void, other]
+        HousePlan:
+            type: object
+            required: [code, name, description, width, depth, floorHeight, parking, floors]
+            properties:
+                code: { type: string }
+                name: { type: string }
+                description: { type: string }
+                width: { type: number, description: เมตร }
+                depth: { type: number, description: เมตร }
+                floorHeight: { type: number }
+                parking: { type: integer }
+                renderUrl: { type: string, format: uri, description: ภาพทัศนียภาพ }
+                modelUrl: { type: string, format: uri, description: ไฟล์โมเดล .glb }
+                floors:
+                    type: array
+                    items:
+                        type: object
+                        required: [label, rooms]
+                        properties:
+                            label: { type: string }
+                            rooms:
+                                type: array
+                                items:
+                                    type: object
+                                    required: [name, kind, x, y, w, h]
+                                    properties:
+                                        name: { type: string }
+                                        kind: { $ref: '#/components/schemas/RoomKind' }
+                                        x: { type: number }
+                                        y: { type: number }
+                                        w: { type: number }
+                                        h: { type: number }
+
+        # ---------- บุคลากร ----------
+        PersonnelDocument:
+            type: object
+            required: [type, fileName, url]
+            properties:
+                type: { type: string, description: ประเภทเอกสาร เช่น สำเนาบัตรประชาชน }
+                fileName: { type: string }
+                url: { type: string, format: uri, description: ลิงก์จาก POST /uploads }
+                expiresAt: { type: string, format: date }
+                uploadedBy: { type: string, description: หลังบ้านใส่ให้ (ไม่ต้องส่ง) }
+        PersonnelTraining:
+            type: object
+            required: [name, completedAt]
+            properties:
+                name: { type: string }
+                completedAt: { type: string, format: date }
+                expiresAt: { type: string, format: date }
+        PersonnelSensitive:
+            type: object
+            description: ข้อมูลอ่อนไหว ส่งมาเฉพาะบทบาทที่มีสิทธิ์ (เจ้าของบริษัท บัญชี/การเงิน) บทบาทอื่นไม่มีฟิลด์นี้ และค่าที่ส่งเข้ามาจะถูกละเว้น
+            properties:
+                compensationType: { type: string, description: เงินเดือน / รายวัน / เหมางาน }
+                compensationRate: { type: number }
+                compensationHistory: { type: string }
+                withholdingTaxTerms: { type: string }
+                bankName: { type: string }
+                bankAccountNumber: { type: string }
+                bankAccountName: { type: string }
+                taxpayerId: { type: string }
+                withholdingCertificate: { type: string }
+                performanceRating: { type: string }
+                performanceNotes: { type: string }
+        PersonnelInput:
+            type: object
+            description: ข้อมูลที่แก้ไขได้ในหน้าบุคลากร (วันที่ว่างให้ละฟิลด์ไว้)
+            required: [fullName]
+            properties:
+                photoUrl: { type: string, description: ลิงก์จาก POST /uploads }
+                fullName: { type: string, minLength: 1 }
+                nationalId: { type: string }
+                position: { type: string }
+                birthDate: { type: string, format: date }
+                hireDate: { type: string, format: date }
+                endDate: { type: string, format: date }
+                phone: { type: string }
+                lineId: { type: string }
+                email: { type: string }
+                registeredAddress: { type: string }
+                currentAddress: { type: string }
+                emergencyContactName: { type: string }
+                emergencyContactRelation: { type: string }
+                emergencyContactPhone: { type: string }
+                employmentType: { type: string, description: ประจำ / รายเดือน / รายวัน }
+                department: { type: string }
+                supervisor: { type: string }
+                expertise: { type: string }
+                workAreas: { type: string }
+                availability: { type: string }
+                education: { type: string }
+                institution: { type: string }
+                otherCertificates: { type: string }
+                professionalLicenseNumber: { type: string }
+                professionalLicenseType: { type: string }
+                professionalLicenseLevel: { type: string }
+                professionalLicenseExpiresAt: { type: string, format: date }
+                workPermitExpiresAt: { type: string, format: date }
+                socialSecurityNumber: { type: string }
+                issuedEquipment: { type: string }
+                documents:
+                    type: array
+                    items: { $ref: '#/components/schemas/PersonnelDocument' }
+                trainings:
+                    type: array
+                    items: { $ref: '#/components/schemas/PersonnelTraining' }
+                sensitive: { $ref: '#/components/schemas/PersonnelSensitive' }
+        Personnel:
+            allOf:
+                - $ref: '#/components/schemas/PersonnelInput'
+                - type: object
+                  required: [id, employeeCode, projectHistory, auditHistory]
+                  properties:
+                      id: { type: string }
+                      employeeCode: { type: string, description: หลังบ้านออกให้เมื่อเพิ่มบุคลากร, examples: [EMP690001] }
+                      projectHistory:
+                          type: array
+                          description: หลังบ้านสร้างจากการมอบหมายงาน (อ่านอย่างเดียว)
+                          items:
+                              type: object
+                              required: [projectCode, role, period, assignment, dailyReport]
+                              properties:
+                                  projectCode: { type: string }
+                                  role: { type: string }
+                                  period: { type: string }
+                                  assignment: { type: string }
+                                  dailyReport: { type: string }
+                                  paidAmount: { type: number, description: ส่งมาเฉพาะบทบาทที่เห็นข้อมูลอ่อนไหว }
+                      auditHistory:
+                          type: array
+                          description: ประวัติการแก้ไข (อ่านอย่างเดียว)
+                          items:
+                              type: object
+                              required: [at, userName, action]
+                              properties:
+                                  at: { type: string, format: date-time }
+                                  userName: { type: string }
+                                  action: { type: string }
+        LicenseAlert:
+            type: object
+            required: [personnelId, fullName, license, expiresAt, expired]
+            properties:
+                personnelId: { type: string }
+                fullName: { type: string }
+                license: { type: string }
+                expiresAt: { type: string, format: date }
+                expired: { type: boolean }
+
+        # ---------- การอนุมัติ ----------
+        ApprovalType:
+            type: string
+            enum: [pr, po, subcontract, change-order, petty-cash, rental]
+        ApprovalStatus:
+            type: string
+            enum: [pending, approved, rejected]
+        ApprovalLevel:
+            type: string
+            description: ผู้มีอำนาจอนุมัติตามเกณฑ์ (หลังบ้านคำนวณจากยอดและประเภท)
+            enum: [project-manager, owner]
+        ApprovalItem:
+            type: object
+            required: [name, quantity, unit, unitPrice]
+            properties:
+                name: { type: string }
+                quantity: { type: number }
+                unit: { type: string }
+                unitPrice: { type: number }
+        ApprovalStep:
+            type: object
+            required: [action, user, at]
+            properties:
+                action: { type: string, enum: [submitted, approved, rejected] }
+                user: { $ref: '#/components/schemas/UserRef' }
+                at: { type: string, format: date-time }
+                note: { type: string }
+        Approval:
+            type: object
+            required: [id, type, projectCode, title, amount, requestedBy, requestedAt, status, approvalLevel, items, history]
+            properties:
+                id: { type: string }
+                type: { $ref: '#/components/schemas/ApprovalType' }
+                projectCode: { type: string }
+                title: { type: string }
+                reason: { type: string }
+                amount: { type: number, description: ยอดรวม = ผลรวม quantity × unitPrice }
+                requestedBy: { $ref: '#/components/schemas/UserRef' }
+                requestedAt: { type: string, format: date-time }
+                status: { $ref: '#/components/schemas/ApprovalStatus' }
+                approvalLevel: { $ref: '#/components/schemas/ApprovalLevel' }
+                items:
+                    type: array
+                    items: { $ref: '#/components/schemas/ApprovalItem' }
+                history:
+                    type: array
+                    items: { $ref: '#/components/schemas/ApprovalStep' }
+        ApprovalPage:
+            allOf:
+                - $ref: '#/components/schemas/PageMeta'
+                - type: object
+                  required: [items]
+                  properties:
+                      items:
+                          type: array
+                          items: { $ref: '#/components/schemas/Approval' }
+        ApprovalSummary:
+            type: object
+            required: [pending, approved, rejected, pendingAmount, ownerPending]
+            properties:
+                pending: { type: integer }
+                approved: { type: integer }
+                rejected: { type: integer }
+                pendingAmount: { type: number }
+                ownerPending: { type: integer, description: รายการรอที่ต้องให้เจ้าของอนุมัติ }
+        DecisionInput:
+            type: object
+            properties:
+                note: { type: string, maxLength: 500 }
+        RejectInput:
+            type: object
+            required: [note]
+            properties:
+                note: { type: string, minLength: 1, maxLength: 500 }
+        BulkApproveResult:
+            type: object
+            required: [approved, skipped]
+            properties:
+                approved:
+                    type: array
+                    items: { $ref: '#/components/schemas/Approval' }
+                skipped:
+                    type: array
+                    items:
+                        type: object
+                        required: [id, reason]
+                        properties:
+                            id: { type: string }
+                            reason: { type: string }
+
+        # ---------- Audit Log ----------
+        AuditModule:
+            type: string
+            enum: [approval, project, personnel, procurement, finance, system]
+        AuditEntry:
+            type: object
+            required: [id, at, user, module, action, target]
+            properties:
+                id: { type: string }
+                at: { type: string, format: date-time }
+                user: { $ref: '#/components/schemas/UserRef' }
+                module: { $ref: '#/components/schemas/AuditModule' }
+                action: { type: string, description: ข้อความการกระทำ (ภาษาไทย) }
+                target: { type: string, description: เลขที่/รหัสของสิ่งที่ถูกกระทำ }
+                detail: { type: string }
+        AuditLogPage:
+            allOf:
+                - $ref: '#/components/schemas/PageMeta'
+                - type: object
+                  required: [items]
+                  properties:
+                      items:
+                          type: array
+                          items: { $ref: '#/components/schemas/AuditEntry' }
+
+        # ---------- Dashboard ----------
+        ProjectHealth:
+            type: string
+            enum: [normal, behind, over-budget, loss]
+        ProjectFinance:
+            type: object
+            required: [projectCode, customerName, contractValue, progress, plannedProgress, budgetCost, earnedRevenue, actualCost, grossProfit, margin, forecastProfit, cashReceived, receivable, health]
+            properties:
+                projectCode: { type: string }
+                customerName: { type: string }
+                contractValue: { type: number }
+                progress: { type: integer }
+                plannedProgress: { type: integer, description: ความคืบหน้าที่ควรเป็นตามเวลา }
+                budgetCost: { type: number }
+                earnedRevenue: { type: number, description: รายได้รับรู้ตามความคืบหน้า }
+                actualCost: { type: number }
+                grossProfit: { type: number }
+                margin: { type: number, description: '% ของรายได้รับรู้' }
+                forecastProfit: { type: number, description: กำไรที่คาดเมื่อจบโครงการ }
+                cashReceived: { type: number }
+                receivable: { type: number }
+                health: { $ref: '#/components/schemas/ProjectHealth' }
+        ProjectGroup:
+            type: string
+            description: |
+                pending-contract = รอทำสัญญา, active = กำลังดำเนินการ (มีสัญญาแล้ว ยังไม่ส่งมอบ),
+                in-hand = โครงการในมือ (รอทำสัญญา + กำลังดำเนินการ), completed = ส่งมอบแล้ว,
+                warranty = ส่งมอบแล้วและยังอยู่ในระยะประกัน
+            enum: [in-hand, pending-contract, active, completed, warranty]
+        ProjectPortfolio:
+            type: object
+            required: [asOf, warrantyMonths, counts, activeByStatus, warranties]
+            properties:
+                asOf: { type: string, format: date-time }
+                warrantyMonths: { type: integer, description: ระยะรับประกันผลงานหลังส่งมอบ (เดือน) }
+                counts:
+                    type: object
+                    required: [total, inHand, pendingContract, active, completed, warranty]
+                    properties:
+                        total: { type: integer }
+                        inHand: { type: integer }
+                        pendingContract: { type: integer }
+                        active: { type: integer }
+                        completed: { type: integer }
+                        warranty: { type: integer }
+                activeByStatus:
+                    type: object
+                    description: แยกโครงการที่กำลังดำเนินการตามสถานะ
+                    required: [planning, in-progress, near-handover, delayed]
+                    properties:
+                        planning: { type: integer }
+                        in-progress: { type: integer }
+                        near-handover: { type: integer }
+                        delayed: { type: integer }
+                inHandValue: { type: number, description: มูลค่าสัญญาของโครงการที่กำลังดำเนินการ (เฉพาะสิทธิ์ finance.company) }
+                warranties:
+                    type: array
+                    description: โครงการที่ยังอยู่ในประกัน เรียงตามวันหมดประกันที่ใกล้ที่สุด
+                    items:
+                        type: object
+                        required: [code, name, customerName, handedOverAt, warrantyUntil, daysLeft]
+                        properties:
+                            code: { type: string }
+                            name: { type: string }
+                            customerName: { type: string }
+                            handedOverAt: { type: string, format: date }
+                            warrantyUntil: { type: string, format: date }
+                            daysLeft: { type: integer }
+        DashboardSummary:
+            type: object
+            required: [asOf, totals, projects]
+            properties:
+                asOf: { type: string, format: date-time }
+                totals:
+                    type: object
+                    required: [contractValue, backlog, activeProjects, earnedRevenue, actualCost, grossProfit, margin, forecastProfit, cashReceived, receivable]
+                    properties:
+                        contractValue: { type: number }
+                        backlog: { type: number }
+                        activeProjects: { type: integer }
+                        earnedRevenue: { type: number }
+                        actualCost: { type: number }
+                        grossProfit: { type: number }
+                        margin: { type: number }
+                        forecastProfit: { type: number }
+                        cashReceived: { type: number }
+                        receivable: { type: number }
+                projects:
+                    type: array
+                    items: { $ref: '#/components/schemas/ProjectFinance' }
+        MonthlyCashFlow:
+            type: object
+            required: [month, cashIn, cashOut]
+            properties:
+                month: { type: string, description: YYYY-MM, examples: ['2026-10'] }
+                cashIn: { type: number }
+                cashOut: { type: number }

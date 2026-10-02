@@ -6,6 +6,8 @@ import { IconFieldModule } from 'primeng/iconfield';
 import { InputIconModule } from 'primeng/inputicon';
 import { InputTextModule } from 'primeng/inputtext';
 import { Table, TableModule } from 'primeng/table';
+import { rxResource } from '@angular/core/rxjs-interop';
+import { problemMessage } from '@/app/api/api';
 import { PersonnelRecord, PersonnelService } from '@/app/pages/service/personnel.service';
 
 @Component({
@@ -16,25 +18,33 @@ import { PersonnelRecord, PersonnelService } from '@/app/pages/service/personnel
         <div class="flex flex-wrap justify-between items-center gap-3 mb-4">
             <div>
                 <h1 class="font-semibold text-2xl m-0">ข้อมูลบุคลากรรวม</h1>
-                <p class="text-color-secondary mt-2 mb-0">{{ records.length }} รายการ</p>
+                <p class="text-color-secondary mt-2 mb-0">{{ records.value().length }} รายการ</p>
             </div>
             <button pButton type="button" label="เพิ่มบุคลากร" icon="pi pi-user-plus" (click)="createPersonnel()"></button>
         </div>
 
-        @if (expiringLicenses.length) {
+        @if (expiringLicenses.value().length) {
             <div class="flex items-start gap-3 border border-orange-300 bg-orange-50 text-orange-900 rounded p-4 mb-4" role="status">
                 <i class="pi pi-exclamation-triangle mt-1"></i>
                 <div>
                     <div class="font-semibold">มีใบอนุญาตหมดอายุหรือใกล้หมดอายุภายใน 90 วัน</div>
-                    <div class="mt-1">{{ expiringLicenses.length }} รายการ กรุณาตรวจสอบและต่ออายุก่อนมอบหมายงาน</div>
+                    <div class="mt-1">{{ expiringLicenses.value().length }} รายการ กรุณาตรวจสอบและต่ออายุก่อนมอบหมายงาน</div>
                 </div>
+            </div>
+        }
+
+        @if (records.error(); as error) {
+            <div class="flex flex-wrap items-center justify-between gap-3 rounded-lg px-4 py-3 mb-4 bg-red-50 text-red-800 dark:bg-red-500/15 dark:text-red-200" role="alert">
+                <span><i class="pi pi-exclamation-triangle mr-2"></i>โหลดข้อมูลบุคลากรไม่สำเร็จ: {{ errorMessage(error) }}</span>
+                <button pButton type="button" [outlined]="true" severity="danger" size="small" icon="pi pi-refresh" label="ลองใหม่" (click)="records.reload()"></button>
             </div>
         }
 
         <div class="card">
             <p-table
                 #dt
-                [value]="records"
+                [value]="records.value()"
+                [loading]="records.isLoading()"
                 dataKey="id"
                 [rows]="10"
                 [paginator]="true"
@@ -101,8 +111,12 @@ export class PersonnelList {
     private readonly personnelService = inject(PersonnelService);
     private readonly router = inject(Router);
 
-    readonly records = this.personnelService.getAll();
-    readonly expiringLicenses = this.personnelService.getExpiringLicenses();
+    readonly records = rxResource({ stream: () => this.personnelService.list(), defaultValue: [] });
+    readonly expiringLicenses = rxResource({ stream: () => this.personnelService.licenseAlerts(90), defaultValue: [] });
+
+    errorMessage(error: unknown) {
+        return problemMessage(error);
+    }
 
     filterRecords(table: Table, event: Event) {
         table.filterGlobal((event.target as HTMLInputElement).value, 'contains');

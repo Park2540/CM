@@ -1,109 +1,85 @@
-import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Injectable, inject } from '@angular/core';
+import { Observable } from 'rxjs';
+import { ApiSchemas, apiUrl, queryParams } from '@/app/api/api';
 
-export interface Project {
-    code: string;
-    name: string;
-    location: string;
-    housePlanCode: string;
-    customerName: string;
-    phone: string;
-    responsibleName: string;
-    value: number;
-    startDate: string;
-    deliveryDate: string;
-    progress: number;
-    status: string;
+export type Project = ApiSchemas['Project'];
+export type ProjectStatus = ApiSchemas['ProjectStatus'];
+export type ProjectInput = ApiSchemas['ProjectInput'];
+export type ContractInput = ApiSchemas['ContractInput'];
+export type ProjectRegion = ApiSchemas['ProjectRegion'];
+export type ProjectGroup = ApiSchemas['ProjectGroup'];
+export type ProjectPortfolio = ApiSchemas['ProjectPortfolio'];
+
+/** กลุ่มโครงการ (ตัวกรองในรายการโครงการและการ์ดใน Dashboard) */
+export const PROJECT_GROUP_LABEL: Record<ProjectGroup, string> = {
+    'in-hand': 'โครงการในมือ',
+    'pending-contract': 'รอทำสัญญา',
+    active: 'กำลังดำเนินการ',
+    completed: 'เสร็จแล้ว',
+    warranty: 'อยู่ในประกัน'
+};
+
+/** โครงการที่บันทึกสัญญาแล้ว — มีมูลค่า วันที่ และที่ตั้งหน้างานครบ จึงมีแผนงาน งวดงาน ภาพ เอกสาร */
+export type ContractedProject = Project & { value: number; startDate: string; deliveryDate: string; location: string; contractSignedAt: string };
+
+export function isContracted(project: Project | null | undefined): project is ContractedProject {
+    return !!project && project.status !== 'pending-contract' && project.value !== null && !!project.startDate && !!project.deliveryDate;
 }
 
-export function getProjectSeverity(status: string) {
+export const PROJECT_STATUS_LABEL: Record<ProjectStatus, string> = {
+    'pending-contract': 'รอเซ็นสัญญา',
+    planning: 'รอดำเนินการ',
+    'in-progress': 'กำลังดำเนินการ',
+    'near-handover': 'ใกล้ส่งมอบ',
+    completed: 'เสร็จสิ้น',
+    delayed: 'ล่าช้า'
+};
+
+export function getProjectSeverity(status: ProjectStatus) {
     switch (status) {
-        case 'เสร็จสิ้น':
+        case 'pending-contract':
+            return 'secondary';
+        case 'completed':
             return 'success';
-        case 'ล่าช้า':
+        case 'delayed':
             return 'danger';
-        case 'รอดำเนินการ':
+        case 'planning':
             return 'warn';
         default:
             return 'info';
     }
 }
 
+/** โครงการ — เรียก API ตามสัญญา (/projects) */
 @Injectable({ providedIn: 'root' })
 export class ProjectService {
-    readonly projects: Project[] = [
-        {
-            code: 'CR690001',
-            housePlanCode: 'ARUN',
-            name: 'ก่อสร้างบ้านพักอาศัย 2 ชั้น คุณณัฐวุฒิ ใจดี',
-            location: 'อ.เมือง จ.เชียงราย (ข้อมูลตัวอย่าง)',
-            customerName: 'ณัฐวุฒิ ใจดี',
-            phone: '081-234-5678',
-            responsibleName: 'ธนกฤต ศรีวงศ์',
-            value: 3850000,
-            startDate: '2026-01-15',
-            deliveryDate: '2026-10-30',
-            progress: 72,
-            status: 'กำลังดำเนินการ'
-        },
-        {
-            code: 'CR690002',
-            housePlanCode: 'RAWEE',
-            name: 'ก่อสร้างบ้านพักอาศัย 2 ชั้น คุณสุภาวดี แสงทอง',
-            location: 'อ.แม่จัน จ.เชียงราย (ข้อมูลตัวอย่าง)',
-            customerName: 'สุภาวดี แสงทอง',
-            phone: '089-123-4567',
-            responsibleName: 'พิมพ์ชนก วัฒนกุล',
-            value: 2475000,
-            startDate: '2026-02-01',
-            deliveryDate: '2026-11-15',
-            progress: 48,
-            status: 'กำลังดำเนินการ'
-        },
-        {
-            code: 'BKK690001',
-            housePlanCode: 'ARUN',
-            name: 'ก่อสร้างบ้านพักอาศัย 2 ชั้น คุณกิตติพงษ์ วัฒนชัย',
-            location: 'เขตบางกะปิ กรุงเทพฯ (ข้อมูลตัวอย่าง)',
-            customerName: 'กิตติพงษ์ วัฒนชัย',
-            phone: '086-555-0192',
-            responsibleName: 'ณัฐพล ภูมิรักษ์',
-            value: 5200000,
-            startDate: '2026-01-05',
-            deliveryDate: '2026-09-30',
-            progress: 91,
-            status: 'ใกล้ส่งมอบ'
-        },
-        {
-            code: 'CNX690001',
-            housePlanCode: 'RAWEE',
-            name: 'ก่อสร้างบ้านพักอาศัย 2 ชั้น คุณพิมพ์ชนก ธรรมรักษ์',
-            location: 'อ.สันทราย จ.เชียงใหม่ (ข้อมูลตัวอย่าง)',
-            customerName: 'พิมพ์ชนก ธรรมรักษ์',
-            phone: '095-765-4321',
-            responsibleName: 'วรัญญา อินทร์แก้ว',
-            value: 3180000,
-            startDate: '2026-03-10',
-            deliveryDate: '2026-12-20',
-            progress: 35,
-            status: 'รอดำเนินการ'
-        },
-        {
-            code: 'PKT690001',
-            housePlanCode: 'ARUN',
-            name: 'ก่อสร้างบ้านพักอาศัย 2 ชั้น คุณธนกร พูลสวัสดิ์',
-            location: 'อ.ถลาง จ.ภูเก็ต (ข้อมูลตัวอย่าง)',
-            customerName: 'ธนกร พูลสวัสดิ์',
-            phone: '082-456-7890',
-            responsibleName: 'ศุภชัย จันทร์เพ็ญ',
-            value: 4600000,
-            startDate: '2026-01-20',
-            deliveryDate: '2026-08-31',
-            progress: 100,
-            status: 'เสร็จสิ้น'
-        }
-    ];
+    private readonly http = inject(HttpClient);
 
-    getProject(code: string): Project | undefined {
-        return this.projects.find((project) => project.code === code);
+    list(query: { status?: ProjectStatus | null; group?: ProjectGroup | null; q?: string } = {}): Observable<Project[]> {
+        return this.http.get<Project[]>(apiUrl('/projects'), { params: queryParams(query) });
+    }
+
+    get(code: string): Observable<Project> {
+        return this.http.get<Project>(apiUrl(`/projects/${encodeURIComponent(code)}`));
+    }
+
+    /** เปิดโครงการ (ข้อมูลเบื้องต้น) — สถานะเริ่มต้น "รอเซ็นสัญญา" */
+    create(input: ProjectInput): Observable<Project> {
+        return this.http.post<Project>(apiUrl('/projects'), input);
+    }
+
+    /** บันทึกสัญญา — แผนงานและงวดงานสร้างหลังตั้งค่างานก่อสร้าง */
+    recordContract(code: string, input: ContractInput): Observable<Project> {
+        return this.http.post<Project>(apiUrl(`/projects/${encodeURIComponent(code)}/contract`), input);
+    }
+
+    /** จำนวนโครงการตามกลุ่มสำหรับ Dashboard */
+    portfolio(): Observable<ProjectPortfolio> {
+        return this.http.get<ProjectPortfolio>(apiUrl('/dashboard/projects'));
+    }
+
+    regions(): Observable<ProjectRegion[]> {
+        return this.http.get<ProjectRegion[]>(apiUrl('/settings/project-regions'));
     }
 }

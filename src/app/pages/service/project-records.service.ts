@@ -1,201 +1,69 @@
-import { Injectable } from '@angular/core';
-import { Project } from './project.service';
-import { ProjectTimeline, TimelinePhase, TimelineTask, todayAsDate } from './project-timeline.service';
+import { HttpClient } from '@angular/common/http';
+import { Injectable, inject } from '@angular/core';
+import { Observable, map } from 'rxjs';
+import { ApiSchemas, apiUrl, queryParams, toDate } from '@/app/api/api';
 
-export interface TeamMember {
-    name: string;
-    role: string;
-    phone: string;
+export type TeamMember = ApiSchemas['TeamMember'];
+export type InstallmentStatus = ApiSchemas['InstallmentStatus'];
+export type DocumentCategory = ApiSchemas['DocumentCategory'];
+export type ProjectDocument = ApiSchemas['ProjectDocument'];
+export type DocumentFileType = ProjectDocument['fileType'];
+
+export type Installment = Omit<ApiSchemas['Installment'], 'dueDate' | 'paidDate'> & { dueDate: Date; paidDate: Date | null };
+export type SitePhoto = ApiSchemas['SitePhoto'] & { date: Date };
+export type PhotoPhaseCount = ApiSchemas['SitePhotoPage']['phases'][number];
+export interface SitePhotoPage {
+    items: SitePhoto[];
+    total: number;
+    phases: PhotoPhaseCount[];
 }
 
-export type InstallmentStatus = 'paid' | 'due' | 'working' | 'upcoming';
+export const DOCUMENT_CATEGORIES: DocumentCategory[] = ['contract', 'drawing', 'permit', 'inspection', 'billing', 'handover'];
 
-export interface Installment {
-    no: number;
-    title: string;
-    phaseSteps: number[];
-    percent: number;
-    amount: number;
-    status: InstallmentStatus;
-    dueDate: Date;
-    paidDate: Date | null;
-}
+export const DOCUMENT_CATEGORY_LABEL: Record<DocumentCategory, string> = {
+    contract: 'สัญญาและงวดงาน',
+    drawing: 'แบบก่อสร้าง',
+    permit: 'ใบอนุญาต',
+    inspection: 'รายงานตรวจคุณภาพ',
+    billing: 'ใบแจ้งหนี้/ใบเสร็จ',
+    handover: 'เอกสารส่งมอบ'
+};
 
-export interface SitePhoto {
-    id: string;
-    date: Date;
-    caption: string;
-    phaseCode: string;
-    phaseStep: number;
-    phaseShortName: string;
-}
+/** ไอคอนและสีตามชนิดไฟล์ (ใช้ร่วมกันในแท็บเอกสารและบันทึกหน้างาน) */
+export const DOCUMENT_FILE_ICON: Record<DocumentFileType, string> = {
+    pdf: 'pi-file-pdf text-red-600 dark:text-red-400',
+    dwg: 'pi-objects-column text-blue-600 dark:text-blue-400',
+    xlsx: 'pi-file-excel text-green-600 dark:text-green-400',
+    docx: 'pi-file-word text-blue-600 dark:text-blue-400',
+    image: 'pi-image text-violet-600 dark:text-violet-400'
+};
 
-export type DocumentCategory = 'สัญญาและงวดงาน' | 'แบบก่อสร้าง' | 'ใบอนุญาต' | 'รายงานตรวจคุณภาพ' | 'ใบแจ้งหนี้/ใบเสร็จ' | 'เอกสารส่งมอบ';
-export type DocumentFileType = 'pdf' | 'dwg' | 'xlsx';
+const dateOnly = (value: string) => new Date(`${value}T00:00:00Z`);
 
-export interface ProjectDocument {
-    id: string;
-    category: DocumentCategory;
-    name: string;
-    date: Date;
-    fileType: DocumentFileType;
-    sizeKb: number;
-}
-
-export interface ProjectRecords {
-    team: TeamMember[];
-    installments: Installment[];
-    photos: SitePhoto[];
-    documents: ProjectDocument[];
-}
-
-export const DOCUMENT_CATEGORIES: DocumentCategory[] = ['สัญญาและงวดงาน', 'แบบก่อสร้าง', 'ใบอนุญาต', 'รายงานตรวจคุณภาพ', 'ใบแจ้งหนี้/ใบเสร็จ', 'เอกสารส่งมอบ'];
-
-/** งวดงานตัวอย่าง: แต่ละงวดเบิกได้เมื่อขั้นตอนที่ผูกไว้เสร็จทั้งหมด (รหัสขั้นตอนตามแม่แบบแผนงาน) */
-const PAYMENT_SCHEDULE: Array<{ title: string; phaseCodes: string[]; percent: number }> = [
-    { title: 'ลงนามสัญญาและได้รับใบอนุญาตก่อสร้าง', phaseCodes: ['01', '02', '03'], percent: 10 },
-    { title: 'งานเตรียมพื้นที่และงานชั่วคราว', phaseCodes: ['04'], percent: 10 },
-    { title: 'งานฐานรากและพื้นชั้นล่าง', phaseCodes: ['05'], percent: 15 },
-    { title: 'งานโครงสร้างคอนกรีตทุกชั้น', phaseCodes: ['06'], percent: 15 },
-    { title: 'งานหลังคา (Dry-in)', phaseCodes: ['07'], percent: 10 },
-    { title: 'งานก่ออิฐ วงกบ และงานระบบก่อนฉาบ', phaseCodes: ['08', '09'], percent: 10 },
-    { title: 'งานฉาบปูนและกันซึม', phaseCodes: ['10'], percent: 10 },
-    { title: 'งานตกแต่งสถาปัตยกรรม', phaseCodes: ['11'], percent: 10 },
-    { title: 'งานติดตั้งระบบและงานภายนอก', phaseCodes: ['12', '13'], percent: 5 },
-    { title: 'ตรวจรับและส่งมอบงาน', phaseCodes: ['14'], percent: 5 }
-];
-
-const DAY_MS = 86_400_000;
-const addDays = (date: Date, days: number) => new Date(date.getTime() + days * DAY_MS);
-const minDate = (a: Date, b: Date) => (a < b ? a : b);
-
-function hash(text: string): number {
-    let value = 0;
-    for (const char of text) value = (value * 31 + char.charCodeAt(0)) >>> 0;
-    return value;
-}
-
-/**
- * ข้อมูลตัวอย่างสำหรับหน้าโครงการ (ทีมงาน งวดงาน ภาพถ่าย เอกสาร) — ใช้แสดงหน้าจอระหว่างที่ยังไม่มี API
- * สร้างจากไทม์ไลน์ของโครงการ เพื่อให้สถานะงวดเงิน ภาพ และเอกสาร สอดคล้องกับความคืบหน้า
- * เมื่อเชื่อมต่อหลังบ้านแล้ว ให้แทนที่ด้วยการเรียก API โดยคง interface เดิมไว้
- */
+/** งวดงาน ภาพถ่าย เอกสาร และทีมงานของโครงการ (/projects/{code}/...) */
 @Injectable({ providedIn: 'root' })
 export class ProjectRecordsService {
-    build(project: Project, timeline: ProjectTimeline): ProjectRecords {
-        const installments = this.buildInstallments(project, timeline);
-        return {
-            team: this.buildTeam(project),
-            installments,
-            photos: this.buildPhotos(project, timeline),
-            documents: this.buildDocuments(project, timeline, installments)
-        };
+    private readonly http = inject(HttpClient);
+
+    private url(code: string, path: string) {
+        return apiUrl(`/projects/${encodeURIComponent(code)}${path}`);
     }
 
-    private buildTeam(project: Project): TeamMember[] {
-        return [
-            { name: project.responsibleName, role: 'ผู้จัดการโครงการ', phone: '081-234-5678' },
-            { name: 'ประเสริฐ ทองดี', role: 'วิศวกรโครงการ', phone: '089-555-0101' },
-            { name: 'สมศักดิ์ มั่นคง', role: 'ผู้ควบคุมงาน', phone: '086-555-0102' },
-            { name: 'อรุณี แก้วใส', role: 'ฝ่ายบัญชีและการเงิน', phone: '053-555-0103' }
-        ];
+    installments(code: string): Observable<Installment[]> {
+        return this.http.get<ApiSchemas['Installment'][]>(this.url(code, '/installments')).pipe(map((rows) => rows.map((row) => ({ ...row, dueDate: dateOnly(row.dueDate), paidDate: row.paidDate ? dateOnly(row.paidDate) : null }))));
     }
 
-    private buildInstallments(project: Project, timeline: ProjectTimeline): Installment[] {
-        const today = todayAsDate();
-        const rows = PAYMENT_SCHEDULE.map((item, index) => {
-            const phases = timeline.phases.filter((phase) => item.phaseCodes.includes(phase.code));
-            const completedAt = new Date(Math.max(...phases.map((phase) => phase.end.getTime())));
-            return {
-                item,
-                index,
-                phases,
-                completedAt,
-                done: phases.every((phase) => phase.status === 'done'),
-                started: phases.some((phase) => phase.status !== 'pending')
-            };
-        });
-        const lastDoneIndex = Math.max(-1, ...rows.filter((row) => row.done).map((row) => row.index));
-
-        return rows.map(({ item, index, phases, completedAt, done, started }): Installment => {
-            // งวดล่าสุดที่งานเสร็จถือว่ารอชำระ งวดก่อนหน้าชำระแล้ว (โครงการที่เสร็จ 100% ถือว่าชำระครบ)
-            const status: InstallmentStatus = done ? (index < lastDoneIndex || project.progress >= 100 ? 'paid' : 'due') : started ? 'working' : 'upcoming';
-            return {
-                no: index + 1,
-                title: item.title,
-                phaseSteps: phases.map((phase) => phase.step),
-                percent: item.percent,
-                amount: Math.round((project.value * item.percent) / 100),
-                status,
-                dueDate: addDays(completedAt, 7),
-                paidDate: status === 'paid' ? minDate(addDays(completedAt, 5), today) : null
-            };
-        });
+    photos(code: string, query: { phaseCode?: string | null; page?: number; pageSize?: number } = {}): Observable<SitePhotoPage> {
+        return this.http
+            .get<ApiSchemas['SitePhotoPage']>(this.url(code, '/photos'), { params: queryParams(query) })
+            .pipe(map((page) => ({ total: page.total, phases: page.phases, items: page.items.map((photo) => ({ ...photo, date: toDate(photo.takenAt) })) })));
     }
 
-    private buildPhotos(project: Project, timeline: ProjectTimeline): SitePhoto[] {
-        const today = todayAsDate();
-        const photos = timeline.phases.flatMap((phase) =>
-            phase.tasks
-                .filter((task) => !task.isMilestone && task.status !== 'pending')
-                .flatMap((task) => {
-                    const count = 1 + (hash(project.code + task.code) % 2);
-                    return Array.from({ length: count }, (_, i): SitePhoto => {
-                        const base = task.status === 'done' ? addDays(task.end, -i) : addDays(task.start, i);
-                        return {
-                            id: `${task.code}-${i + 1}`,
-                            date: minDate(base, today),
-                            caption: count > 1 ? `${task.name} (${i + 1}/${count})` : task.name,
-                            phaseCode: phase.code,
-                            phaseStep: phase.step,
-                            phaseShortName: phase.shortName
-                        };
-                    });
-                })
-        );
-        return photos.sort((a, b) => b.date.getTime() - a.date.getTime() || b.id.localeCompare(a.id));
+    documents(code: string): Observable<ProjectDocument[]> {
+        return this.http.get<ProjectDocument[]>(this.url(code, '/documents'));
     }
 
-    private buildDocuments(project: Project, timeline: ProjectTimeline, installments: Installment[]): ProjectDocument[] {
-        const documents: ProjectDocument[] = [];
-        const tasks = new Map<string, TimelineTask>(timeline.phases.flatMap((phase) => phase.tasks.map((task) => [task.code, task] as const)));
-        const phase = (code: string) => timeline.phases.find((item) => item.code === code) as TimelinePhase;
-        const add = (category: DocumentCategory, name: string, date: Date, fileType: DocumentFileType = 'pdf') => documents.push({ id: `doc-${documents.length + 1}`, category, name, date, fileType, sizeKb: 180 + (hash(project.code + name) % 4800) });
-
-        const contract = tasks.get('03.07');
-        if (contract?.status === 'done') {
-            add('สัญญาและงวดงาน', `สัญญาจ้างก่อสร้าง ${project.code}.pdf`, contract.end);
-            add('สัญญาและงวดงาน', 'ตารางงวดงานและเงื่อนไขการชำระเงิน.pdf', contract.end);
-        }
-
-        const design = phase('02');
-        if (design.status === 'done') {
-            add('แบบก่อสร้าง', 'แบบสถาปัตยกรรม (แปลน รูปด้าน รูปตัด).pdf', design.end);
-            add('แบบก่อสร้าง', 'แบบโครงสร้างและรายการคำนวณ.pdf', design.end);
-            add('แบบก่อสร้าง', 'แบบระบบไฟฟ้าและสุขาภิบาล.dwg', design.end, 'dwg');
-            add('แบบก่อสร้าง', 'รายการประกอบแบบ (Specification).pdf', design.end);
-            add('แบบก่อสร้าง', 'BOQ และประมาณราคา.xlsx', design.end, 'xlsx');
-        }
-
-        const permit = tasks.get('03.05');
-        if (permit?.status === 'done') add('ใบอนุญาต', 'ใบอนุญาตก่อสร้างอาคาร (อ.1).pdf', permit.end);
-
-        for (const task of tasks.values()) {
-            if (task.isHoldPoint && task.status === 'done') add('รายงานตรวจคุณภาพ', `รายงานผลตรวจ - ${task.name}.pdf`, task.end);
-        }
-
-        for (const installment of installments) {
-            if (installment.status === 'paid') add('ใบแจ้งหนี้/ใบเสร็จ', `ใบเสร็จรับเงิน งวดที่ ${installment.no}.pdf`, installment.paidDate ?? installment.dueDate);
-            if (installment.status === 'due') add('ใบแจ้งหนี้/ใบเสร็จ', `ใบแจ้งหนี้ งวดที่ ${installment.no}.pdf`, addDays(installment.dueDate, -7));
-        }
-
-        const handover = phase('14');
-        if (handover.status === 'done') {
-            add('เอกสารส่งมอบ', 'แบบก่อสร้างจริง (As-built).pdf', handover.end);
-            add('เอกสารส่งมอบ', 'คู่มือการใช้งานและบำรุงรักษาอาคาร.pdf', handover.end);
-            add('เอกสารส่งมอบ', 'หนังสือรับประกันผลงาน.pdf', handover.end);
-        }
-
-        return documents.sort((a, b) => b.date.getTime() - a.date.getTime());
+    team(code: string): Observable<TeamMember[]> {
+        return this.http.get<TeamMember[]>(this.url(code, '/team'));
     }
 }

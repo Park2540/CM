@@ -1,11 +1,14 @@
-import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Injectable, inject } from '@angular/core';
+import { Observable, map } from 'rxjs';
+import { ApiSchemas, apiUrl, queryParams } from '@/app/api/api';
 
 export interface PersonnelDocument {
     type: string;
     fileName: string;
+    url: string;
     expiresAt: string;
     uploadedBy: string;
-    dataUrl?: string;
 }
 
 export interface PersonnelProjectHistory {
@@ -14,7 +17,7 @@ export interface PersonnelProjectHistory {
     period: string;
     assignment: string;
     dailyReport: string;
-    paidAmount: number;
+    paidAmount: number | null;
 }
 
 export interface PersonnelTraining {
@@ -23,8 +26,14 @@ export interface PersonnelTraining {
     expiresAt: string;
 }
 
+/**
+ * โมเดลหน้าจอ (ช่องว่าง = สตริงว่าง เพื่อผูกกับฟอร์มได้ตรงๆ)
+ * แปลงจาก/เป็น Personnel ของ API ใน PersonnelService
+ */
 export interface PersonnelRecord {
+    /** ว่างสำหรับบุคลากรใหม่ที่ยังไม่บันทึก */
     id: string;
+    /** หลังบ้านออกให้ตอนบันทึกครั้งแรก */
     employeeCode: string;
     photoUrl: string;
     fullName: string;
@@ -56,6 +65,11 @@ export interface PersonnelRecord {
     otherCertificates: string;
     workPermitExpiresAt: string;
     socialSecurityNumber: string;
+    issuedEquipment: string;
+    documents: PersonnelDocument[];
+    trainings: PersonnelTraining[];
+    /** หลังบ้านส่งข้อมูลอ่อนไหวมาหรือไม่ (ตามสิทธิ์ของผู้ใช้) */
+    hasSensitive: boolean;
     compensationType: string;
     compensationRate: number;
     compensationHistory: string;
@@ -65,233 +79,119 @@ export interface PersonnelRecord {
     bankAccountName: string;
     taxpayerId: string;
     withholdingCertificate: string;
-    documents: PersonnelDocument[];
-    projectHistory: PersonnelProjectHistory[];
-    auditHistory: string[];
-    trainings: PersonnelTraining[];
-    issuedEquipment: string;
     performanceRating: string;
     performanceNotes: string;
+    /** อ่านอย่างเดียว (หลังบ้านสร้างให้) */
+    projectHistory: PersonnelProjectHistory[];
+    auditHistory: string[];
 }
 
+export type LicenseAlert = ApiSchemas['LicenseAlert'];
+
+type ApiPersonnel = ApiSchemas['Personnel'];
+type PersonnelInput = ApiSchemas['PersonnelInput'];
+
+const TEXT_FIELDS = [
+    'photoUrl',
+    'fullName',
+    'nationalId',
+    'professionalLicenseNumber',
+    'professionalLicenseType',
+    'professionalLicenseLevel',
+    'professionalLicenseExpiresAt',
+    'position',
+    'birthDate',
+    'hireDate',
+    'phone',
+    'lineId',
+    'email',
+    'registeredAddress',
+    'currentAddress',
+    'emergencyContactName',
+    'emergencyContactRelation',
+    'emergencyContactPhone',
+    'employmentType',
+    'endDate',
+    'department',
+    'supervisor',
+    'expertise',
+    'workAreas',
+    'availability',
+    'education',
+    'institution',
+    'otherCertificates',
+    'workPermitExpiresAt',
+    'socialSecurityNumber',
+    'issuedEquipment'
+] as const;
+
+const SENSITIVE_TEXT_FIELDS = ['compensationType', 'compensationHistory', 'withholdingTaxTerms', 'bankName', 'bankAccountNumber', 'bankAccountName', 'taxpayerId', 'withholdingCertificate', 'performanceRating', 'performanceNotes'] as const;
+
+const auditDate = new Intl.DateTimeFormat('th-TH', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+export function blankPersonnel(hasSensitive: boolean): PersonnelRecord {
+    const record = Object.fromEntries([...TEXT_FIELDS, ...SENSITIVE_TEXT_FIELDS].map((field) => [field, ''])) as unknown as PersonnelRecord;
+    return { ...record, id: '', employeeCode: '', employmentType: 'ประจำ', compensationType: 'เงินเดือน', compensationRate: 0, documents: [], trainings: [], projectHistory: [], auditHistory: [], hasSensitive };
+}
+
+function fromApi(api: ApiPersonnel): PersonnelRecord {
+    const record = blankPersonnel(!!api.sensitive);
+    for (const field of TEXT_FIELDS) record[field] = api[field] ?? '';
+    for (const field of SENSITIVE_TEXT_FIELDS) record[field] = api.sensitive?.[field] ?? '';
+    return {
+        ...record,
+        id: api.id,
+        employeeCode: api.employeeCode,
+        compensationRate: api.sensitive?.compensationRate ?? 0,
+        documents: (api.documents ?? []).map((doc) => ({ type: doc.type, fileName: doc.fileName, url: doc.url, expiresAt: doc.expiresAt ?? '', uploadedBy: doc.uploadedBy ?? '' })),
+        trainings: (api.trainings ?? []).map((training) => ({ name: training.name, completedAt: training.completedAt, expiresAt: training.expiresAt ?? '' })),
+        projectHistory: api.projectHistory.map((history) => ({ ...history, paidAmount: history.paidAmount ?? null })),
+        auditHistory: api.auditHistory.map((entry) => `${auditDate.format(new Date(entry.at))} ${entry.action} โดย ${entry.userName}`)
+    };
+}
+
+/** ช่องว่างไม่ส่ง (โดยเฉพาะวันที่ ที่ API ตรวจรูปแบบ) */
+const optional = (value: string) => value.trim() || undefined;
+
+function toApi(record: PersonnelRecord): PersonnelInput {
+    const input: PersonnelInput = { fullName: record.fullName.trim() };
+    for (const field of TEXT_FIELDS) if (field !== 'fullName') input[field] = optional(record[field]);
+    input.documents = record.documents.map((doc) => ({ type: doc.type, fileName: doc.fileName, url: doc.url, expiresAt: optional(doc.expiresAt) }));
+    input.trainings = record.trainings.map((training) => ({ name: training.name, completedAt: training.completedAt, expiresAt: optional(training.expiresAt) }));
+    if (record.hasSensitive) {
+        input.sensitive = { compensationRate: Number(record.compensationRate) || 0 };
+        for (const field of SENSITIVE_TEXT_FIELDS) input.sensitive[field] = optional(record[field]);
+    }
+    return input;
+}
+
+/** ใบอนุญาตยังไม่หมดอายุ ณ วันที่ระบุ (ใช้ตรวจคุณสมบัติก่อนมอบหมายงาน) */
+export function isProfessionalLicenseValid(record: Pick<PersonnelRecord, 'professionalLicenseNumber' | 'professionalLicenseExpiresAt'> | undefined, onDate = new Date()): boolean {
+    if (!record?.professionalLicenseNumber || !record.professionalLicenseExpiresAt) return false;
+    return new Date(`${record.professionalLicenseExpiresAt}T23:59:59`) >= onDate;
+}
+
+/** บุคลากร — เรียก API ตามสัญญา (/personnel) */
 @Injectable({ providedIn: 'root' })
 export class PersonnelService {
-    private readonly records: PersonnelRecord[] = [
-        {
-            id: 'personnel-001',
-            employeeCode: 'EMP690001',
-            photoUrl: '',
-            fullName: 'ธนกฤต ศรีวงศ์',
-            nationalId: '1-2345-*****-**-*',
-            professionalLicenseNumber: 'ภย. 12345 (ตัวอย่าง)',
-            professionalLicenseType: 'วิศวกรโยธา',
-            professionalLicenseLevel: 'ภาคีวิศวกร',
-            professionalLicenseExpiresAt: '2026-11-25',
-            position: 'วิศวกรโครงการ',
-            birthDate: '1990-06-15',
-            hireDate: '2020-04-01',
-            phone: '081-234-5678',
-            lineId: 'thanakrit.demo',
-            email: 'thanakrit@example.invalid',
-            registeredAddress: 'อำเภอเมือง เชียงราย (ข้อมูลตัวอย่าง)',
-            currentAddress: 'อำเภอเมือง เชียงราย (ข้อมูลตัวอย่าง)',
-            emergencyContactName: 'ศิริพร ศรีวงศ์',
-            emergencyContactRelation: 'คู่สมรส',
-            emergencyContactPhone: '089-000-0001',
-            employmentType: 'ประจำ',
-            endDate: '',
-            department: 'ฝ่ายก่อสร้าง',
-            supervisor: 'ผู้จัดการโครงการ',
-            expertise: 'งานโครงสร้าง, งานสถาปัตย์',
-            workAreas: 'เชียงราย, เชียงใหม่',
-            availability: 'จันทร์-ศุกร์ 08:00-17:00',
-            education: 'วิศวกรรมศาสตรบัณฑิต สาขาวิศวกรรมโยธา',
-            institution: 'มหาวิทยาลัยตัวอย่าง',
-            otherCertificates: 'ความปลอดภัยในการทำงาน (ตัวอย่าง)',
-            workPermitExpiresAt: '',
-            socialSecurityNumber: '***-****-****',
-            compensationType: 'เงินเดือน',
-            compensationRate: 45000,
-            compensationHistory: '45,000 บาท/เดือน มีผล 01/01/2026',
-            withholdingTaxTerms: 'หักภาษี ณ ที่จ่ายตามประเภทเงินได้ (รอยืนยันโดยฝ่ายบัญชี)',
-            bankName: 'ธนาคารตัวอย่าง',
-            bankAccountNumber: 'xxx-x-xxxxx-x',
-            bankAccountName: 'ธนกฤต ศรีวงศ์',
-            taxpayerId: '***-***-****',
-            withholdingCertificate: 'หนังสือรับรองภาษีหัก ณ ที่จ่าย (ตัวอย่าง)',
-            documents: [
-                { type: 'สำเนาบัตรประชาชน', fileName: 'บัตรประชาชน-ตัวอย่าง.pdf', expiresAt: '', uploadedBy: 'ฝ่ายบุคคล' },
-                { type: 'ใบอนุญาตประกอบวิชาชีพ', fileName: 'ใบอนุญาต-ตัวอย่าง.pdf', expiresAt: '2027-03-31', uploadedBy: 'ฝ่ายบุคคล' }
-            ],
-            projectHistory: [{ projectCode: 'CR690001', role: 'วิศวกรโครงการ', period: 'ม.ค. 2026 - ปัจจุบัน', assignment: 'ควบคุมงานโครงสร้าง', dailyReport: 'รายงานประจำวันที่ 30/09/2026', paidAmount: 405000 }],
-            auditHistory: ['01/09/2026 เพิ่มข้อมูลบุคลากรโดย ฝ่ายบุคคล', '15/09/2026 แก้ไขข้อมูลติดต่อโดย ฝ่ายบุคคล'],
-            trainings: [{ name: 'ความปลอดภัยในการทำงาน', completedAt: '2026-01-10', expiresAt: '2027-01-10' }],
-            issuedEquipment: 'หมวกนิรภัย, เสื้อสะท้อนแสง, รองเท้านิรภัย',
-            performanceRating: 'ดีมาก',
-            performanceNotes: 'ทำงานตามแผนและส่งรายงานครบถ้วน (ตัวอย่าง)'
-        },
-        {
-            id: 'personnel-002',
-            employeeCode: 'EMP690002',
-            photoUrl: '',
-            fullName: 'พิมพ์ชนก วัฒนกุล',
-            nationalId: '1-9876-*****-**-*',
-            professionalLicenseNumber: '',
-            professionalLicenseType: '',
-            professionalLicenseLevel: '',
-            professionalLicenseExpiresAt: '',
-            position: 'เจ้าหน้าที่จัดซื้อ',
-            birthDate: '1995-11-02',
-            hireDate: '2022-08-15',
-            phone: '089-123-4567',
-            lineId: 'pimchanok.demo',
-            email: 'pimchanok@example.invalid',
-            registeredAddress: 'อำเภอเมือง เชียงราย (ข้อมูลตัวอย่าง)',
-            currentAddress: 'อำเภอเมือง เชียงราย (ข้อมูลตัวอย่าง)',
-            emergencyContactName: 'วิชัย วัฒนกุล',
-            emergencyContactRelation: 'บิดา',
-            emergencyContactPhone: '086-000-0002',
-            employmentType: 'ประจำ',
-            endDate: '',
-            department: 'ฝ่ายจัดซื้อ',
-            supervisor: 'หัวหน้าฝ่ายจัดซื้อ',
-            expertise: 'จัดซื้อ, เปรียบเทียบราคา',
-            workAreas: 'เชียงราย',
-            availability: 'จันทร์-ศุกร์ 08:00-17:00',
-            education: 'บริหารธุรกิจบัณฑิต',
-            institution: 'มหาวิทยาลัยตัวอย่าง',
-            otherCertificates: '',
-            workPermitExpiresAt: '',
-            socialSecurityNumber: '***-****-****',
-            compensationType: 'เงินเดือน',
-            compensationRate: 32000,
-            compensationHistory: '32,000 บาท/เดือน มีผล 01/04/2026',
-            withholdingTaxTerms: 'หักภาษี ณ ที่จ่ายตามประเภทเงินได้ (รอยืนยันโดยฝ่ายบัญชี)',
-            bankName: 'ธนาคารตัวอย่าง',
-            bankAccountNumber: 'xxx-x-xxxxx-x',
-            bankAccountName: 'พิมพ์ชนก วัฒนกุล',
-            taxpayerId: '***-***-****',
-            withholdingCertificate: '',
-            documents: [],
-            projectHistory: [],
-            auditHistory: ['15/08/2022 เพิ่มข้อมูลบุคลากรโดย ฝ่ายบุคคล'],
-            trainings: [],
-            issuedEquipment: '',
-            performanceRating: '',
-            performanceNotes: ''
-        }
-    ];
+    private readonly http = inject(HttpClient);
 
-    getAll(): PersonnelRecord[] {
-        return this.records;
+    list(q?: string): Observable<PersonnelRecord[]> {
+        return this.http.get<ApiPersonnel[]>(apiUrl('/personnel'), { params: queryParams({ q }) }).pipe(map((rows) => rows.map(fromApi)));
     }
 
-    getById(id: string): PersonnelRecord | undefined {
-        return this.records.find((record) => record.id === id);
+    get(id: string): Observable<PersonnelRecord> {
+        return this.http.get<ApiPersonnel>(apiUrl(`/personnel/${encodeURIComponent(id)}`)).pipe(map(fromApi));
     }
 
-    createBlank(): PersonnelRecord {
-        const buddhistYear = String(new Date().getFullYear() + 543).slice(-2);
-        const prefix = `EMP${buddhistYear}`;
-        const highestNumber = Math.max(0, ...this.records.filter((record) => record.employeeCode.startsWith(prefix)).map((record) => Number(record.employeeCode.slice(prefix.length)) || 0));
-        const nextNumber = String(highestNumber + 1).padStart(4, '0');
-
-        return {
-            id: `personnel-${Date.now()}`,
-            employeeCode: `${prefix}${nextNumber}`,
-            photoUrl: '',
-            fullName: '',
-            nationalId: '',
-            professionalLicenseNumber: '',
-            professionalLicenseType: '',
-            professionalLicenseLevel: '',
-            professionalLicenseExpiresAt: '',
-            position: '',
-            birthDate: '',
-            hireDate: '',
-            phone: '',
-            lineId: '',
-            email: '',
-            registeredAddress: '',
-            currentAddress: '',
-            emergencyContactName: '',
-            emergencyContactRelation: '',
-            emergencyContactPhone: '',
-            employmentType: 'ประจำ',
-            endDate: '',
-            department: '',
-            supervisor: '',
-            expertise: '',
-            workAreas: '',
-            availability: '',
-            education: '',
-            institution: '',
-            otherCertificates: '',
-            workPermitExpiresAt: '',
-            socialSecurityNumber: '',
-            compensationType: 'เงินเดือน',
-            compensationRate: 0,
-            compensationHistory: '',
-            withholdingTaxTerms: '',
-            bankName: '',
-            bankAccountNumber: '',
-            bankAccountName: '',
-            taxpayerId: '',
-            withholdingCertificate: '',
-            documents: [],
-            projectHistory: [],
-            auditHistory: [],
-            trainings: [],
-            issuedEquipment: '',
-            performanceRating: '',
-            performanceNotes: ''
-        };
+    /** เพิ่มใหม่ถ้ายังไม่มี id ไม่เช่นนั้นแก้ไข */
+    save(record: PersonnelRecord): Observable<PersonnelRecord> {
+        const body = toApi(record);
+        const request = record.id ? this.http.put<ApiPersonnel>(apiUrl(`/personnel/${encodeURIComponent(record.id)}`), body) : this.http.post<ApiPersonnel>(apiUrl('/personnel'), body);
+        return request.pipe(map(fromApi));
     }
 
-    save(record: PersonnelRecord): PersonnelRecord {
-        const existingIndex = this.records.findIndex((item) => item.id === record.id);
-        const savedRecord = { ...record, auditHistory: [...record.auditHistory, `${new Date().toLocaleDateString('th-TH')} แก้ไขข้อมูลบุคลากร`] };
-
-        if (existingIndex === -1) {
-            this.records.push(savedRecord);
-        } else {
-            this.records[existingIndex] = savedRecord;
-        }
-
-        return savedRecord;
-    }
-
-    isProfessionalLicenseValid(record: PersonnelRecord | undefined, onDate = new Date()): boolean {
-        if (!record?.professionalLicenseNumber || !record.professionalLicenseExpiresAt) return false;
-
-        const expiresAt = new Date(`${record.professionalLicenseExpiresAt}T23:59:59`);
-        return expiresAt >= onDate;
-    }
-
-    canAssignToProject(id: string, requiresProfessionalLicense: boolean, onDate = new Date()): boolean {
-        return !requiresProfessionalLicense || this.isProfessionalLicenseValid(this.getById(id), onDate);
-    }
-
-    getExpiringLicenses(withinDays = 90): Array<{ record: PersonnelRecord; license: string; expiresAt: string }> {
-        const today = new Date();
-        const cutoff = new Date(today);
-        cutoff.setDate(cutoff.getDate() + withinDays);
-
-        return this.records.flatMap((record) => {
-            const licenses = [
-                { license: 'ใบอนุญาตประกอบวิชาชีพ', expiresAt: record.professionalLicenseExpiresAt },
-                { license: 'ใบอนุญาตทำงาน', expiresAt: record.workPermitExpiresAt },
-                ...record.trainings.map((training) => ({ license: training.name, expiresAt: training.expiresAt })),
-                ...record.documents.map((document) => ({ license: document.type, expiresAt: document.expiresAt }))
-            ];
-
-            return licenses
-                .filter(({ expiresAt }) => {
-                    if (!expiresAt) return false;
-                    const expirationDate = new Date(`${expiresAt}T23:59:59`);
-                    return expirationDate <= cutoff;
-                })
-                .map(({ license, expiresAt }) => ({ record, license, expiresAt }));
-        });
+    licenseAlerts(withinDays = 90): Observable<LicenseAlert[]> {
+        return this.http.get<LicenseAlert[]>(apiUrl('/personnel/license-alerts'), { params: queryParams({ withinDays }) });
     }
 }

@@ -4,7 +4,7 @@ import { ButtonModule } from 'primeng/button';
 import { TimelinePhase } from '@/app/pages/service/project-timeline.service';
 import { Installment, SitePhoto, TeamMember } from '@/app/pages/service/project-records.service';
 import { ThaiDatePipe } from '../thai-date.pipe';
-import { INSTALLMENT_LABEL, INSTALLMENT_PILL_CLASS, PhotoPlaceholder, ProjectTab, initials } from './project-ui';
+import { INSTALLMENT_LABEL, INSTALLMENT_PILL_CLASS, ProjectTab, initials } from './project-ui';
 
 export interface OwnerAction {
     key: string;
@@ -112,7 +112,7 @@ export class CurrentWorkCard {
 @Component({
     selector: 'app-recent-photos-card',
     standalone: true,
-    imports: [PhotoPlaceholder],
+    imports: [ThaiDatePipe],
     template: `
         <section class="card m-0" aria-labelledby="photos-heading">
             <h2 id="photos-heading" class="text-lg font-semibold m-0 mb-4">ภาพล่าสุดจากหน้างาน</h2>
@@ -120,12 +120,17 @@ export class CurrentWorkCard {
                 <div class="grid grid-cols-3 gap-2">
                     @for (photo of recent(); track photo.id) {
                         <button type="button" class="aspect-square p-0 border-0 bg-transparent cursor-pointer rounded-lg focus-visible:outline-2 focus-visible:outline-primary" [attr.aria-label]="'เปิดภาพ ' + photo.caption" (click)="open.emit(photo)">
-                            <app-photo-placeholder class="h-full" [date]="photo.date" />
+                            <span class="relative block w-full h-full rounded-lg overflow-hidden bg-emphasis"
+                                ><img [src]="photo.thumbnailUrl" [alt]="photo.caption" class="w-full h-full object-cover" loading="lazy" /><span
+                                    class="absolute left-1.5 bottom-1.5 text-xs px-1.5 py-0.5 rounded bg-surface-0/85 dark:bg-surface-900/85 text-color"
+                                    >{{ photo.date | thaiDate: 'dayMonth' }}</span
+                                ></span
+                            >
                         </button>
                     }
                 </div>
                 <button type="button" class="flex items-center gap-1 mt-4 text-sm font-semibold bg-transparent border-0 p-0 cursor-pointer text-color hover:text-primary" (click)="viewAll.emit()">
-                    ดูภาพทั้งหมด ({{ photos().length }}) <i class="pi pi-chevron-right text-xs"></i>
+                    ดูภาพทั้งหมด ({{ total() ?? photos().length }}) <i class="pi pi-chevron-right text-xs"></i>
                 </button>
             } @else {
                 <p class="text-muted-color m-0">ยังไม่มีภาพจากหน้างาน</p>
@@ -136,6 +141,8 @@ export class CurrentWorkCard {
 export class RecentPhotosCard {
     readonly photos = input.required<SitePhoto[]>();
     readonly limit = input(6);
+    /** จำนวนภาพทั้งหมดของโครงการ (รายการที่ส่งมาอาจเป็นแค่หน้าแรก) */
+    readonly total = input<number | null>(null);
     readonly open = output<SitePhoto>();
     readonly viewAll = output<void>();
 
