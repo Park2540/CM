@@ -1,4 +1,4 @@
-import { NgClass } from '@angular/common';
+import { DecimalPipe, NgClass } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, computed, inject, linkedSignal, signal } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
@@ -18,6 +18,8 @@ import { ProjectService, isContracted } from '@/app/pages/service/project.servic
 import { ThaiDatePipe } from './thai-date.pipe';
 import { apiResource } from '@/app/api/api-resource';
 
+type SetupStep = 'options' | 'tasks' | 'payments';
+
 /**
  * ตั้งค่างานก่อสร้าง (หลังบันทึกสัญญา): เลือกว่าบ้านหลังนี้มีอะไรบ้าง เช่น จำนวนชั้น ประเภทฐานราก ระบบพิเศษ
  * หลังบ้านคัดงานจากแม่แบบตามตัวเลือกและสร้างไทม์ไลน์ — ฟอร์มสร้างจาก GET /settings/construction-options ทั้งหมด
@@ -25,7 +27,7 @@ import { apiResource } from '@/app/api/api-resource';
 @Component({
     selector: 'app-project-setup',
     standalone: true,
-    imports: [ButtonModule, DialogModule, InputTextModule, NgClass, RouterLink, SkeletonModule, TagModule, ThaiDatePipe, ToastModule],
+    imports: [ButtonModule, DecimalPipe, DialogModule, InputTextModule, NgClass, RouterLink, SkeletonModule, TagModule, ThaiDatePipe, ToastModule],
     providers: [MessageService],
     template: `
         <p-toast />
@@ -60,7 +62,7 @@ import { apiResource } from '@/app/api/api-resource';
                     @if (editing()) {
                         <div class="flex flex-wrap gap-2">
                             <button pButton type="button" label="ยกเลิก" icon="pi pi-times" severity="secondary" [outlined]="true" [disabled]="saving()" (click)="cancelEdit()"></button>
-                            <button pButton type="button" label="ยืนยันการแก้ไข" icon="pi pi-check" [disabled]="!dirty() || !preview()" (click)="confirmOpen.set(true)"></button>
+                            <button pButton type="button" label="ยืนยันการแก้ไข" icon="pi pi-check" [disabled]="!dirty() || !preview() || !paymentValid()" (click)="confirmOpen.set(true)"></button>
                         </div>
                     } @else {
                         <button pButton type="button" label="แก้ไข" icon="pi pi-pencil" [outlined]="true" [disabled]="!preview()" (click)="startEdit()"></button>
@@ -116,12 +118,99 @@ import { apiResource } from '@/app/api/api-resource';
                                     @if (item.value === 'tasks' && preview(); as data) {
                                         <span class="text-xs px-2 py-0.5 rounded-full bg-emphasis text-color">{{ data.taskCount }} งาน</span>
                                     }
+                                    @if (item.value === 'payments' && paymentPercents().length) {
+                                        <span class="text-xs px-2 py-0.5 rounded-full" [ngClass]="paymentValid() ? 'bg-emphasis text-color' : 'bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-200'">{{ paymentPercents().length }} งวด · {{ paymentTotal() }}%</span>
+                                    }
                                 </button>
                             }
                         </div>
                     </nav>
 
-                    @if (step() === 'tasks') {
+                    @if (step() === 'payments') {
+                        <section class="card m-0" aria-labelledby="payment-heading">
+                            <div class="flex flex-wrap justify-between items-start gap-3 mb-4">
+                                <div class="min-w-0 flex-1">
+                                    <h2 id="payment-heading" class="text-lg font-semibold m-0">สัดส่วนการเบิกจ่ายตามงวดงาน</h2>
+                                    <p class="text-sm text-muted-color mt-1 mb-0">กำหนดว่าแต่ละงวดเบิกได้กี่ % ของมูลค่าสัญญา ฿{{ project.value | number: '1.0-0' }} — เบิกงวดได้เมื่อขั้นตอนที่ผูกไว้เสร็จ และรวมทุกงวดต้องได้ 100%</p>
+                                </div>
+                                @if (!readOnly() && !paymentIsDefault()) {
+                                    <button pButton type="button" [text]="true" size="small" icon="pi pi-refresh" label="คืนค่าเริ่มต้น" (click)="resetPaymentPercents()"></button>
+                                }
+                            </div>
+                            @if (errors()['paymentPercents']) {
+                                <div class="rounded-lg px-3 py-2 mb-3 text-sm bg-red-50 text-red-800 dark:bg-red-500/15 dark:text-red-200" role="alert">{{ errors()['paymentPercents'] }}</div>
+                            }
+
+                            @if (setup(); as current) {
+                                <div class="overflow-x-auto">
+                                    <table class="w-full text-sm border-collapse min-w-[32rem]">
+                                        <caption class="sr-only">
+                                            สัดส่วนการเบิกจ่ายแต่ละงวด
+                                        </caption>
+                                        <thead>
+                                            <tr class="border-b border-surface text-left text-muted-color">
+                                                <th scope="col" class="py-2 pr-3 font-semibold w-12">งวด</th>
+                                                <th scope="col" class="py-2 pr-3 font-semibold">รายละเอียดงาน</th>
+                                                <th scope="col" class="py-2 pr-3 font-semibold text-right w-32">สัดส่วน (%)</th>
+                                                <th scope="col" class="py-2 font-semibold text-right w-36">จำนวนเงิน</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @for (item of current.paymentSchedule; track item.no; let i = $index) {
+                                                <tr class="border-b border-surface align-middle">
+                                                    <td class="py-3 pr-3">{{ item.no }}</td>
+                                                    <td class="py-3 pr-3">
+                                                        <span class="block">{{ item.title }}</span>
+                                                        <span class="block text-xs text-muted-color">ขั้นตอนที่ {{ phaseSteps(item.phaseCodes) }}</span>
+                                                    </td>
+                                                    <td class="py-3 pr-3 text-right">
+                                                        <input
+                                                            pInputText
+                                                            type="number"
+                                                            min="0.01"
+                                                            max="100"
+                                                            step="0.5"
+                                                            inputmode="decimal"
+                                                            class="w-24 text-right"
+                                                            [value]="paymentPercents()[i]"
+                                                            [disabled]="readOnly()"
+                                                            [attr.aria-label]="'สัดส่วนงวดที่ ' + item.no"
+                                                            [attr.aria-invalid]="!!paymentError(i)"
+                                                            (input)="setPaymentPercent(i, inputValue($event))"
+                                                        />
+                                                        @if (paymentError(i); as message) {
+                                                            <small class="block mt-1 text-red-600 dark:text-red-400">{{ message }}</small>
+                                                        }
+                                                    </td>
+                                                    <td class="py-3 text-right font-semibold tabular-nums">฿{{ paymentAmounts()[i] | number: '1.0-0' }}</td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                        <tfoot>
+                                            <tr class="font-semibold">
+                                                <th scope="row" colspan="2" class="py-3 pr-3 text-left">รวม</th>
+                                                <td class="py-3 pr-3 text-right tabular-nums" [ngClass]="paymentTotal() === 100 ? 'text-green-700 dark:text-green-400' : 'text-red-600 dark:text-red-400'">{{ paymentTotal() }}%</td>
+                                                <td class="py-3 text-right tabular-nums">฿{{ paymentSum() | number: '1.0-0' }}</td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                                @if (paymentTotal() !== 100) {
+                                    <p class="text-sm text-red-600 dark:text-red-400 mt-3 mb-0" role="status">
+                                        สัดส่วนรวมต้องได้ 100% —
+                                        @if (paymentTotal() < 100) {
+                                            ขาดอีก {{ round2(100 - paymentTotal()) }}%
+                                        } @else {
+                                            เกินมา {{ round2(paymentTotal() - 100) }}%
+                                        }
+                                    </p>
+                                }
+                                <p class="text-xs text-muted-color mt-3 mb-0">จำนวนเงินปัดเป็นบาท งวดสุดท้ายรับเศษที่เหลือเพื่อให้รวมเท่ามูลค่าสัญญา · งานเพิ่ม-ลดแยกเป็นงวดต่างหาก</p>
+                            } @else {
+                                <p-skeleton height="20rem" />
+                            }
+                        </section>
+                    } @else if (step() === 'tasks') {
                         <section class="card m-0" aria-labelledby="task-detail-heading">
                             <div class="flex flex-wrap justify-between items-start gap-3 mb-4">
                                 <div class="min-w-0 flex-1">
@@ -289,6 +378,9 @@ import { apiResource } from '@/app/api/api-resource';
                                 <p id="required-task-note" class="text-xs text-muted-color mt-4 mb-0">
                                     <i class="pi pi-lock text-[0.65rem] mr-1"></i>จุดตรวจและหมุดหมายตัดออกไม่ได้ · งานที่เพิ่มเองลบได้ด้วยปุ่มถังขยะ · วันที่จัดให้พอดีกับระยะสัญญาโดยอัตโนมัติ
                                 </p>
+                                <div class="flex justify-end mt-4">
+                                    <button pButton type="button" label="ถัดไป: งวดเงิน" icon="pi pi-arrow-right" iconPos="right" [outlined]="true" (click)="goToStep('payments')"></button>
+                                </div>
                             } @else {
                                 <p-skeleton height="20rem" />
                             }
@@ -386,7 +478,7 @@ import { apiResource } from '@/app/api/api-resource';
                         }
                         @if (sections().length) {
                             <div class="flex justify-end">
-                                <button pButton type="button" label="ถัดไป: เลือกงานย่อยรายขั้นตอน" icon="pi pi-arrow-right" iconPos="right" [outlined]="true" (click)="goToTasks()"></button>
+                                <button pButton type="button" label="ถัดไป: เลือกงานย่อยรายขั้นตอน" icon="pi pi-arrow-right" iconPos="right" [outlined]="true" (click)="goToStep('tasks')"></button>
                             </div>
                         }
                     }
@@ -446,26 +538,45 @@ import { apiResource } from '@/app/api/api-resource';
                                                         <span class="block font-semibold truncate">{{ phase.shortName }}</span>
                                                         <span class="block text-xs text-muted-color">{{ phase.start | thaiDate: 'dayMonth' }} – {{ phase.end | thaiDate: 'dayMonth' }}</span>
                                                     </span>
-                                                    <span class="text-sm text-muted-color shrink-0">{{ tasks.length }} งาน</span>
+                                                    <span class="text-sm text-muted-color shrink-0">
+                                                        @if (includedCount(tasks) < tasks.length) {
+                                                            {{ includedCount(tasks) }}/{{ tasks.length }} งาน
+                                                        } @else {
+                                                            {{ tasks.length }} งาน
+                                                        }
+                                                    </span>
                                                     @if (optionalTasks(phase.tasks).length) {
                                                         <span class="text-xs font-semibold text-primary shrink-0">+{{ optionalTasks(phase.tasks).length }}</span>
                                                     }
                                                     <i class="pi text-xs text-muted-color" [ngClass]="expanded().has(phase.code) ? 'pi-chevron-up' : 'pi-chevron-down'"></i>
                                                 </button>
                                                 @if (expanded().has(phase.code)) {
-                                                    <ul class="list-none p-0 m-0 ml-12 mb-2 flex flex-col gap-1.5">
-                                                        @for (task of tasks; track $index) {
-                                                            <li class="text-sm flex items-start gap-2" [ngClass]="{ 'text-primary': task.optional }">
-                                                                <span class="text-muted-color w-10 shrink-0">{{ task.code }}</span>
-                                                                <span class="flex-1">
-                                                                    {{ task.name }}
-                                                                    @if (task.isHoldPoint) {
-                                                                        <span class="ml-1 text-xs px-1.5 py-0.5 rounded bg-orange-100 text-orange-800 dark:bg-orange-500/20 dark:text-orange-200">จุดตรวจ</span>
-                                                                    }
-                                                                    @if (task.isMilestone) {
-                                                                        <span class="ml-1 text-xs px-1.5 py-0.5 rounded bg-emphasis text-muted-color">หมุดหมาย</span>
-                                                                    }
-                                                                </span>
+                                                    <ul class="list-none p-0 m-0 ml-9 mb-2 flex flex-col gap-0.5">
+                                                        @for (task of tasks; track task.code) {
+                                                            <li>
+                                                                <label class="text-sm flex items-start gap-2 px-1 py-0.5 rounded" [ngClass]="{ 'text-primary': task.optional && task.included, 'task-excluded': !task.included }" [class.cursor-pointer]="canToggle(task)">
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        class="mt-0.5 shrink-0 accent-[var(--p-primary-color)]"
+                                                                        [checked]="task.included"
+                                                                        [disabled]="!canToggle(task)"
+                                                                        [attr.aria-describedby]="task.required ? 'preview-required-note' : null"
+                                                                        (change)="toggleTask(task.code)"
+                                                                    />
+                                                                    <span class="text-muted-color w-10 shrink-0 tabular-nums">{{ task.code }}</span>
+                                                                    <span class="flex-1 min-w-0">
+                                                                        <span [class.line-through]="!task.included">{{ task.name }}</span>
+                                                                        @if (task.isHoldPoint) {
+                                                                            <span class="ml-1 text-xs px-1.5 py-0.5 rounded bg-orange-100 text-orange-800 dark:bg-orange-500/20 dark:text-orange-200"><i class="pi pi-lock text-[0.6rem] mr-1"></i>จุดตรวจ</span>
+                                                                        }
+                                                                        @if (task.isMilestone) {
+                                                                            <span class="ml-1 text-xs px-1.5 py-0.5 rounded bg-emphasis text-muted-color"><i class="pi pi-lock text-[0.6rem] mr-1"></i>หมุดหมาย</span>
+                                                                        }
+                                                                        @if (task.custom) {
+                                                                            <span class="ml-1 text-xs px-1.5 py-0.5 rounded bg-primary text-primary-contrast">เพิ่มเอง</span>
+                                                                        }
+                                                                    </span>
+                                                                </label>
                                                             </li>
                                                         }
                                                     </ul>
@@ -474,7 +585,12 @@ import { apiResource } from '@/app/api/api-resource';
                                         }
                                     }
                                 </ol>
-                                <p class="text-xs text-muted-color mt-3 mb-0"><span class="text-primary font-semibold">สีหลัก</span> = งานที่เพิ่มเพราะตัวเลือก · วันที่จัดให้พอดีกับระยะสัญญาโดยอัตโนมัติ</p>
+                                <p id="preview-required-note" class="text-xs text-muted-color mt-3 mb-0">
+                                    @if (!readOnly()) {
+                                        ติ๊กออกงานที่โครงการนี้ไม่ต้องทำ · <i class="pi pi-lock text-[0.6rem]"></i> จุดตรวจและหมุดหมายตัดออกไม่ได้ ·
+                                    }
+                                    <span class="text-primary font-semibold">สีหลัก</span> = งานที่เพิ่มเพราะตัวเลือก · วันที่จัดให้พอดีกับระยะสัญญาโดยอัตโนมัติ
+                                </p>
                             }
                         } @else {
                             <p-skeleton height="16rem" />
@@ -482,6 +598,12 @@ import { apiResource } from '@/app/api/api-resource';
 
                         @if (generalError()) {
                             <div class="rounded-lg px-3 py-2 mt-4 text-sm bg-red-50 text-red-800 dark:bg-red-500/15 dark:text-red-200" role="alert">{{ generalError() }}</div>
+                        }
+                        @if (!readOnly() && paymentPercents().length && !paymentValid()) {
+                            <p class="text-sm text-red-600 dark:text-red-400 mt-4 mb-0" role="status">
+                                <i class="pi pi-exclamation-circle mr-1"></i>สัดส่วนงวดเงินรวม {{ paymentTotal() }}% ต้องได้ 100% ก่อนบันทึก
+                                <button type="button" class="link-button" (click)="step.set('payments')">แก้ไขงวดเงิน</button>
+                            </p>
                         }
 
                         @if (editing()) {
@@ -498,12 +620,12 @@ import { apiResource } from '@/app/api/api-resource';
                                 </p>
                                 <div class="grid grid-cols-2 gap-2">
                                     <button pButton type="button" label="ยกเลิก" severity="secondary" [outlined]="true" [disabled]="saving()" (click)="cancelEdit()"></button>
-                                    <button pButton type="button" label="ยืนยันการแก้ไข" icon="pi pi-check" [disabled]="!dirty() || !preview()" (click)="confirmOpen.set(true)"></button>
+                                    <button pButton type="button" label="ยืนยันการแก้ไข" icon="pi pi-check" [disabled]="!dirty() || !preview() || !paymentValid()" (click)="confirmOpen.set(true)"></button>
                                 </div>
                             </div>
                         } @else if (!setup()?.configured && canEdit()) {
                             <div class="mt-5 pt-4 border-t border-surface">
-                                <button pButton type="button" icon="pi pi-check" class="w-full" label="บันทึกและสร้างไทม์ไลน์" [loading]="saving()" [disabled]="!preview()" (click)="save()"></button>
+                                <button pButton type="button" icon="pi pi-check" class="w-full" label="บันทึกและสร้างไทม์ไลน์" [loading]="saving()" [disabled]="!preview() || !paymentValid()" (click)="save()"></button>
                             </div>
                         } @else if (setup()?.configuredAt) {
                             <div class="flex flex-wrap items-center justify-between gap-2 mt-5 pt-4 border-t border-surface">
@@ -722,8 +844,25 @@ export class ProjectSetup {
         const describeCustom = (tasks: CustomTask[]) => (tasks.length ? tasks.map((task) => `${task.name} (${task.durationDays} วัน)`).join(', ') : 'ไม่มี');
         const savedCustom = this.setup()?.customTasks ?? [];
         if (JSON.stringify(savedCustom) !== JSON.stringify(this.customTasks())) rows.push({ key: 'customTasks', label: 'งานที่เพิ่มเอง', from: describeCustom(savedCustom), to: describeCustom(this.customTasks()) });
+        const savedPercents = this.savedPaymentPercents();
+        if (savedPercents.join() !== this.paymentPercents().join()) rows.push({ key: 'paymentPercents', label: 'สัดส่วนงวดเงิน (%)', from: savedPercents.join(' / '), to: this.paymentPercents().join(' / ') });
         return rows;
     });
+
+    /** สัดส่วนงวดเงิน (ขั้นที่ 3) เรียงตาม setup.paymentSchedule — ไม่มีผลกับตัวอย่างงาน จึงส่งเฉพาะตอนบันทึก */
+    private readonly savedPaymentPercents = computed(() => this.setup()?.paymentSchedule.map((item) => item.percent) ?? []);
+    readonly paymentPercents = linkedSignal<number[]>(() => this.savedPaymentPercents());
+    readonly paymentTotal = computed(() => this.round2(this.paymentPercents().reduce((sum, percent) => sum + (Number.isFinite(percent) ? percent : 0), 0)));
+    readonly paymentValid = computed(() => this.paymentTotal() === 100 && this.paymentPercents().every((_, index) => !this.paymentError(index)));
+    readonly paymentIsDefault = computed(() => (this.setup()?.paymentSchedule ?? []).every((item, index) => item.defaultPercent === this.paymentPercents()[index]));
+    /** จำนวนเงินแต่ละงวด ปัดเป็นบาท งวดสุดท้ายรับเศษ (เหมือนหลังบ้าน) */
+    readonly paymentAmounts = computed(() => {
+        const value = this.project()?.value ?? 0;
+        const amounts = this.paymentPercents().map((percent) => Math.round((value * (Number.isFinite(percent) ? percent : 0)) / 100));
+        if (amounts.length && this.paymentTotal() === 100) amounts[amounts.length - 1] += value - amounts.reduce((sum, amount) => sum + amount, 0);
+        return amounts;
+    });
+    readonly paymentSum = computed(() => this.paymentAmounts().reduce((sum, amount) => sum + amount, 0));
     /** งานย่อยจากแม่แบบที่ตัดออก และงานที่เพิ่มเอง (ขั้นที่ 2) */
     readonly excludedTasks = linkedSignal<string[]>(() => this.setup()?.excludedTasks ?? []);
     readonly customTasks = linkedSignal<CustomTask[]>(() => this.setup()?.customTasks ?? []);
@@ -755,11 +894,12 @@ export class ProjectSetup {
     readonly onlyOptional = signal(false);
     /** ขั้นตอนที่เปิดดูรายการงาน — เริ่มจากขั้นตอนฐานราก (ตัวอย่างที่ตัวเลือกมีผลชัดที่สุด) */
     readonly expanded = signal(new Set<string>(['05']));
-    readonly steps: Array<{ value: 'options' | 'tasks'; label: string }> = [
+    readonly steps: Array<{ value: SetupStep; label: string }> = [
         { value: 'options', label: 'ตัวเลือกงาน' },
-        { value: 'tasks', label: 'งานย่อยรายขั้นตอน' }
+        { value: 'tasks', label: 'งานย่อยรายขั้นตอน' },
+        { value: 'payments', label: 'งวดเงิน' }
     ];
-    readonly step = signal<'options' | 'tasks'>('options');
+    readonly step = signal<SetupStep>('options');
     /** ขั้นตอนที่เปิดดูในขั้นที่ 2 */
     readonly taskPhases = signal(new Set<string>(['01']));
     /** ฟอร์มเพิ่มงานเอง (เปิดได้ทีละขั้นตอน) */
@@ -806,9 +946,35 @@ export class ProjectSetup {
         });
     }
 
-    goToTasks() {
-        this.step.set('tasks');
+    goToStep(step: SetupStep) {
+        this.step.set(step);
         window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    /** '01', '02' → "1, 2" */
+    phaseSteps(codes: string[]) {
+        return codes.map((code) => Number(code)).join(', ');
+    }
+
+    round2(value: number) {
+        return Math.round(value * 100) / 100;
+    }
+
+    setPaymentPercent(index: number, raw: string) {
+        const value = raw.trim() === '' ? NaN : Number(raw);
+        this.paymentPercents.update((list) => list.map((percent, i) => (i === index ? value : percent)));
+    }
+
+    /** ตรวจแบบเดียวกับหลังบ้าน (paymentPercents.{index}) แสดงทันทีขณะพิมพ์ */
+    paymentError(index: number) {
+        const percent = this.paymentPercents()[index];
+        if (!Number.isFinite(percent) || percent <= 0 || percent > 100) return 'ต้องมากกว่า 0 และไม่เกิน 100';
+        if (Math.abs(Math.round(percent * 100) - percent * 100) > 1e-6) return 'ทศนิยมไม่เกิน 2 ตำแหน่ง';
+        return '';
+    }
+
+    resetPaymentPercents() {
+        this.paymentPercents.set(this.setup()?.paymentSchedule.map((item) => item.defaultPercent) ?? []);
     }
 
     emptySet() {
@@ -893,6 +1059,7 @@ export class ProjectSetup {
         this.selected.set(this.setup()?.options ?? {});
         this.excludedTasks.set(this.setup()?.excludedTasks ?? []);
         this.customTasks.set(this.setup()?.customTasks ?? []);
+        this.paymentPercents.set(this.savedPaymentPercents());
         this.adding.set(null);
         this.errors.set({});
         this.generalError.set('');
@@ -915,7 +1082,7 @@ export class ProjectSetup {
         this.saving.set(true);
         this.errors.set({});
         this.generalError.set('');
-        this.setupService.save(this.code(), this.draft()).subscribe({
+        this.setupService.save(this.code(), { ...this.draft(), paymentPercents: this.paymentPercents() }).subscribe({
             next: (setup) => {
                 if (!isEdit) {
                     this.router.navigate(['/projects', this.code()], { queryParams: { tab: 'timeline' } });
@@ -934,6 +1101,7 @@ export class ProjectSetup {
                     this.errors.set(problem.errors);
                     // ข้อผิดพลาดของงานย่อยอยู่ในขั้นที่ 2
                     if (Object.keys(problem.errors).some((key) => key.startsWith('excludedTasks') || key.startsWith('customTasks'))) this.step.set('tasks');
+                    else if (Object.keys(problem.errors).some((key) => key.startsWith('paymentPercents'))) this.step.set('payments');
                 }
                 this.generalError.set(problemMessage(error, 'บันทึกการตั้งค่าไม่สำเร็จ'));
             }

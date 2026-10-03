@@ -44,8 +44,8 @@ export interface ProjectRecords {
 
 export const DOCUMENT_CATEGORIES: DocumentCategory[] = ['สัญญาและงวดงาน', 'แบบก่อสร้าง', 'ใบอนุญาต', 'รายงานตรวจคุณภาพ', 'ใบแจ้งหนี้/ใบเสร็จ', 'เอกสารส่งมอบ'];
 
-/** งวดงานตัวอย่าง: แต่ละงวดเบิกได้เมื่อขั้นตอนที่ผูกไว้เสร็จทั้งหมด (รหัสขั้นตอนตามแม่แบบแผนงาน) */
-const PAYMENT_SCHEDULE: Array<{ title: string; phaseCodes: string[]; percent: number }> = [
+/** งวดงานตามสัญญา: แต่ละงวดเบิกได้เมื่อขั้นตอนที่ผูกไว้เสร็จทั้งหมด (รหัสขั้นตอนตามแม่แบบแผนงาน) — percent เป็นค่าตั้งต้น ปรับรายโครงการได้ที่การตั้งค่างานก่อสร้าง */
+export const PAYMENT_SCHEDULE: Array<{ title: string; phaseCodes: string[]; percent: number }> = [
     { title: 'ลงนามสัญญาและได้รับใบอนุญาตก่อสร้าง', phaseCodes: ['01', '02', '03'], percent: 10 },
     { title: 'งานเตรียมพื้นที่และงานชั่วคราว', phaseCodes: ['04'], percent: 10 },
     { title: 'งานฐานรากและพื้นชั้นล่าง', phaseCodes: ['05'], percent: 15 },
@@ -74,8 +74,12 @@ function hash(text: string): number {
  * เมื่อเชื่อมต่อหลังบ้านแล้ว ให้แทนที่ด้วยการเรียก API โดยคง interface เดิมไว้
  */
 export class RecordsGenerator {
-    build(project: ContractedProject, timeline: ProjectTimeline): ProjectRecords {
-        const installments = this.buildInstallments(project, timeline);
+    /**
+     * percents = สัดส่วนของแต่ละงวดตาม PAYMENT_SCHEDULE
+     * paid = เลขงวด → วันที่ได้รับชำระ (จากการบันทึกรับชำระ) งวดที่ไม่อยู่ในนี้มีสถานะตามความคืบหน้า
+     */
+    build(project: ContractedProject, timeline: ProjectTimeline, percents: number[], paid: Map<number, Date>): ProjectRecords {
+        const installments = this.installments(project, timeline, percents, paid);
         return {
             installments,
             photos: this.buildPhotos(project, timeline),
@@ -83,34 +87,49 @@ export class RecordsGenerator {
         };
     }
 
-    private buildInstallments(project: ContractedProject, timeline: ProjectTimeline): Installment[] {
-        const today = todayAsDate();
-        const rows = PAYMENT_SCHEDULE.map((item, index) => {
-            const phases = timeline.phases.filter((phase) => item.phaseCodes.includes(phase.code));
-            const completedAt = new Date(Math.max(...phases.map((phase) => phase.end.getTime())));
-            return {
-                item,
-                index,
-                phases,
-                completedAt,
-                done: phases.every((phase) => phase.status === 'done'),
-                started: phases.some((phase) => phase.status !== 'pending')
-            };
-        });
-        const lastDoneIndex = Math.max(-1, ...rows.filter((row) => row.done).map((row) => row.index));
+    installments(project: ContractedProject, timeline: ProjectTimeline, percents: number[], paid: Map<number, Date>): Installment[] {
+        // ปัดเศษรายงวด แล้วให้งวดสุดท้ายรับส่วนต่าง ยอดรวมจึงเท่ามูลค่าสัญญาพอดี
+        const amounts = percents.map((percent) => Math.round((project.value * percent) / 100));
+        amounts[amounts.length - 1] += project.value - amounts.reduce((sum, amount) => sum + amount, 0);
 
-        return rows.map(({ item, index, phases, completedAt, done, started }): Installment => {
-            // งวดล่าสุดที่งานเสร็จถือว่ารอชำระ งวดก่อนหน้าชำระแล้ว (โครงการที่เสร็จ 100% ถือว่าชำระครบ)
-            const status: InstallmentStatus = done ? (index < lastDoneIndex || project.progress >= 100 ? 'paid' : 'due') : started ? 'working' : 'upcoming';
+        return this.rows(timeline).map(({ item, index, phases, completedAt, done, started }): Installment => {
+            const paidDate = paid.get(index + 1) ?? null;
+            // ชำระแล้วเมื่อบันทึกรับชำระเท่านั้น งานเสร็จแต่ยังไม่ได้รับเงิน = รอชำระ
+            const status: InstallmentStatus = paidDate ? 'paid' : done ? 'due' : started ? 'working' : 'upcoming';
             return {
                 no: index + 1,
                 title: item.title,
                 phaseSteps: phases.map((phase) => phase.step),
-                percent: item.percent,
-                amount: Math.round((project.value * item.percent) / 100),
+                percent: percents[index]!,
+                amount: amounts[index]!,
                 status,
                 dueDate: addDays(completedAt, 7),
-                paidDate: status === 'paid' ? minDate(addDays(completedAt, 5), today) : null
+                paidDate
+            };
+        });
+    }
+
+    /**
+     * งวดที่ถือว่าชำระแล้วตามกติกาก่อนมีการบันทึกรับชำระ (ใช้ตั้งต้นข้อมูลเดิมครั้งเดียว):
+     * งวดล่าสุดที่งานเสร็จยังรอชำระ งวดก่อนหน้าชำระแล้ว 5 วันหลังงานเสร็จ (โครงการที่เสร็จ 100% ถือว่าชำระครบ)
+     */
+    legacyPaid(project: ContractedProject, timeline: ProjectTimeline): Map<number, Date> {
+        const today = todayAsDate();
+        const rows = this.rows(timeline);
+        const lastDoneIndex = Math.max(-1, ...rows.filter((row) => row.done).map((row) => row.index));
+        return new Map(rows.filter((row) => row.done && (row.index < lastDoneIndex || project.progress >= 100)).map((row) => [row.index + 1, minDate(addDays(row.completedAt, 5), today)]));
+    }
+
+    private rows(timeline: ProjectTimeline) {
+        return PAYMENT_SCHEDULE.map((item, index) => {
+            const phases = timeline.phases.filter((phase) => item.phaseCodes.includes(phase.code));
+            return {
+                item,
+                index,
+                phases,
+                completedAt: new Date(Math.max(...phases.map((phase) => phase.end.getTime()))),
+                done: phases.every((phase) => phase.status === 'done'),
+                started: phases.some((phase) => phase.status !== 'pending')
             };
         });
     }

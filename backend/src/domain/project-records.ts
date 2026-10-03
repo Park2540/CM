@@ -1,9 +1,10 @@
 import type { ApiSchemas } from '../api/api.js';
-import { timelineFromApi } from './shared.js';
+import { ContractedProject, ProjectTimeline, timelineFromApi } from './shared.js';
 import { isContracted } from './shared.js';
 import { RecordsGenerator } from './records-generator.js';
+import { PaymentRecord, activePayments, hasLedger, initLedger, installmentKey, toApiPayment } from './payments.js';
 import { changeOrderInstallments } from './change-orders.js';
-import { currentProject, getTimeline, getUpdates } from './projects.js';
+import { currentProject, getTimeline, getUpdates, paymentPercentsOf } from './projects.js';
 
 const generator = new RecordsGenerator();
 const isoDate = (date: Date) => date.toISOString().slice(0, 10);
@@ -17,22 +18,89 @@ const CATEGORY_CODE: Record<string, ApiSchemas['DocumentCategory']> = {
     เอกสารส่งมอบ: 'handover'
 };
 
-/** งวดงาน ภาพ เอกสาร ทีมงาน สร้างจากโครงการและไทม์ไลน์ปัจจุบัน (เปลี่ยนตามการอัปเดตงาน) */
+/** งวดงาน ภาพ เอกสาร ทีมงาน สร้างจากโครงการและไทม์ไลน์ปัจจุบัน (เปลี่ยนตามการอัปเดตงาน) — สถานะชำระแล้วมาจากการบันทึกรับชำระ */
 export function generatedRecords(code: string) {
     const project = currentProject(code);
-    const timeline = getTimeline(code);
-    return isContracted(project) && timeline ? generator.build(project, timelineFromApi(timeline)) : undefined;
+    const apiTimeline = getTimeline(code);
+    if (!isContracted(project) || !apiTimeline) return undefined;
+    const timeline = timelineFromApi(apiTimeline);
+    ensureLedger(code, project, timeline);
+    const paid = new Map<number, Date>();
+    for (const record of activePayments(code).values()) if (record.key.startsWith('no:')) paid.set(record.installmentNo, new Date(`${record.paidDate}T00:00:00Z`));
+    return generator.build(project, timeline, paymentPercentsOf(code), paid);
 }
 
+/**
+ * ข้อมูลเดิมก่อนมีการบันทึกรับชำระ: สร้างรายการรับชำระจากกติกาเดิมครั้งเดียว ให้สถานะงวดไม่เปลี่ยน
+ * (โครงการใหม่จะได้สมุดว่าง เพราะยังไม่มีงานเสร็จ)
+ */
+function ensureLedger(code: string, project: ContractedProject, timeline: ProjectTimeline) {
+    if (hasLedger(code)) return;
+    const legacy = generator.legacyPaid(project, timeline);
+    const rows = generator.installments(project, timeline, paymentPercentsOf(code), new Map());
+    initLedger(
+        code,
+        rows
+            .filter((row) => legacy.has(row.no))
+            .map((row): PaymentRecord => {
+                const paidDate = isoDate(legacy.get(row.no)!);
+                return {
+                    id: `pay-${code}-${row.no}`,
+                    key: installmentKey(row),
+                    installmentNo: row.no,
+                    paidDate,
+                    amount: row.amount,
+                    withholdingTax: 0,
+                    method: 'transfer',
+                    note: 'ข้อมูลตัวอย่างที่ระบบสร้าง',
+                    evidence: [],
+                    recordedBy: { id: 'system', name: 'ระบบ', roleLabel: 'ระบบ' },
+                    recordedAt: `${paidDate}T10:00:00+07:00`
+                };
+            })
+    );
+}
+
+/** งวดตามสัญญา + งวดงานเพิ่ม-ลด พร้อมการรับชำระของแต่ละงวด */
 export function apiInstallments(code: string): ApiSchemas['Installment'][] | undefined {
-    const contract = generatedRecords(code)?.installments.map((item) => ({ ...item, dueDate: isoDate(item.dueDate), paidDate: item.paidDate ? isoDate(item.paidDate) : null }));
+    const contract = generatedRecords(code)?.installments.map((item): ApiSchemas['Installment'] => ({ ...item, dueDate: isoDate(item.dueDate), paidDate: item.paidDate ? isoDate(item.paidDate) : null }));
     if (!contract) return undefined;
-    return [...contract, ...changeOrderInstallments(code, contract.length + 1, currentProject(code)?.value ?? 0)];
+    const payments = activePayments(code);
+    return [...contract, ...changeOrderInstallments(code, contract.length + 1, currentProject(code)?.value ?? 0)].map((item) => {
+        const payment = payments.get(installmentKey(item));
+        return payment ? { ...item, status: 'paid', paidDate: payment.paidDate, payment: toApiPayment(payment) } : item;
+    });
 }
 
-/** เอกสารที่ระบบสร้างตามความคืบหน้า + เอกสารที่แนบมากับบันทึกหน้างาน ล่าสุดก่อน */
+/** ไฟล์ที่อัปโหลด → ชนิดไฟล์ของเอกสารโครงการ */
+function fileTypeOf(file: ApiSchemas['UploadedFile']): ApiSchemas['ProjectDocument']['fileType'] {
+    if (file.contentType.startsWith('image/')) return 'image';
+    const extension = file.name.split('.').pop()?.toLowerCase() ?? '';
+    return ({ xlsx: 'xlsx', xls: 'xlsx', docx: 'docx', doc: 'docx', dwg: 'dwg' } as const)[extension as 'xlsx'] ?? 'pdf';
+}
+
+/** หลักฐานการรับชำระ (หมวดใบแจ้งหนี้/ใบเสร็จ) */
+function paymentDocuments(code: string): ApiSchemas['ProjectDocument'][] {
+    return [...activePayments(code).values()].flatMap((payment) =>
+        payment.evidence.map((file, index) => ({
+            id: `${payment.id}-evidence-${index + 1}`,
+            category: 'billing' as const,
+            name: `หลักฐานรับชำระ งวดที่ ${payment.installmentNo} · ${file.name}`,
+            date: payment.paidDate,
+            fileType: fileTypeOf(file),
+            sizeKb: file.sizeKb,
+            downloadUrl: file.url,
+            uploadedBy: payment.recordedBy.name
+        }))
+    );
+}
+
+/** เอกสารที่ระบบสร้างตามความคืบหน้า + เอกสารที่แนบมากับบันทึกหน้างาน + หลักฐานรับชำระ ล่าสุดก่อน */
 export function apiDocuments(code: string): ApiSchemas['ProjectDocument'][] | undefined {
-    const generated = generatedRecords(code)?.documents.map((doc): ApiSchemas['ProjectDocument'] => ({
+    const records = generatedRecords(code);
+    // งวดที่มีหลักฐานจริงแล้ว ไม่ต้องแสดงใบเสร็จตัวอย่างที่ระบบสร้าง
+    const withEvidence = new Set([...activePayments(code).values()].filter((payment) => payment.evidence.length).map((payment) => `ใบเสร็จรับเงิน งวดที่ ${payment.installmentNo}.pdf`));
+    const generated = records?.documents.filter((doc) => !withEvidence.has(doc.name)).map((doc): ApiSchemas['ProjectDocument'] => ({
         id: doc.id,
         category: CATEGORY_CODE[doc.category],
         name: doc.name,
@@ -43,7 +111,7 @@ export function apiDocuments(code: string): ApiSchemas['ProjectDocument'][] | un
     }));
     if (!generated) return undefined;
     const attached = getUpdates(code).flatMap((update) => update.documents);
-    return [...attached, ...generated].sort((a, b) => b.date.localeCompare(a.date));
+    return [...attached, ...paymentDocuments(code), ...generated].sort((a, b) => b.date.localeCompare(a.date));
 }
 
 /** ภาพตัวอย่างจากแผน + ภาพจริงที่แนบมากับบันทึกหน้างาน ล่าสุดก่อน */

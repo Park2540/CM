@@ -49,7 +49,7 @@ npm run api:types            # สร้าง src/api/schema.ts ใหม่จ
   - ผิดติดกัน 5 ครั้งล็อก 15 นาที
   - บัญชีที่ถูกระงับใช้ token เดิมต่อไม่ได้
 - `src/domain/passwords.ts`: เก็บรหัสผ่านแบบ hash ด้วย scrypt
-- `src/routes/files.ts`: อัปโหลดไฟล์ (รูป/PDF/Excel/Word/DWG ไม่เกิน 10 MB) และดาวน์โหลดผ่าน `/api/files/:id`
+- `src/routes/files.ts`: อัปโหลดไฟล์ (รูป/PDF/Excel/Word/DWG ไม่เกิน 10 MB และแบบ 3 มิติ GLB/glTF/DAE/FBX/OBJ/SKP/RVT ไม่เกิน 200 MB) และดาวน์โหลดผ่าน `/api/files/:id`
 
 **Collection ใน MongoDB:**
 
@@ -58,15 +58,19 @@ npm run api:types            # สร้าง src/api/schema.ts ใหม่จ
 | ผู้ใช้ | `user_accounts`, `user_passwords` |
 | สมัครสมาชิก | `registrations`, `registration_passwords` |
 | บุคลากรและผู้รับเหมา | `personnel`, `subcontractors` |
-| โครงการ | `projects`, `project_setups`, `project_timelines`, `progress_updates`, `project_staff`, `project_subcontractors` |
+| โครงการ | `projects`, `project_setups`, `project_timelines`, `progress_updates`, `project_staff`, `project_subcontractors`, `change_orders` |
+| การรับชำระเงิน | `installment_payments` |
+| แบบบ้าน | `project_models` (แบบ 3 มิติ), `project_houses` (รายละเอียด ภาพแปลน ทัศนียภาพ) |
 | การอนุมัติ | `approvals`, `approval_settings` |
 | อื่น ๆ | `audit_logs`, `uploads` |
 
 ## ข้อจำกัดที่ควรรู้
 
 - **โหลดข้อมูลทั้งหมดเข้าหน่วยความจำ:** เหมาะกับข้อมูลระดับบริษัทเดียว (หลักพันถึงหมื่นรายการ) และรันได้ 1 instance ถ้าข้อมูลโตมากหรือต้องรันหลาย instance ควรเปลี่ยนแต่ละโมดูลให้อ่านและเขียน MongoDB ตรงทีละคำขอ
-- **ข้อมูลการเงินยังคำนวณจากข้อมูลตัวอย่าง:** ตัวเลขใน Dashboard (กำไร-ขาดทุน กระแสเงินสด) และภาพหน้างานตัวอย่างสร้างจากความคืบหน้าของโครงการ ยังไม่ได้เชื่อมระบบบัญชีจริง
+- **ข้อมูลการเงินบางส่วนยังเป็นข้อมูลตัวอย่าง:** เงินรับใน Dashboard มาจากการบันทึกรับชำระจริง แต่ต้นทุนและกำไรยังคำนวณจากสมมติฐาน และภาพหน้างานตัวอย่างสร้างจากความคืบหน้า ยังไม่ได้เชื่อมระบบบัญชีจริง
+- **การรับชำระของข้อมูลเดิม:** โครงการที่มีอยู่ก่อนมีการบันทึกรับชำระ ระบบสร้างรายการรับชำระตัวอย่าง (บันทึกโดย "ระบบ" ไม่มีหลักฐาน) ให้ครั้งเดียวตามสถานะเดิม
 - **ไฟล์ที่อัปโหลดเปิดได้โดยไม่ต้องแนบ token:** เพราะต้องใช้ใน `<img>` แต่รหัสไฟล์เป็น UUID สุ่มที่เดาไม่ได้ ถ้าต้องการปลอดภัยขึ้นควรเปลี่ยนเป็น signed URL ที่หมดอายุได้
+- **แปลง .skp เป็น 3 มิติต้องรันบน Windows ที่ติดตั้ง SketchUp:** `src/convert/` เรียก `SketchUpAPI.dll` ผ่าน koffi ใน worker thread แล้วเขียน .glb (พร้อม .glb.gz สำหรับส่งแบบ gzip) เปิดได้เฉพาะไฟล์ที่บันทึกจาก SketchUp รุ่นเดียวกันหรือเก่ากว่า ยังไม่ใส่ภาพ texture (ใช้สีเฉลี่ยของวัสดุ) — ถ้าเซิร์ฟเวอร์ไม่มี SketchUp สถานะจะเป็น `unavailable` และผู้ใช้ต้องส่งออก .glb เอง ใช้งานจริงควรดาวน์โหลด SketchUp C API SDK จาก Trimble แล้วตั้ง `SKETCHUP_API_DIR` ไปที่ SDK แทนการใช้ DLL ของโปรแกรม SketchUp ที่ติดตั้ง
 - **ยังไม่ส่งอีเมลจริง:** ทั้งคำเชิญและลิงก์ตั้งรหัสผ่าน ตอนนี้แค่บันทึกใน Audit Log
 
 ## เพิ่มหรือแก้ endpoint

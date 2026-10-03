@@ -1,10 +1,35 @@
-import { Component, DestroyRef, ElementRef, afterNextRender, effect, inject, input, signal, untracked, viewChild } from '@angular/core';
+import { DecimalPipe } from '@angular/common';
+import { Component, DestroyRef, ElementRef, afterNextRender, computed, effect, inject, input, signal, untracked, viewChild } from '@angular/core';
 import type * as T from 'three';
 import type { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { HousePlan, PlanRoom, RoomKind } from '@/app/pages/service/house-plan.service';
+import { ModelFile, ModelFormat, VIEWABLE_MODEL_ACCEPT, modelFormatOf } from '@/app/pages/service/project-model.service';
 
 type Three = typeof import('three');
 type ModelView = 'exterior' | number;
+/** sample = จำลองจากแปลน, model = แบบ 3 มิติของโครงการ/แบบบ้าน, local = ไฟล์จากเครื่อง (ดูอย่างเดียว ไม่บันทึก), none = ไม่มีอะไรแสดง */
+type ModelSource = 'sample' | 'model' | 'local' | 'none';
+type PartState = 'all' | 'some' | 'none';
+type IfcDimension = 'discipline' | 'category' | 'storey' | 'system';
+/** กลุ่มชิ้นงานใน .glb ที่แปลงจาก IFC (1 node ต่อ งาน × หมวด × ชั้น × ระบบ) */
+interface IfcNode {
+    object: T.Object3D;
+    discipline: string;
+    category: string;
+    storey: string;
+    system: string;
+    elements: number;
+}
+const emptyFilters = (): Record<IfcDimension, Set<string>> => ({ discipline: new Set(), category: new Set(), storey: new Set(), system: new Set() });
+/** ค่าของกลุ่มในมิตินั้น (หมวดใส่งานนำหน้า เพราะชื่อหมวดซ้ำข้ามงานได้) */
+const ifcKey = (node: IfcNode, dimension: IfcDimension) => (dimension === 'category' ? `${node.discipline}|${node.category}` : node[dimension]);
+/** ส่วนประกอบระดับหมวด (เช่น tag "รวมโครงสร้าง") และส่วนย่อย (tag) */
+interface PartGroup {
+    id: string;
+    name: string;
+    state: PartState;
+    children: Array<{ id: string; name: string; visible: boolean }>;
+}
 
 const WALL = 0.15;
 const SLAB = 0.15;
@@ -22,14 +47,19 @@ const SLAB_COLOR: Record<RoomKind, number> = {
     other: 0xddd3f3
 };
 
+/** รูปแบบที่อ่านเป็นข้อความ (ที่เหลืออ่านเป็น binary) */
+const isTextFormat = (format: ModelFormat) => format === 'dae' || format === 'obj';
+
 /**
- * ตัวดูโมเดลบ้าน 3 มิติ (three.js โหลดเมื่อเปิดใช้งานเท่านั้น)
- * - ค่าเริ่มต้น: ใช้ไฟล์ modelUrl ของแบบบ้าน ถ้าไม่มีจะสร้างโมเดลจำลองจากข้อมูลแปลน
- * - ผู้ใช้เปิดไฟล์ .glb / .gltf จากเครื่องเพื่อดูได้ (แสดงในเบราว์เซอร์ ไม่อัปโหลด)
+ * ตัวดูโมเดลบ้าน 3 มิติ (three.js และ loader โหลดเมื่อใช้งานเท่านั้น)
+ * - ลำดับที่แสดง: แบบ 3 มิติของโครงการ [model] → ไฟล์ modelUrl ของแบบบ้าน → โมเดลจำลองจากแปลน
+ * - รองรับ .glb .gltf .dae .fbx .obj (ไฟล์ที่ SketchUp / Revit ส่งออก)
+ * - ผู้ใช้เปิดไฟล์จากเครื่องเพื่อดูได้ (แสดงในเบราว์เซอร์ ไม่อัปโหลด)
  */
 @Component({
     selector: 'app-house-model-viewer',
     standalone: true,
+    imports: [DecimalPipe],
     template: `
         <div #container class="viewer relative w-full h-full overflow-hidden rounded-lg">
             <canvas #canvas class="block w-full h-full outline-none" tabindex="0" aria-label="โมเดลบ้าน 3 มิติ ลากเพื่อหมุน เลื่อนลูกกลิ้งเพื่อซูม"></canvas>
@@ -39,20 +69,139 @@ const SLAB_COLOR: Record<RoomKind, number> = {
                     @for (option of viewOptions(); track option.value) {
                         <button type="button" class="tool" [class.tool-active]="view() === option.value" [attr.aria-pressed]="view() === option.value" (click)="setView(option.value)">{{ option.label }}</button>
                     }
-                } @else {
-                    <span class="tool max-w-56 truncate" [title]="fileName()"><i class="pi pi-box mr-1"></i>{{ fileName() }}</span>
-                    <button type="button" class="tool" (click)="showSample()"><i class="pi pi-replay mr-1"></i>กลับโมเดลจากแปลน</button>
+                    @if (model()) {
+                        <button type="button" class="tool" (click)="showDefault()"><i class="pi pi-box mr-1"></i>กลับแบบ 3D ของโครงการ</button>
+                    }
+                } @else if (source() !== 'none') {
+                    <span class="tool max-w-56 truncate" [title]="fileName()"><i class="pi mr-1" [class.pi-box]="source() === 'model'" [class.pi-desktop]="source() === 'local'"></i>{{ fileName() }}</span>
+                    <button type="button" class="tool" [class.tool-active]="flipped()" [attr.aria-pressed]="flipped()" title="ใช้เมื่อโมเดลนอนราบ (ไฟล์ที่ใช้แกน Z เป็นแกนตั้ง)" (click)="flipUpAxis()"><i class="pi pi-sync mr-1"></i>สลับแกนตั้ง</button>
+                    @if (source() === 'local') {
+                        <button type="button" class="tool" (click)="showDefault()"><i class="pi pi-times mr-1"></i>ปิดไฟล์จากเครื่อง</button>
+                    } @else if (plan()) {
+                        <button type="button" class="tool" (click)="showSample()"><i class="pi pi-th-large mr-1"></i>ดูโมเดลจำลองจากแปลน</button>
+                    }
                 }
             </div>
 
             <div class="absolute top-3 right-3 flex gap-2">
-                <button type="button" class="tool tool-icon" aria-label="เปิดไฟล์โมเดล 3D จากเครื่อง (.glb, .gltf)" title="เปิดไฟล์ 3D (.glb, .gltf)" (click)="fileInput.click()"><i class="pi pi-upload"></i></button>
+                @if ((parts().length > 1 || ifcMode()) && source() !== 'sample') {
+                    <button type="button" class="tool" [class.tool-active]="partsOpen()" [attr.aria-pressed]="partsOpen()" aria-controls="model-parts" title="เปิด/ปิดการมองเห็นแต่ละส่วนของโมเดล" (click)="partsOpen.set(!partsOpen())">
+                        <i class="pi pi-sitemap mr-1"></i>ส่วนประกอบ
+                        @if (hiddenCount()) {
+                            <span class="text-xs">(ซ่อน {{ hiddenCount() }})</span>
+                        }
+                    </button>
+                }
+                <button type="button" class="tool tool-icon" aria-label="เปิดไฟล์ 3 มิติจากเครื่องเพื่อดู (ไม่บันทึก)" title="เปิดไฟล์ 3D จากเครื่องเพื่อดู (.glb .gltf .dae .fbx .obj) — ไม่บันทึกเข้าระบบ" (click)="fileInput.click()">
+                    <i class="pi pi-folder-open"></i>
+                </button>
                 <button type="button" class="tool tool-icon" aria-label="รีเซ็ตมุมมอง" title="รีเซ็ตมุมมอง" (click)="resetView()"><i class="pi pi-refresh"></i></button>
                 <button type="button" class="tool tool-icon" [attr.aria-label]="fullscreen() ? 'ออกจากเต็มจอ' : 'เต็มจอ'" [title]="fullscreen() ? 'ออกจากเต็มจอ' : 'เต็มจอ'" (click)="toggleFullscreen()">
                     <i class="pi" [class.pi-window-maximize]="!fullscreen()" [class.pi-window-minimize]="fullscreen()"></i>
                 </button>
             </div>
-            <input #fileInput type="file" accept=".glb,.gltf,model/gltf-binary,model/gltf+json" class="hidden" (change)="onFileSelected($event)" />
+            <input #fileInput type="file" [accept]="accept" class="hidden" (change)="onFileSelected($event)" />
+
+            @if (source() === 'none' && !loading()) {
+                <div class="absolute inset-0 flex flex-col items-center justify-center gap-2 text-center px-6 pointer-events-none">
+                    <i class="pi pi-box text-4xl text-muted-color"></i>
+                    <span class="font-semibold">ยังไม่มีแบบ 3 มิติ</span>
+                    <span class="text-sm text-muted-color">แบบที่ส่งออกจาก SketchUp หรือ Revit อัปโหลดได้ที่ปุ่ม "อัปโหลดแบบ 3D"</span>
+                </div>
+            }
+
+            @if (partsOpen() && ifcMode() && source() !== 'sample') {
+                <section id="model-parts" class="parts-panel" aria-label="ส่วนประกอบของโมเดล (IFC)">
+                    <div class="flex items-center justify-between gap-2 mb-2">
+                        <span class="font-semibold text-sm">ส่วนประกอบ</span>
+                        <button type="button" class="bg-transparent border-0 p-1 cursor-pointer text-muted-color" aria-label="ปิดแผงส่วนประกอบ" (click)="partsOpen.set(false)"><i class="pi pi-times"></i></button>
+                    </div>
+                    <div class="dim-tabs" role="tablist" aria-label="จัดกลุ่มตาม">
+                        @for (dim of dimensions; track dim.value) {
+                            <button type="button" role="tab" class="dim-tab" [class.dim-tab-active]="ifcDimension() === dim.value" [attr.aria-selected]="ifcDimension() === dim.value" (click)="ifcDimension.set(dim.value); partQuery.set('')">
+                                {{ dim.label }}
+                                @if (disabledCount(dim.value)) {
+                                    <span class="dim-badge">{{ disabledCount(dim.value) }}</span>
+                                }
+                            </button>
+                        }
+                    </div>
+                    <input type="search" class="parts-search mt-2" [placeholder]="'ค้นหา' + dimensionLabel()" [attr.aria-label]="'ค้นหา' + dimensionLabel()" [value]="partQuery()" (input)="partQuery.set($any($event.target).value)" />
+                    <div class="flex gap-2 my-2 text-xs">
+                        <button type="button" class="link-button" (click)="setDimensionAll(true)">แสดงทั้งหมด</button>
+                        <button type="button" class="link-button" (click)="setDimensionAll(false)">ซ่อนทั้งหมด</button>
+                        @if (totalDisabled()) {
+                            <button type="button" class="link-button ml-auto" (click)="resetIfc()">ล้างตัวกรองทุกแท็บ</button>
+                        }
+                    </div>
+                    <ul class="list-none p-0 m-0 overflow-y-auto flex-1 min-h-0">
+                        @for (row of ifcRows(); track row.key) {
+                            @if (row.header) {
+                                <li class="text-xs font-semibold text-muted-color mt-2 mb-1">{{ row.label }}</li>
+                            } @else {
+                                <li class="part-row" [class.pl-3]="ifcDimension() === 'category'">
+                                    <label class="flex items-center gap-2 flex-1 min-w-0 cursor-pointer">
+                                        <input type="checkbox" class="accent-[var(--p-primary-color)]" [checked]="row.enabled" (change)="toggleValue(row.key)" />
+                                        <span class="truncate" [title]="row.label">{{ row.label }}</span>
+                                    </label>
+                                    <span class="text-xs text-muted-color tabular-nums">{{ row.elements | number }}</span>
+                                    <button type="button" class="part-solo" title="ดูเฉพาะรายการนี้" [attr.aria-label]="'ดูเฉพาะ ' + row.label" (click)="soloValue(row.key)"><i class="pi pi-eye text-[0.65rem]"></i></button>
+                                </li>
+                            }
+                        } @empty {
+                            <li class="text-xs text-muted-color py-2">ไม่พบรายการที่ค้นหา</li>
+                        }
+                    </ul>
+                    <p class="text-xs text-muted-color m-0 mt-2">ตัวเลข = จำนวนชิ้นงาน · แสดงเฉพาะชิ้นงานที่เปิดอยู่ในทุกแท็บ</p>
+                </section>
+            } @else if (partsOpen() && parts().length > 1 && source() !== 'sample') {
+                <section id="model-parts" class="parts-panel" aria-label="ส่วนประกอบของโมเดล">
+                    <div class="flex items-center justify-between gap-2 mb-2">
+                        <span class="font-semibold text-sm">ส่วนประกอบ ({{ partCount() }})</span>
+                        <button type="button" class="bg-transparent border-0 p-1 cursor-pointer text-muted-color" aria-label="ปิดแผงส่วนประกอบ" (click)="partsOpen.set(false)"><i class="pi pi-times"></i></button>
+                    </div>
+                    <input type="search" class="parts-search" placeholder="ค้นหา Tag / ส่วนประกอบ" aria-label="ค้นหาส่วนประกอบ" [value]="partQuery()" (input)="partQuery.set($any($event.target).value)" />
+                    <div class="flex gap-2 my-2 text-xs">
+                        <button type="button" class="link-button" (click)="setAll(true)">แสดงทั้งหมด</button>
+                        <button type="button" class="link-button" (click)="setAll(false)">ซ่อนทั้งหมด</button>
+                    </div>
+                    <ul class="list-none p-0 m-0 overflow-y-auto flex-1 min-h-0">
+                        @for (group of filteredParts(); track group.id) {
+                            <li>
+                                <div class="part-row font-semibold">
+                                    @if (group.children.length) {
+                                        <button type="button" class="part-expand" [attr.aria-expanded]="expandedParts().has(group.id)" [attr.aria-label]="(expandedParts().has(group.id) ? 'ย่อ ' : 'ขยาย ') + group.name" (click)="toggleExpand(group.id)">
+                                            <i class="pi text-[0.6rem]" [class.pi-chevron-down]="expandedParts().has(group.id) || !!partQuery()" [class.pi-chevron-right]="!expandedParts().has(group.id) && !partQuery()"></i>
+                                        </button>
+                                    } @else {
+                                        <span class="part-expand"></span>
+                                    }
+                                    <label class="flex items-center gap-2 flex-1 min-w-0 cursor-pointer">
+                                        <input type="checkbox" class="accent-[var(--p-primary-color)]" [checked]="group.state === 'all'" [indeterminate]="group.state === 'some'" (change)="toggleGroup(group.id)" />
+                                        <span class="truncate" [title]="group.name">{{ group.name }}</span>
+                                    </label>
+                                    <button type="button" class="part-solo" title="ดูเฉพาะส่วนนี้" [attr.aria-label]="'ดูเฉพาะ ' + group.name" (click)="solo(group.id)"><i class="pi pi-eye text-[0.65rem]"></i></button>
+                                </div>
+                                @if (group.children.length && (expandedParts().has(group.id) || partQuery())) {
+                                    <ul class="list-none p-0 m-0 pl-5">
+                                        @for (part of group.children; track part.id) {
+                                            <li class="part-row">
+                                                <label class="flex items-center gap-2 flex-1 min-w-0 cursor-pointer">
+                                                    <input type="checkbox" class="accent-[var(--p-primary-color)]" [checked]="part.visible" (change)="togglePart(part.id)" />
+                                                    <span class="truncate" [title]="part.name">{{ part.name }}</span>
+                                                </label>
+                                                <button type="button" class="part-solo" title="ดูเฉพาะส่วนนี้" [attr.aria-label]="'ดูเฉพาะ ' + part.name" (click)="solo(part.id)"><i class="pi pi-eye text-[0.65rem]"></i></button>
+                                            </li>
+                                        }
+                                    </ul>
+                                }
+                            </li>
+                        } @empty {
+                            <li class="text-xs text-muted-color py-2">ไม่พบส่วนประกอบที่ค้นหา</li>
+                        }
+                    </ul>
+                </section>
+            }
 
             <div class="absolute bottom-3 left-3 text-xs px-2 py-1 rounded bg-surface-0/85 dark:bg-surface-900/85 text-muted-color pointer-events-none">ลากเพื่อหมุน · ลูกกลิ้งเพื่อซูม · คลิกขวาลากเพื่อเลื่อน</div>
 
@@ -109,18 +258,137 @@ const SLAB_COLOR: Record<RoomKind, number> = {
             justify-content: center;
             padding: 0;
         }
+        .parts-panel {
+            position: absolute;
+            top: 3.5rem;
+            right: 0.75rem;
+            bottom: 2.75rem;
+            width: min(20rem, calc(100% - 1.5rem));
+            display: flex;
+            flex-direction: column;
+            padding: 0.75rem;
+            border-radius: var(--p-content-border-radius);
+            border: 1px solid var(--p-content-border-color);
+            background: color-mix(in srgb, var(--p-content-background) 96%, transparent);
+            color: var(--p-text-color);
+            box-shadow: 0 4px 16px rgb(15 23 42 / 15%);
+            font-size: 0.85rem;
+        }
+        .parts-search {
+            width: 100%;
+            padding: 0.35rem 0.6rem;
+            border: 1px solid var(--p-content-border-color);
+            border-radius: var(--p-content-border-radius);
+            background: var(--p-content-background);
+            color: var(--p-text-color);
+            font: inherit;
+        }
+        .part-row {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            padding: 0.15rem 0;
+        }
+        .part-expand,
+        .part-solo {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 1.25rem;
+            height: 1.25rem;
+            flex-shrink: 0;
+            border: 0;
+            background: transparent;
+            color: var(--p-text-muted-color);
+            cursor: pointer;
+            padding: 0;
+        }
+        .part-solo {
+            opacity: 0;
+        }
+        .part-row:hover .part-solo,
+        .part-solo:focus-visible {
+            opacity: 1;
+        }
+        .dim-tabs {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0.25rem;
+            padding: 0.2rem;
+            border-radius: var(--p-content-border-radius);
+            background: var(--p-content-hover-background);
+        }
+        .dim-tab {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.25rem;
+            padding: 0.3rem 0.25rem;
+            border: 0;
+            border-radius: calc(var(--p-content-border-radius) - 2px);
+            background: transparent;
+            color: var(--p-text-muted-color);
+            font: inherit;
+            cursor: pointer;
+        }
+        .dim-tab-active {
+            background: var(--p-content-background);
+            color: var(--p-text-color);
+            font-weight: 600;
+            box-shadow: 0 1px 2px rgb(15 23 42 / 12%);
+        }
+        .dim-badge {
+            min-width: 1.1rem;
+            padding: 0 0.25rem;
+            border-radius: 999px;
+            background: var(--p-primary-color);
+            color: var(--p-primary-contrast-color);
+            font-size: 0.65rem;
+            line-height: 1.1rem;
+        }
+        .link-button {
+            padding: 0;
+            border: 0;
+            background: transparent;
+            color: var(--p-primary-color);
+            font: inherit;
+            text-decoration: underline;
+            cursor: pointer;
+        }
     `
 })
 export class HouseModelViewer {
-    readonly plan = input.required<HousePlan>();
+    /** แบบบ้านจากคลัง (ใช้สร้างโมเดลจำลองจากแปลน) */
+    readonly plan = input<HousePlan | undefined>(undefined);
+    /** แบบ 3 มิติของโครงการ (มาก่อนแบบบ้านจากคลัง) */
+    readonly model = input<ModelFile | null>(null);
 
+    readonly accept = VIEWABLE_MODEL_ACCEPT;
     readonly loading = signal(true);
     readonly error = signal('');
-    readonly source = signal<'sample' | 'file'>('sample');
+    readonly source = signal<ModelSource>('none');
+    readonly flipped = signal(false);
     readonly fileName = signal('');
     readonly view = signal<ModelView>('exterior');
     readonly fullscreen = signal(false);
     readonly viewOptions = signal<Array<{ value: ModelView; label: string }>>([]);
+
+    // ---------- ส่วนประกอบ (เปิด/ปิดการมองเห็น) ----------
+    readonly parts = signal<PartGroup[]>([]);
+    readonly partsOpen = signal(false);
+    readonly partQuery = signal('');
+    readonly expandedParts = signal(new Set<string>());
+    /** object ของแต่ละส่วน (id → Object3D) */
+    private partObjects = new Map<string, T.Object3D>();
+    readonly partCount = computed(() => this.parts().reduce((sum, group) => sum + Math.max(1, group.children.length), 0));
+    readonly hiddenCount = computed(() => (this.ifcMode() ? this.totalDisabled() : this.parts().reduce((sum, group) => sum + (group.children.length ? group.children.filter((part) => !part.visible).length : group.state === 'none' ? 1 : 0), 0)));
+    readonly filteredParts = computed(() => {
+        const q = this.partQuery().trim().toLowerCase();
+        if (!q) return this.parts();
+        return this.parts()
+            .map((group) => (group.name.toLowerCase().includes(q) ? group : { ...group, children: group.children.filter((part) => part.name.toLowerCase().includes(q)) }))
+            .filter((group) => group.name.toLowerCase().includes(q) || group.children.length);
+    });
 
     private readonly container = viewChild.required<ElementRef<HTMLDivElement>>('container');
     private readonly canvas = viewChild.required<ElementRef<HTMLCanvasElement>>('canvas');
@@ -131,12 +399,14 @@ export class HouseModelViewer {
     private camera?: T.PerspectiveCamera;
     private controls?: OrbitControls;
     private ground?: T.Mesh;
-    private model?: T.Object3D;
+    private model3d?: T.Object3D;
     private floorGroups: T.Group[] = [];
     private roof?: T.Object3D;
     private frame = 0;
     private resizeObserver?: ResizeObserver;
     private destroyed = false;
+    /** กันผลการโหลดครั้งเก่ามาทับครั้งใหม่ (เช่น สลับเวอร์ชันเร็ว ๆ) */
+    private loadToken = 0;
     private readonly onFullscreenChange = () => {
         this.fullscreen.set(document.fullscreenElement === this.container().nativeElement);
     };
@@ -144,11 +414,12 @@ export class HouseModelViewer {
     constructor() {
         afterNextRender(() => this.init());
         inject(DestroyRef).onDestroy(() => this.dispose());
-        // Rebuild when another plan is passed in (e.g. navigating to a different project).
+        // Rebuild when another plan or model is passed in (e.g. a new model version).
         effect(() => {
-            const plan = this.plan();
+            this.plan();
+            this.model();
             untracked(() => {
-                if (this.scene) this.showDefault(plan);
+                if (this.scene) void this.showDefault();
             });
         });
     }
@@ -193,35 +464,48 @@ export class HouseModelViewer {
             document.addEventListener('fullscreenchange', this.onFullscreenChange);
             this.resize();
 
-            await this.showDefault(this.plan());
+            await this.showDefault();
         } catch {
             this.error.set('ไม่สามารถแสดงผล 3 มิติได้ เบราว์เซอร์อาจไม่รองรับ WebGL');
             this.loading.set(false);
         }
     }
 
-    /** ใช้ไฟล์โมเดลของแบบบ้านถ้ามี ไม่มีก็สร้างจากแปลน */
-    private async showDefault(plan: HousePlan) {
-        if (!plan.modelUrl) {
+    /** แบบ 3 มิติของโครงการ → ไฟล์โมเดลของแบบบ้าน → โมเดลจำลองจากแปลน → ว่าง */
+    async showDefault() {
+        if (!this.three) return;
+        const token = ++this.loadToken;
+        this.error.set('');
+        const plan = this.plan();
+        const file: ModelFile | null = this.model() ?? (plan?.modelUrl ? { url: plan.modelUrl, name: plan.name, format: modelFormatOf(plan.modelUrl) ?? 'glb', upAxis: 'y' } : null);
+        if (!file) {
             this.showSample();
             return;
         }
         this.loading.set(true);
         try {
-            const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader.js');
-            const gltf = await new GLTFLoader().loadAsync(plan.modelUrl);
-            this.setModel(gltf.scene, 'file', plan.name);
+            const object = await this.loadModel(file.format, await this.fetchModel(file.url, file.format));
+            if (this.destroyed || token !== this.loadToken) return;
+            this.setModel(object, 'model', file.name, file.upAxis === 'z');
         } catch {
-            this.error.set('โหลดไฟล์โมเดลของแบบบ้านไม่สำเร็จ แสดงโมเดลจำลองจากแปลนแทน');
+            if (token !== this.loadToken) return;
+            this.error.set(`โหลดแบบ 3 มิติ "${file.name}" ไม่สำเร็จ${plan ? ' แสดงโมเดลจำลองจากแปลนแทน' : ''} — ตรวจสอบว่าส่งออกไฟล์ถูกต้อง (.gltf ต้องเป็นไฟล์เดียว)`);
             this.showSample();
         } finally {
-            this.loading.set(false);
+            if (token === this.loadToken) this.loading.set(false);
         }
     }
 
     showSample() {
         if (!this.three) return;
         const plan = this.plan();
+        if (!plan) {
+            this.clearModel();
+            this.source.set('none');
+            this.loading.set(false);
+            this.requestRender();
+            return;
+        }
         this.viewOptions.set([{ value: 'exterior', label: 'ภายนอก' }, ...plan.floors.map((floor, index) => ({ value: index as ModelView, label: floor.label }))]);
         this.view.set('exterior');
         this.setModel(this.buildHouse(plan), 'sample', '');
@@ -233,19 +517,220 @@ export class HouseModelViewer {
         const file = input.files?.[0];
         input.value = '';
         if (!file || !this.three) return;
+        const format = modelFormatOf(file.name);
+        if (!format) {
+            this.error.set(`เปิด "${file.name}" ในเบราว์เซอร์ไม่ได้ — ไฟล์ .skp / .rvt ต้องส่งออกเป็น .glb .dae .fbx หรือ .obj ก่อน`);
+            return;
+        }
 
+        const token = ++this.loadToken;
         this.loading.set(true);
         this.error.set('');
         try {
-            const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader.js');
-            const buffer = await file.arrayBuffer();
-            const gltf = await new GLTFLoader().parseAsync(buffer, '');
-            this.setModel(gltf.scene, 'file', file.name);
+            const data = isTextFormat(format) ? await file.text() : await file.arrayBuffer();
+            const object = await this.loadModel(format, data);
+            if (token === this.loadToken) this.setModel(object, 'local', file.name);
         } catch {
-            this.error.set(file.name.toLowerCase().endsWith('.gltf') ? 'เปิดไฟล์ไม่สำเร็จ ไฟล์ .gltf ที่แยกไฟล์ภาพ/ข้อมูลไว้ต่างหากยังไม่รองรับ กรุณาส่งออกเป็น .glb' : 'เปิดไฟล์ไม่สำเร็จ กรุณาตรวจสอบว่าเป็นไฟล์ .glb หรือ .gltf ที่ถูกต้อง');
+            this.error.set(format === 'gltf' ? 'เปิดไฟล์ไม่สำเร็จ ไฟล์ .gltf ที่แยกไฟล์ภาพ/ข้อมูลไว้ต่างหากยังไม่รองรับ กรุณาส่งออกเป็น .glb' : `เปิดไฟล์ไม่สำเร็จ กรุณาตรวจสอบว่าเป็นไฟล์ .${format} ที่ถูกต้อง`);
         } finally {
-            this.loading.set(false);
+            if (token === this.loadToken) this.loading.set(false);
         }
+    }
+
+    /** หมุนโมเดลที่ใช้แกน Z เป็นแกนตั้ง (เช่น OBJ ที่ไม่ได้สลับแกนตอนส่งออก) ให้ตั้งขึ้น */
+    flipUpAxis() {
+        if (!this.model3d || this.source() === 'sample') return;
+        this.flipped.update((value) => !value);
+        this.model3d.rotation.x = this.flipped() ? -Math.PI / 2 : 0;
+        this.frameModel(this.model3d);
+    }
+
+    // ---------- ส่วนประกอบของไฟล์ IFC: กรองตาม งาน / หมวด / ชั้น / ระบบ ----------
+    readonly dimensions: Array<{ value: IfcDimension; label: string }> = [
+        { value: 'discipline', label: 'งาน' },
+        { value: 'category', label: 'หมวด' },
+        { value: 'storey', label: 'ชั้น' },
+        { value: 'system', label: 'ระบบ' }
+    ];
+    readonly ifcMode = signal(false);
+    readonly ifcDimension = signal<IfcDimension>('discipline');
+    /** ค่าที่ปิดอยู่ของแต่ละมิติ (หมวดใช้ key "งาน|หมวด") */
+    readonly ifcDisabled = signal<Record<IfcDimension, Set<string>>>(emptyFilters());
+    private ifcNodes: IfcNode[] = [];
+    private ifcStoreys: string[] = [];
+    readonly dimensionLabel = computed(() => this.dimensions.find((dim) => dim.value === this.ifcDimension())!.label);
+    readonly totalDisabled = computed(() => Object.values(this.ifcDisabled()).reduce((sum, set) => sum + set.size, 0));
+
+    disabledCount(dimension: IfcDimension) {
+        return this.ifcDisabled()[dimension].size;
+    }
+
+    /** แถวของแท็บที่เลือก: ค่า + จำนวนชิ้นงาน (หมวดจัดกลุ่มใต้หัวข้องาน, ชั้นเรียงตามระดับ) */
+    readonly ifcRows = computed((): Array<{ key: string; label: string; elements: number; enabled: boolean; header?: boolean }> => {
+        const dimension = this.ifcDimension();
+        const disabled = this.ifcDisabled()[dimension];
+        const q = this.partQuery().trim().toLowerCase();
+        const counts = new Map<string, number>();
+        for (const node of this.ifcNodes) counts.set(ifcKey(node, dimension), (counts.get(ifcKey(node, dimension)) ?? 0) + node.elements);
+        let keys = [...counts.keys()];
+        if (dimension === 'storey') keys.sort((a, b) => (this.ifcStoreys.indexOf(a) + 1 || 999) - (this.ifcStoreys.indexOf(b) + 1 || 999));
+        else keys.sort((a, b) => a.localeCompare(b, 'th'));
+        if (q) keys = keys.filter((key) => key.toLowerCase().includes(q));
+        const row = (key: string) => ({ key, label: dimension === 'category' ? key.split('|')[1]! : key, elements: counts.get(key)!, enabled: !disabled.has(key) });
+        if (dimension !== 'category') return keys.map(row);
+        // หมวด: หัวข้อตามงาน
+        const rows: Array<{ key: string; label: string; elements: number; enabled: boolean; header?: boolean }> = [];
+        let current = '';
+        for (const key of keys) {
+            const discipline = key.split('|')[0]!;
+            if (discipline !== current) rows.push({ key: `#${discipline}`, label: discipline, elements: 0, enabled: true, header: true });
+            current = discipline;
+            rows.push(row(key));
+        }
+        return rows;
+    });
+
+    toggleValue(key: string) {
+        const dimension = this.ifcDimension();
+        this.ifcDisabled.update((filters) => {
+            const next = new Set(filters[dimension]);
+            if (!next.delete(key)) next.add(key);
+            return { ...filters, [dimension]: next };
+        });
+        this.applyIfcFilters();
+    }
+
+    /** ดูเฉพาะค่านี้ในแท็บปัจจุบัน (แท็บอื่นคงเดิม) */
+    soloValue(key: string) {
+        const dimension = this.ifcDimension();
+        const all = new Set(this.ifcNodes.map((node) => ifcKey(node, dimension)));
+        all.delete(key);
+        this.ifcDisabled.update((filters) => ({ ...filters, [dimension]: all }));
+        this.applyIfcFilters();
+    }
+
+    setDimensionAll(visible: boolean) {
+        const dimension = this.ifcDimension();
+        this.ifcDisabled.update((filters) => ({ ...filters, [dimension]: visible ? new Set() : new Set(this.ifcNodes.map((node) => ifcKey(node, dimension))) }));
+        this.applyIfcFilters();
+    }
+
+    resetIfc() {
+        this.ifcDisabled.set(emptyFilters());
+        this.applyIfcFilters();
+    }
+
+    private applyIfcFilters() {
+        const filters = this.ifcDisabled();
+        for (const node of this.ifcNodes) node.object.visible = this.dimensions.every(({ value }) => !filters[value].has(ifcKey(node, value)));
+        this.requestRender();
+    }
+
+    /**
+     * ส่วนประกอบของโมเดล 2 ระดับ: ข้ามชั้นที่มีลูกเดียวลงไป แล้วใช้ลูกเป็นหมวด และลูกของหมวดเป็นส่วนย่อย
+     * ไฟล์ที่แปลงจาก .skp: หมวด = tag ชั้นนอก ส่วนย่อย = tag (ชื่อจริงและค่าเปิด/ปิดตั้งต้นอยู่ใน userData)
+     */
+    private buildParts(object: T.Object3D) {
+        this.partObjects = new Map();
+        let root = object;
+        while (root.children.length === 1 && !root.userData['kind'] && !root.userData['source']) root = root.children[0]!;
+        // ไฟล์ที่แปลงจาก IFC: กรองหลายมิติแทนรายการ 2 ระดับ
+        this.ifcMode.set(root.userData['source'] === 'ifc');
+        this.ifcNodes = [];
+        this.ifcDisabled.set(emptyFilters());
+        if (this.ifcMode()) {
+            this.ifcStoreys = (root.userData['storeys'] as string[] | undefined) ?? [];
+            this.ifcNodes = root.children.map((child) => ({
+                object: child,
+                discipline: String(child.userData['discipline'] ?? 'อื่น ๆ'),
+                category: String(child.userData['category'] ?? child.name),
+                storey: String(child.userData['storey'] ?? ''),
+                system: String(child.userData['system'] ?? ''),
+                elements: Number(child.userData['elements'] ?? 1)
+            }));
+            this.parts.set([]);
+            this.ifcDimension.set('discipline');
+            this.partQuery.set('');
+            return;
+        }
+        const nameOf = (node: T.Object3D, fallback: string) => String(node.userData['name'] ?? (node.name || fallback));
+        const groups: PartGroup[] = root.children.map((category, i) => {
+            const id = `g${i}`;
+            this.partObjects.set(id, category);
+            // ส่วนย่อย: ลูกที่มีชื่อ (ไฟล์ทั่วไปอาจมีลูกเป็น mesh ไม่มีชื่อ ไม่ต้องแสดง)
+            const named = category.children.filter((child) => child.userData['name'] || child.name);
+            const hiddenCategory = category.userData['visible'] === false;
+            const children = named.length > 1 || category.userData['kind'] ? named.map((child, j) => {
+                const childId = `${id}.${j}`;
+                this.partObjects.set(childId, child);
+                // ปิดทั้งหมวด = ปิดทุกส่วนย่อย (หมวดเปิดไว้เสมอ ใช้ส่วนย่อยคุมการมองเห็น)
+                child.visible = !hiddenCategory && child.userData['visible'] !== false;
+                return { id: childId, name: nameOf(child, `ส่วนที่ ${j + 1}`), visible: child.visible };
+            }) : [];
+            if (children.length) category.visible = true;
+            else category.visible = !hiddenCategory;
+            return { id, name: nameOf(category, `ส่วนที่ ${i + 1}`), children, state: 'all' as PartState };
+        });
+        this.parts.set(groups.map((group) => this.withState(group)));
+        this.expandedParts.set(new Set());
+        this.partQuery.set('');
+    }
+
+    private withState(group: PartGroup): PartGroup {
+        const visible = group.children.length ? group.children.filter((part) => part.visible).length : this.partObjects.get(group.id)!.visible ? 1 : 0;
+        const total = Math.max(1, group.children.length);
+        return { ...group, state: visible === total ? 'all' : visible ? 'some' : 'none' };
+    }
+
+    /** ตั้งค่าการมองเห็นจาก object จริงแล้วอัปเดตรายการ */
+    private syncParts() {
+        this.parts.update((groups) => groups.map((group) => this.withState({ ...group, children: group.children.map((part) => ({ ...part, visible: this.partObjects.get(part.id)!.visible })) })));
+        this.requestRender();
+    }
+
+    togglePart(id: string) {
+        const object = this.partObjects.get(id);
+        if (!object) return;
+        object.visible = !object.visible;
+        this.syncParts();
+    }
+
+    toggleGroup(id: string) {
+        const group = this.parts().find((item) => item.id === id);
+        if (!group) return;
+        const show = group.state !== 'all';
+        if (group.children.length) group.children.forEach((part) => (this.partObjects.get(part.id)!.visible = show));
+        else this.partObjects.get(id)!.visible = show;
+        this.syncParts();
+    }
+
+    setAll(visible: boolean) {
+        for (const group of this.parts()) {
+            if (group.children.length) group.children.forEach((part) => (this.partObjects.get(part.id)!.visible = visible));
+            else this.partObjects.get(group.id)!.visible = visible;
+        }
+        this.syncParts();
+    }
+
+    /** แสดงเฉพาะส่วนที่เลือก (หมวดหรือส่วนย่อย) */
+    solo(id: string) {
+        this.setAll(false);
+        const group = this.parts().find((item) => item.id === id);
+        if (group?.children.length) group.children.forEach((part) => (this.partObjects.get(part.id)!.visible = true));
+        else {
+            this.partObjects.get(id)!.visible = true;
+            const parent = this.parts().find((item) => item.children.some((part) => part.id === id));
+            if (parent && !parent.children.length) this.partObjects.get(parent.id)!.visible = true;
+        }
+        this.syncParts();
+    }
+
+    toggleExpand(id: string) {
+        this.expandedParts.update((set) => {
+            const next = new Set(set);
+            if (!next.delete(id)) next.add(id);
+            return next;
+        });
     }
 
     setView(view: ModelView) {
@@ -264,22 +749,81 @@ export class HouseModelViewer {
         else void this.container().nativeElement.requestFullscreen?.();
     }
 
-    private setModel(object: T.Object3D, source: 'sample' | 'file', name: string) {
-        const three = this.three!;
+    private async fetchModel(url: string, format: ModelFormat): Promise<string | ArrayBuffer> {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return isTextFormat(format) ? response.text() : response.arrayBuffer();
+    }
+
+    /** แปลงข้อมูลไฟล์เป็นโมเดล three.js ตามรูปแบบไฟล์ (โหลด loader เฉพาะที่ใช้) */
+    private async loadModel(format: ModelFormat, data: string | ArrayBuffer): Promise<T.Object3D> {
+        switch (format) {
+            case 'glb':
+            case 'gltf': {
+                const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader.js');
+                return (await new GLTFLoader().parseAsync(data, '')).scene;
+            }
+            case 'dae': {
+                // SketchUp ส่งออกเป็น Z_UP — ColladaLoader หมุนให้ตามข้อมูลแกนในไฟล์
+                const { ColladaLoader } = await import('three/examples/jsm/loaders/ColladaLoader.js');
+                const collada = new ColladaLoader().parse(data as string, '');
+                if (!collada) throw new Error('invalid collada');
+                return collada.scene;
+            }
+            case 'fbx': {
+                const { FBXLoader } = await import('three/examples/jsm/loaders/FBXLoader.js');
+                return new FBXLoader().parse(data as ArrayBuffer, '');
+            }
+            case 'obj': {
+                const { OBJLoader } = await import('three/examples/jsm/loaders/OBJLoader.js');
+                const object = new OBJLoader().parse(data as string);
+                // ไม่ได้แนบไฟล์วัสดุ (.mtl) ใช้สีผนังแทนสีเริ่มต้นของ loader
+                const material = new this.three!.MeshStandardMaterial({ color: 0xf4f1ea, roughness: 0.9, side: this.three!.DoubleSide });
+                object.traverse((child) => {
+                    if ((child as T.Mesh).isMesh) (child as T.Mesh).material = material;
+                });
+                return object;
+            }
+        }
+    }
+
+    private setModel(object: T.Object3D, source: Exclude<ModelSource, 'none'>, name: string, zUp = false) {
         this.clearModel();
-        if (source === 'file') {
+        if (source !== 'sample') {
             this.floorGroups = [];
             this.roof = undefined;
+            // โมเดลรายละเอียดสูง (เช่น แปลงจาก .skp หลายล้านสามเหลี่ยม) ไม่ทำเงา ให้หมุนดูได้ลื่น
+            let triangles = 0;
             object.traverse((child) => {
-                if ((child as T.Mesh).isMesh) child.castShadow = child.receiveShadow = true;
+                const mesh = child as T.Mesh;
+                if (mesh.isMesh) triangles += (mesh.geometry.index?.count ?? mesh.geometry.attributes['position']?.count ?? 0) / 3;
             });
+            const shadows = triangles < 1_000_000;
+            object.traverse((child) => {
+                if ((child as T.Mesh).isMesh) child.castShadow = child.receiveShadow = shadows;
+            });
+            if (zUp) object.rotation.x = -Math.PI / 2;
         }
-        this.model = object;
+        this.model3d = object;
         this.scene!.add(object);
         this.source.set(source);
         this.fileName.set(name);
+        this.flipped.set(zUp);
+        // คำนวณกรอบมุมกล้องจากทุกส่วน (รวมส่วนที่ซ่อนตั้งต้น) ก่อนตั้งค่าการมองเห็น
+        this.frameModel(object);
+        if (source === 'sample') {
+            this.parts.set([]);
+            this.partsOpen.set(false);
+        } else {
+            this.buildParts(object);
+            this.requestRender();
+        }
+    }
 
-        // Frame the model: sit it on the ground and look at it from the front-right corner.
+    /** วางโมเดลบนพื้นแล้วมองจากมุมหน้าขวา — ใช้ได้กับทุกหน่วย (เช่น FBX จาก Revit ที่เป็นเซนติเมตร) */
+    private frameModel(object: T.Object3D) {
+        const three = this.three!;
+        object.updateMatrixWorld(true);
         const box = new three.Box3().setFromObject(object);
         const sphere = box.getBoundingSphere(new three.Sphere());
         const camera = this.camera!;
@@ -405,10 +949,10 @@ export class HouseModelViewer {
     }
 
     private clearModel() {
-        if (!this.model) return;
-        this.scene?.remove(this.model);
-        disposeObject(this.model);
-        this.model = undefined;
+        if (!this.model3d) return;
+        this.scene?.remove(this.model3d);
+        disposeObject(this.model3d);
+        this.model3d = undefined;
     }
 
     private dispose() {

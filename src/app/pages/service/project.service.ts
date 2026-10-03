@@ -10,6 +10,23 @@ export type ContractInput = ApiSchemas['ContractInput'];
 export type ProjectRegion = ApiSchemas['ProjectRegion'];
 export type ProjectGroup = ApiSchemas['ProjectGroup'];
 export type ProjectPortfolio = ApiSchemas['ProjectPortfolio'];
+export type WarrantyType = ApiSchemas['WarrantyType'];
+export type WarrantyTerm = ApiSchemas['WarrantyTerm'];
+export type WarrantyCoverage = ApiSchemas['WarrantyCoverage'];
+
+/** ใกล้หมดประกัน: เหลือไม่เกินกี่วัน */
+export const WARRANTY_EXPIRING_DAYS = 60;
+
+/** ระยะประกันเป็นข้อความ เช่น 12 → "1 ปี", 18 → "18 เดือน" */
+export function warrantyPeriod(months: number): string {
+    return months % 12 === 0 ? `${months / 12} ปี` : `${months} เดือน`;
+}
+
+/** สถานะของการรับประกันแต่ละส่วน */
+export function coverageState(coverage: WarrantyCoverage): 'expired' | 'expiring' | 'active' {
+    if (!coverage.active) return 'expired';
+    return coverage.daysLeft <= WARRANTY_EXPIRING_DAYS ? 'expiring' : 'active';
+}
 
 /** กลุ่มโครงการ (ตัวกรองในรายการโครงการและการ์ดใน Dashboard) */
 export const PROJECT_GROUP_LABEL: Record<ProjectGroup, string> = {

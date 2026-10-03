@@ -26,5 +26,7 @@ export const config = {
     dataDir,
     uploadDir: join(dataDir, 'uploads'),
     /** กุญแจลงลายเซ็น access token */
-    authSecret: authSecret || 'dev-only-secret-change-me-in-production'
+    authSecret: authSecret || 'dev-only-secret-change-me-in-production',
+    /** โฟลเดอร์ที่มี SketchUpAPI.dll สำหรับแปลง .skp เป็น 3 มิติ (ว่าง = หา SketchUp ที่ติดตั้งในเครื่องเอง) */
+    sketchupApiDir: process.env['SKETCHUP_API_DIR'] ?? ''
 };

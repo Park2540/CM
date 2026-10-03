@@ -4,7 +4,7 @@
  */
 
 export interface paths {
-    '/auth/login': {
+    "/auth/login": {
         parameters: {
             query?: never;
             header?: never;
@@ -20,14 +20,14 @@ export interface paths {
          *     - ผิดติดกัน 5 ครั้งต่ออีเมล → 429 ล็อก 15 นาที
          *     - lastLoginAt ใน user คือเวลาเข้าสู่ระบบครั้งก่อนหน้า (ก่อนครั้งนี้)
          */
-        post: operations['login'];
+        post: operations["login"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/auth/me': {
+    "/auth/me": {
         parameters: {
             query?: never;
             header?: never;
@@ -35,7 +35,7 @@ export interface paths {
             cookie?: never;
         };
         /** ผู้ใช้ที่ล็อกอินอยู่ */
-        get: operations['getCurrentUser'];
+        get: operations["getCurrentUser"];
         put?: never;
         post?: never;
         delete?: never;
@@ -44,7 +44,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/auth/logout': {
+    "/auth/logout": {
         parameters: {
             query?: never;
             header?: never;
@@ -54,14 +54,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** ออกจากระบบ (ยกเลิก token ปัจจุบัน) */
-        post: operations['logout'];
+        post: operations["logout"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/auth/register': {
+    "/auth/register": {
         parameters: {
             query?: never;
             header?: never;
@@ -75,14 +75,14 @@ export interface paths {
          * @description หลังบ้านต้องปฏิเสธการเข้าสู่ระบบของผู้ที่คำขอยังไม่ได้รับอนุมัติ
          *     อีเมลที่มีบัญชีอยู่แล้วหรือมีคำขอรออนุมัติอยู่ ตอบ 409
          */
-        post: operations['register'];
+        post: operations["register"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/registrations': {
+    "/registrations": {
         parameters: {
             query?: never;
             header?: never;
@@ -90,7 +90,7 @@ export interface paths {
             cookie?: never;
         };
         /** คำขอสมัครสมาชิก (ต้องมีสิทธิ์ user.manage) */
-        get: operations['listRegistrations'];
+        get: operations["listRegistrations"];
         put?: never;
         post?: never;
         delete?: never;
@@ -99,7 +99,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/registrations/{id}/approve': {
+    "/registrations/{id}/approve": {
         parameters: {
             query?: never;
             header?: never;
@@ -114,14 +114,14 @@ export interface paths {
          * อนุมัติคำขอและสร้างบัญชี (สถานะ active) — เฉพาะบทบาทแอดมินหรือเจ้าของบริษัท (403)
          * @description ผูกกับบุคลากรในทะเบียน (ยังไม่มีบัญชี) และกำหนดบทบาท/สิทธิ์ตามกฎเดียวกับ POST /user-accounts คำขอที่ไม่ใช่ pending ตอบ 409
          */
-        post: operations['approveRegistration'];
+        post: operations["approveRegistration"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/registrations/{id}/reject': {
+    "/registrations/{id}/reject": {
         parameters: {
             query?: never;
             header?: never;
@@ -133,14 +133,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** ปฏิเสธคำขอ (ต้องระบุเหตุผล) — เฉพาะบทบาทแอดมินหรือเจ้าของบริษัท (403) */
-        post: operations['rejectRegistration'];
+        post: operations["rejectRegistration"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/users': {
+    "/users": {
         parameters: {
             query?: never;
             header?: never;
@@ -148,7 +148,7 @@ export interface paths {
             cookie?: never;
         };
         /** รายชื่อผู้ใช้ (ใช้ในตัวกรอง) */
-        get: operations['listUsers'];
+        get: operations["listUsers"];
         put?: never;
         post?: never;
         delete?: never;
@@ -157,7 +157,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/roles': {
+    "/roles": {
         parameters: {
             query?: never;
             header?: never;
@@ -165,7 +165,7 @@ export interface paths {
             cookie?: never;
         };
         /** บทบาทและสิทธิ์ทั้งหมด */
-        get: operations['listRoles'];
+        get: operations["listRoles"];
         put?: never;
         post?: never;
         delete?: never;
@@ -174,7 +174,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/user-accounts': {
+    "/user-accounts": {
         parameters: {
             query?: never;
             header?: never;
@@ -182,17 +182,17 @@ export interface paths {
             cookie?: never;
         };
         /** บัญชีผู้ใช้ของบุคลากร (ต้องมีสิทธิ์ user.manage) */
-        get: operations['listUserAccounts'];
+        get: operations["listUserAccounts"];
         put?: never;
         /** สร้างบัญชีให้บุคลากรและส่งคำเชิญตั้งรหัสผ่านทางอีเมล (สถานะเริ่มต้น invited) */
-        post: operations['createUserAccount'];
+        post: operations["createUserAccount"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/user-accounts/{id}': {
+    "/user-accounts/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -203,7 +203,7 @@ export interface paths {
         };
         get?: never;
         /** แก้บทบาท โครงการ และสิทธิ์รายคน — แก้บทบาทหรือถอน user.manage ของตัวเองไม่ได้ (409) */
-        put: operations['updateUserAccount'];
+        put: operations["updateUserAccount"];
         post?: never;
         delete?: never;
         options?: never;
@@ -211,7 +211,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/user-accounts/{id}/suspend': {
+    "/user-accounts/{id}/suspend": {
         parameters: {
             query?: never;
             header?: never;
@@ -223,14 +223,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** ระงับบัญชี (ออกจากระบบทุกอุปกรณ์ทันที) — ระงับตัวเองหรือเจ้าของบริษัทคนสุดท้ายไม่ได้ (409) */
-        post: operations['suspendUserAccount'];
+        post: operations["suspendUserAccount"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/user-accounts/{id}/activate': {
+    "/user-accounts/{id}/activate": {
         parameters: {
             query?: never;
             header?: never;
@@ -242,14 +242,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** เปิดใช้บัญชีที่ระงับไว้ (กลับเป็น active หรือ invited ถ้ายังไม่เคยตั้งรหัสผ่าน) */
-        post: operations['activateUserAccount'];
+        post: operations["activateUserAccount"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/user-accounts/{id}/reset-password': {
+    "/user-accounts/{id}/reset-password": {
         parameters: {
             query?: never;
             header?: never;
@@ -261,14 +261,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** ส่งลิงก์ตั้งรหัสผ่านใหม่ทางอีเมล (บัญชี invited = ส่งคำเชิญซ้ำ) — บัญชีที่ระงับอยู่ทำไม่ได้ (409) */
-        post: operations['resetUserPassword'];
+        post: operations["resetUserPassword"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/settings/approval': {
+    "/settings/approval": {
         parameters: {
             query?: never;
             header?: never;
@@ -276,9 +276,9 @@ export interface paths {
             cookie?: never;
         };
         /** เกณฑ์การอนุมัติ */
-        get: operations['getApprovalSettings'];
+        get: operations["getApprovalSettings"];
         /** แก้ไขเกณฑ์การอนุมัติ (แอดมิน/เจ้าของบริษัท) */
-        put: operations['updateApprovalSettings'];
+        put: operations["updateApprovalSettings"];
         post?: never;
         delete?: never;
         options?: never;
@@ -286,7 +286,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/projects': {
+    "/projects": {
         parameters: {
             query?: never;
             header?: never;
@@ -294,21 +294,21 @@ export interface paths {
             cookie?: never;
         };
         /** รายการโครงการที่ผู้ใช้มีสิทธิ์เห็น */
-        get: operations['listProjects'];
+        get: operations["listProjects"];
         put?: never;
         /**
          * เปิดโครงการใหม่ (ต้องมีสิทธิ์ project.create)
          * @description หลังบ้านออกรหัสโครงการ (รหัสภูมิภาค + ปี พ.ศ. 2 หลัก + ลำดับ 4 หลัก เช่น CR690003) และบันทึก Audit Log
          *     โครงการใหม่มีสถานะ pending-contract (ยังไม่มีมูลค่า วันที่ และแผนงาน จนกว่าจะบันทึกสัญญาและตั้งค่างานก่อสร้าง)
          */
-        post: operations['createProject'];
+        post: operations["createProject"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/settings/project-regions': {
+    "/settings/project-regions": {
         parameters: {
             query?: never;
             header?: never;
@@ -316,7 +316,7 @@ export interface paths {
             cookie?: never;
         };
         /** รหัสภูมิภาคที่ใช้ขึ้นต้นรหัสโครงการ */
-        get: operations['listProjectRegions'];
+        get: operations["listProjectRegions"];
         put?: never;
         post?: never;
         delete?: never;
@@ -325,7 +325,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/settings/construction-options': {
+    "/settings/construction-options": {
         parameters: {
             query?: never;
             header?: never;
@@ -337,7 +337,7 @@ export interface paths {
          * @description หน้าบ้านสร้างฟอร์มจากรายการนี้ทั้งหมด เพิ่มตัวเลือกใหม่ที่หลังบ้านได้โดยไม่ต้องแก้หน้าบ้าน
          *     งานที่ต้องทำของแต่ละตัวเลือกกำหนดที่หลังบ้าน (แม่แบบแผนงาน)
          */
-        get: operations['listConstructionOptions'];
+        get: operations["listConstructionOptions"];
         put?: never;
         post?: never;
         delete?: never;
@@ -346,7 +346,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/house-plans': {
+    "/house-plans": {
         parameters: {
             query?: never;
             header?: never;
@@ -354,7 +354,7 @@ export interface paths {
             cookie?: never;
         };
         /** แบบบ้านทั้งหมดที่เลือกได้ตอนเปิดโครงการ */
-        get: operations['listHousePlans'];
+        get: operations["listHousePlans"];
         put?: never;
         post?: never;
         delete?: never;
@@ -363,16 +363,16 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/projects/{code}': {
+    "/projects/{code}": {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                code: components['parameters']['ProjectCode'];
+                code: components["parameters"]["ProjectCode"];
             };
             cookie?: never;
         };
-        get: operations['getProject'];
+        get: operations["getProject"];
         put?: never;
         post?: never;
         delete?: never;
@@ -381,12 +381,12 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/projects/{code}/contract': {
+    "/projects/{code}/contract": {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                code: components['parameters']['ProjectCode'];
+                code: components["parameters"]["ProjectCode"];
             };
             cookie?: never;
         };
@@ -399,19 +399,19 @@ export interface paths {
          *     ไทม์ไลน์ยังไม่ถูกสร้างจนกว่าจะตั้งค่างานก่อสร้าง (PUT /projects/{code}/setup)
          *     endpoint ข้อมูลรายโครงการ (timeline, installments, photos, documents, team, updates, inspection) ตอบ 409 จนกว่าจะบันทึกสัญญาและตั้งค่างานก่อสร้าง
          */
-        post: operations['recordProjectContract'];
+        post: operations["recordProjectContract"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/projects/{code}/setup': {
+    "/projects/{code}/setup": {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                code: components['parameters']['ProjectCode'];
+                code: components["parameters"]["ProjectCode"];
             };
             cookie?: never;
         };
@@ -419,14 +419,14 @@ export interface paths {
          * การตั้งค่างานก่อสร้างของโครงการ
          * @description ยังไม่ตั้งค่า → configured = false และ options เป็นค่าเริ่มต้น; 409 ถ้ายังไม่บันทึกสัญญา
          */
-        get: operations['getProjectSetup'];
+        get: operations["getProjectSetup"];
         /**
          * บันทึกการตั้งค่างานก่อสร้างและสร้างไทม์ไลน์ (ต้องมีสิทธิ์ project.manage)
-         * @description หลังบ้านคัดงานจากแม่แบบตามตัวเลือก จัดวันที่ให้พอดีกับระยะสัญญา สร้างไทม์ไลน์และงวดงานใหม่ และบันทึก Audit Log
+         * @description หลังบ้านคัดงานจากแม่แบบตามตัวเลือก จัดวันที่ให้พอดีกับระยะสัญญา สร้างไทม์ไลน์และงวดงานใหม่ (ตามสัดส่วน paymentPercents) และบันทึก Audit Log
          *     ตัวเลือกที่ถูกซ่อน (visibleWhen ไม่ตรง) หลังบ้านปรับเป็นค่าเริ่มต้นเอง
          *     409 ถ้ายังไม่บันทึกสัญญา หรือเริ่มรายงานความคืบหน้าแล้ว (locked)
          */
-        put: operations['saveProjectSetup'];
+        put: operations["saveProjectSetup"];
         post?: never;
         delete?: never;
         options?: never;
@@ -434,36 +434,36 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/projects/{code}/setup/preview': {
+    "/projects/{code}/setup/preview": {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                code: components['parameters']['ProjectCode'];
+                code: components["parameters"]["ProjectCode"];
             };
             cookie?: never;
         };
         get?: never;
         put?: never;
         /** ดูตัวอย่างงานที่จะเกิดขึ้นจากตัวเลือก (ไม่บันทึก) */
-        post: operations['previewProjectSetup'];
+        post: operations["previewProjectSetup"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/projects/{code}/timeline': {
+    "/projects/{code}/timeline": {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                code: components['parameters']['ProjectCode'];
+                code: components["parameters"]["ProjectCode"];
             };
             cookie?: never;
         };
         /** ไทม์ไลน์ตามแผนงานพร้อมความคืบหน้ารายงาน */
-        get: operations['getProjectTimeline'];
+        get: operations["getProjectTimeline"];
         put?: never;
         post?: never;
         delete?: never;
@@ -472,17 +472,17 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/projects/{code}/updates': {
+    "/projects/{code}/updates": {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                code: components['parameters']['ProjectCode'];
+                code: components["parameters"]["ProjectCode"];
             };
             cookie?: never;
         };
         /** บันทึกหน้างาน/ประวัติการอัปเดตความคืบหน้า (ล่าสุดก่อน) */
-        get: operations['listProgressUpdates'];
+        get: operations["listProgressUpdates"];
         put?: never;
         /**
          * บันทึกความคืบหน้าประจำวัน
@@ -491,19 +491,19 @@ export interface paths {
          *     งานที่เป็นจุดตรวจ (Hold Point) อัปเดตผ่าน endpoint นี้ไม่ได้ ต้องใช้ /inspection
          *     การลด % ต้องระบุเหตุผลใน note
          */
-        post: operations['createProgressUpdate'];
+        post: operations["createProgressUpdate"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/projects/{code}/tasks/{taskCode}/inspection': {
+    "/projects/{code}/tasks/{taskCode}/inspection": {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                code: components['parameters']['ProjectCode'];
+                code: components["parameters"]["ProjectCode"];
                 taskCode: string;
             };
             cookie?: never;
@@ -511,14 +511,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** บันทึกผลตรวจจุด Hold Point (ผ่าน = งานเสร็จ, ไม่ผ่าน = ต้องแก้ไขและตรวจใหม่) */
-        post: operations['recordInspection'];
+        post: operations["recordInspection"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/uploads': {
+    "/uploads": {
         parameters: {
             query?: never;
             header?: never;
@@ -528,24 +528,24 @@ export interface paths {
         get?: never;
         put?: never;
         /** อัปโหลดไฟล์ (รูปหน้างาน) แล้วนำ id ไปอ้างอิงในบันทึก */
-        post: operations['uploadFile'];
+        post: operations["uploadFile"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/projects/{code}/change-orders': {
+    "/projects/{code}/change-orders": {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                code: components['parameters']['ProjectCode'];
+                code: components["parameters"]["ProjectCode"];
             };
             cookie?: never;
         };
         /** งานเพิ่ม-ลดของโครงการ (ล่าสุดก่อน) */
-        get: operations['listChangeOrders'];
+        get: operations["listChangeOrders"];
         put?: never;
         /**
          * ขอเพิ่ม-ลดงาน (ต้องมีสิทธิ์ project.manage) — สร้างคำขออนุมัติประเภท change-order ในศูนย์อนุมัติ
@@ -555,19 +555,19 @@ export interface paths {
          *     - เพิ่ม newTask เข้าไทม์ไลน์ (ท้ายขั้นตอนที่ระบุ ก่อนหมุดหมาย)
          *     งานที่ลูกค้าขอ (source = customer) อนุมัติไม่ได้จนกว่าลูกค้าจะยืนยัน (409)
          */
-        post: operations['createChangeOrder'];
+        post: operations["createChangeOrder"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/projects/{code}/change-orders/{id}/customer-confirm': {
+    "/projects/{code}/change-orders/{id}/customer-confirm": {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                code: components['parameters']['ProjectCode'];
+                code: components["parameters"]["ProjectCode"];
                 id: string;
             };
             cookie?: never;
@@ -575,19 +575,19 @@ export interface paths {
         get?: never;
         put?: never;
         /** บันทึกว่าลูกค้ายืนยันรายการและราคาแล้ว (คำขอที่ยังรออนุมัติ) */
-        post: operations['confirmChangeOrderByCustomer'];
+        post: operations["confirmChangeOrderByCustomer"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/projects/{code}/change-orders/{id}/cancel': {
+    "/projects/{code}/change-orders/{id}/cancel": {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                code: components['parameters']['ProjectCode'];
+                code: components["parameters"]["ProjectCode"];
                 id: string;
             };
             cookie?: never;
@@ -595,24 +595,24 @@ export interface paths {
         get?: never;
         put?: never;
         /** ยกเลิกคำขอที่ยังรออนุมัติ (คำขออนุมัติที่ผูกไว้ถูกปิดด้วย) */
-        post: operations['cancelChangeOrder'];
+        post: operations["cancelChangeOrder"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/projects/{code}/installments': {
+    "/projects/{code}/installments": {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                code: components['parameters']['ProjectCode'];
+                code: components["parameters"]["ProjectCode"];
             };
             cookie?: never;
         };
         /** งวดงานและการชำระเงินของลูกค้า */
-        get: operations['listProjectInstallments'];
+        get: operations["listProjectInstallments"];
         put?: never;
         post?: never;
         delete?: never;
@@ -621,17 +621,146 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/projects/{code}/photos': {
+    "/projects/{code}/models": {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                code: components['parameters']['ProjectCode'];
+                code: components["parameters"]["ProjectCode"];
+            };
+            cookie?: never;
+        };
+        /**
+         * แบบบ้าน 3 มิติของโครงการ ทุกเวอร์ชัน (ล่าสุดก่อน)
+         * @description แนบได้ตั้งแต่เปิดโครงการ (ไม่ต้องรอบันทึกสัญญา)
+         */
+        get: operations["listProjectModels"];
+        put?: never;
+        /** อัปโหลดแบบบ้าน 3 มิติเวอร์ชันใหม่ (ต้องมีสิทธิ์ project.manage) */
+        post: operations["createProjectModel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{code}/house": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+            };
+            cookie?: never;
+        };
+        /** ข้อมูลแบบบ้านของโครงการ (รายละเอียด ภาพแปลนรายชั้น ภาพทัศนียภาพ 4 มุม) */
+        get: operations["getProjectHouse"];
+        /** บันทึกข้อมูลแบบบ้านของโครงการ (ต้องมีสิทธิ์ project.manage) */
+        put: operations["saveProjectHouse"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{code}/models/{id}/convert": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** สั่งแปลงไฟล์ต้นฉบับ .skp เป็น 3 มิติใหม่ (เช่น หลังแปลงไม่สำเร็จ) — ต้องมีสิทธิ์ project.manage */
+        post: operations["convertProjectModel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{code}/models/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** ลบแบบ 3 มิติ 1 เวอร์ชัน (ต้องมีสิทธิ์ project.manage) — บันทึก Audit Log */
+        delete: operations["deleteProjectModel"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{code}/installments/{no}/payment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+                /** @description เลขงวด */
+                no: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * บันทึกรับชำระเงินงวดงานพร้อมหลักฐาน (ต้องมีสิทธิ์ payment.record)
+         * @description งวดจะเป็น paid ทันที และหลักฐานจะแสดงในเอกสารของโครงการหมวด billing
+         *     ยอดรับ + ภาษีหัก ณ ที่จ่าย ต้องไม่เกินยอดงวด ถ้าน้อยกว่าต้องระบุเหตุผลใน note
+         *     409 ถ้างวดนี้บันทึกรับชำระแล้ว หรือเป็นงวดงานลด (ยอดติดลบ หักจากงวดอื่น)
+         */
+        post: operations["recordInstallmentPayment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{code}/installments/{no}/payment/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+                no: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** ยกเลิกการบันทึกรับชำระ (เช่น บันทึกผิดงวด) — เก็บประวัติไว้ใน Audit Log (ต้องมีสิทธิ์ payment.record) */
+        post: operations["cancelInstallmentPayment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{code}/photos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
             };
             cookie?: never;
         };
         /** ภาพถ่ายหน้างาน (ล่าสุดก่อน) */
-        get: operations['listProjectPhotos'];
+        get: operations["listProjectPhotos"];
         put?: never;
         post?: never;
         delete?: never;
@@ -640,16 +769,16 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/projects/{code}/documents': {
+    "/projects/{code}/documents": {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                code: components['parameters']['ProjectCode'];
+                code: components["parameters"]["ProjectCode"];
             };
             cookie?: never;
         };
-        get: operations['listProjectDocuments'];
+        get: operations["listProjectDocuments"];
         put?: never;
         post?: never;
         delete?: never;
@@ -658,12 +787,12 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/projects/{code}/assignments': {
+    "/projects/{code}/assignments": {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                code: components['parameters']['ProjectCode'];
+                code: components["parameters"]["ProjectCode"];
             };
             cookie?: never;
         };
@@ -671,7 +800,7 @@ export interface paths {
          * ผู้รับผิดชอบ (บุคลากร) และผู้รับเหมาช่วงของโครงการ
          * @description ความคืบหน้า/สถานะของผู้รับเหมาช่วง หลังบ้านคำนวณจากขั้นตอนที่มอบหมายในไทม์ไลน์; contractValue ส่งเฉพาะผู้มีสิทธิ์ project.manage
          */
-        get: operations['getProjectAssignments'];
+        get: operations["getProjectAssignments"];
         put?: never;
         post?: never;
         delete?: never;
@@ -680,12 +809,12 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/projects/{code}/staff': {
+    "/projects/{code}/staff": {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                code: components['parameters']['ProjectCode'];
+                code: components["parameters"]["ProjectCode"];
             };
             cookie?: never;
         };
@@ -695,40 +824,40 @@ export interface paths {
          * มอบหมายบุคลากรเป็นผู้รับผิดชอบในโครงการ (ต้องมีสิทธิ์ project.manage)
          * @description ผู้จัดการโครงการคนแรกในรายการคือ responsibleName ของโครงการ (หลังบ้านอัปเดตให้); คนเดิมซ้ำในบทบาทเดิมตอบ 409
          */
-        post: operations['addProjectStaff'];
+        post: operations["addProjectStaff"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/projects/{code}/staff/{assignmentId}': {
+    "/projects/{code}/staff/{assignmentId}": {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                code: components['parameters']['ProjectCode'];
+                code: components["parameters"]["ProjectCode"];
                 assignmentId: string;
             };
             cookie?: never;
         };
         get?: never;
         /** แก้บทบาท/หมายเหตุของผู้รับผิดชอบ */
-        put: operations['updateProjectStaff'];
+        put: operations["updateProjectStaff"];
         post?: never;
         /** นำผู้รับผิดชอบออกจากโครงการ — โครงการต้องมีผู้จัดการโครงการอย่างน้อย 1 คน (409) */
-        delete: operations['removeProjectStaff'];
+        delete: operations["removeProjectStaff"];
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/projects/{code}/subcontractors': {
+    "/projects/{code}/subcontractors": {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                code: components['parameters']['ProjectCode'];
+                code: components["parameters"]["ProjectCode"];
             };
             cookie?: never;
         };
@@ -738,35 +867,35 @@ export interface paths {
          * มอบหมายผู้รับเหมาช่วงตามขั้นตอนงาน (ต้องมีสิทธิ์ project.manage)
          * @description ต้องตั้งค่างานก่อสร้างแล้ว (ใช้ขั้นตอนจากไทม์ไลน์); ผู้รับเหมาที่ปิดใช้งานมอบหมายไม่ได้ (422); ผู้รับเหมารายเดิมซ้ำในโครงการเดียวกันตอบ 409 (ให้แก้ไขรายการเดิม)
          */
-        post: operations['addProjectSubcontractor'];
+        post: operations["addProjectSubcontractor"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/projects/{code}/subcontractors/{assignmentId}': {
+    "/projects/{code}/subcontractors/{assignmentId}": {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                code: components['parameters']['ProjectCode'];
+                code: components["parameters"]["ProjectCode"];
                 assignmentId: string;
             };
             cookie?: never;
         };
         get?: never;
         /** แก้ขอบเขตงาน ขั้นตอน มูลค่าจ้าง */
-        put: operations['updateProjectSubcontractor'];
+        put: operations["updateProjectSubcontractor"];
         post?: never;
         /** ยกเลิกการมอบหมาย — ลบไม่ได้เมื่อขั้นตอนที่รับผิดชอบเริ่มงานแล้ว (409) ให้แก้ไขแทน */
-        delete: operations['removeProjectSubcontractor'];
+        delete: operations["removeProjectSubcontractor"];
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/subcontractors': {
+    "/subcontractors": {
         parameters: {
             query?: never;
             header?: never;
@@ -774,17 +903,17 @@ export interface paths {
             cookie?: never;
         };
         /** ทะเบียนผู้รับเหมาช่วง */
-        get: operations['listSubcontractors'];
+        get: operations["listSubcontractors"];
         put?: never;
         /** เพิ่มผู้รับเหมาช่วง (ต้องมีสิทธิ์ project.manage) — หลังบ้านออกรหัส SUB-xxx */
-        post: operations['createSubcontractor'];
+        post: operations["createSubcontractor"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/subcontractors/{id}': {
+    "/subcontractors/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -795,7 +924,7 @@ export interface paths {
         };
         get?: never;
         /** แก้ไขข้อมูลผู้รับเหมาช่วง / เปิด-ปิดใช้งาน */
-        put: operations['updateSubcontractor'];
+        put: operations["updateSubcontractor"];
         post?: never;
         delete?: never;
         options?: never;
@@ -803,17 +932,17 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/projects/{code}/team': {
+    "/projects/{code}/team": {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                code: components['parameters']['ProjectCode'];
+                code: components["parameters"]["ProjectCode"];
             };
             cookie?: never;
         };
         /** รายชื่อติดต่อทีมงานโครงการ (สร้างจากผู้รับผิดชอบที่มอบหมายใน /assignments) */
-        get: operations['listProjectTeam'];
+        get: operations["listProjectTeam"];
         put?: never;
         post?: never;
         delete?: never;
@@ -822,7 +951,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/house-plans/{code}': {
+    "/house-plans/{code}": {
         parameters: {
             query?: never;
             header?: never;
@@ -832,7 +961,7 @@ export interface paths {
             cookie?: never;
         };
         /** แบบบ้าน แปลนรายชั้น และไฟล์โมเดล 3D */
-        get: operations['getHousePlan'];
+        get: operations["getHousePlan"];
         put?: never;
         post?: never;
         delete?: never;
@@ -841,24 +970,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/personnel': {
+    "/personnel": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations['listPersonnel'];
+        get: operations["listPersonnel"];
         put?: never;
         /** เพิ่มบุคลากร (หลังบ้านออกรหัสบุคลากร) */
-        post: operations['createPersonnel'];
+        post: operations["createPersonnel"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/personnel/{id}': {
+    "/personnel/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -867,8 +996,8 @@ export interface paths {
             };
             cookie?: never;
         };
-        get: operations['getPersonnel'];
-        put: operations['updatePersonnel'];
+        get: operations["getPersonnel"];
+        put: operations["updatePersonnel"];
         post?: never;
         delete?: never;
         options?: never;
@@ -876,7 +1005,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/personnel/license-alerts': {
+    "/personnel/license-alerts": {
         parameters: {
             query?: never;
             header?: never;
@@ -884,7 +1013,7 @@ export interface paths {
             cookie?: never;
         };
         /** ใบอนุญาต/เอกสารที่หมดอายุหรือใกล้หมดอายุ */
-        get: operations['listLicenseAlerts'];
+        get: operations["listLicenseAlerts"];
         put?: never;
         post?: never;
         delete?: never;
@@ -893,7 +1022,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/approvals': {
+    "/approvals": {
         parameters: {
             query?: never;
             header?: never;
@@ -901,7 +1030,7 @@ export interface paths {
             cookie?: never;
         };
         /** คำขออนุมัติที่ผู้ใช้มีสิทธิ์เห็น (ล่าสุดก่อน) */
-        get: operations['listApprovals'];
+        get: operations["listApprovals"];
         put?: never;
         post?: never;
         delete?: never;
@@ -910,7 +1039,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/approvals/summary': {
+    "/approvals/summary": {
         parameters: {
             query?: never;
             header?: never;
@@ -918,7 +1047,7 @@ export interface paths {
             cookie?: never;
         };
         /** ตัวเลขสรุป (ใช้กับแถบแจ้งเตือนและการ์ดสรุป) */
-        get: operations['getApprovalSummary'];
+        get: operations["getApprovalSummary"];
         put?: never;
         post?: never;
         delete?: never;
@@ -927,16 +1056,16 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/approvals/{id}': {
+    "/approvals/{id}": {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                id: components['parameters']['ApprovalId'];
+                id: components["parameters"]["ApprovalId"];
             };
             cookie?: never;
         };
-        get: operations['getApproval'];
+        get: operations["getApproval"];
         put?: never;
         post?: never;
         delete?: never;
@@ -945,43 +1074,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/approvals/{id}/approve': {
+    "/approvals/{id}/approve": {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                id: components['parameters']['ApprovalId'];
+                id: components["parameters"]["ApprovalId"];
             };
             cookie?: never;
         };
         get?: never;
         put?: never;
-        post: operations['approveApproval'];
+        post: operations["approveApproval"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/approvals/{id}/reject': {
+    "/approvals/{id}/reject": {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                id: components['parameters']['ApprovalId'];
+                id: components["parameters"]["ApprovalId"];
             };
             cookie?: never;
         };
         get?: never;
         put?: never;
-        post: operations['rejectApproval'];
+        post: operations["rejectApproval"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/approvals/bulk-approve': {
+    "/approvals/bulk-approve": {
         parameters: {
             query?: never;
             header?: never;
@@ -991,14 +1120,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** อนุมัติหลายรายการ (รายการที่ทำไม่ได้จะอยู่ใน skipped) */
-        post: operations['bulkApprove'];
+        post: operations["bulkApprove"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/audit-logs': {
+    "/audit-logs": {
         parameters: {
             query?: never;
             header?: never;
@@ -1006,7 +1135,7 @@ export interface paths {
             cookie?: never;
         };
         /** บันทึกการกระทำ (ล่าสุดก่อน, อ่านอย่างเดียว) */
-        get: operations['listAuditLogs'];
+        get: operations["listAuditLogs"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1015,7 +1144,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/audit-logs/export': {
+    "/audit-logs/export": {
         parameters: {
             query?: never;
             header?: never;
@@ -1023,7 +1152,7 @@ export interface paths {
             cookie?: never;
         };
         /** ส่งออก CSV ตามตัวกรองเดียวกับ /audit-logs (UTF-8 พร้อม BOM) */
-        get: operations['exportAuditLogs'];
+        get: operations["exportAuditLogs"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1032,7 +1161,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/dashboard/summary': {
+    "/dashboard/summary": {
         parameters: {
             query?: never;
             header?: never;
@@ -1040,7 +1169,7 @@ export interface paths {
             cookie?: never;
         };
         /** กำไร-ขาดทุนรายโครงการและยอดรวมบริษัท (เจ้าของบริษัท) */
-        get: operations['getDashboardSummary'];
+        get: operations["getDashboardSummary"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1049,7 +1178,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/dashboard/projects': {
+    "/dashboard/projects": {
         parameters: {
             query?: never;
             header?: never;
@@ -1060,7 +1189,7 @@ export interface paths {
          * จำนวนโครงการตามสถานะ (ในมือ เสร็จแล้ว กำลังดำเนินการ รอทำสัญญา อยู่ในประกัน)
          * @description inHandValue ส่งเฉพาะผู้มีสิทธิ์ finance.company
          */
-        get: operations['getProjectPortfolio'];
+        get: operations["getProjectPortfolio"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1069,7 +1198,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/dashboard/cash-flow': {
+    "/dashboard/cash-flow": {
         parameters: {
             query?: never;
             header?: never;
@@ -1077,7 +1206,7 @@ export interface paths {
             cookie?: never;
         };
         /** เงินรับ-เงินจ่ายรายเดือน (เดือนล่าสุดนับถึงวันนี้) */
-        get: operations['getCashFlow'];
+        get: operations["getCashFlow"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1111,7 +1240,7 @@ export interface components {
             total: number;
         };
         /** @enum {string} */
-        RoleId: 'admin' | 'owner' | 'admin-staff' | 'accounting' | 'procurement' | 'storekeeper' | 'auditor' | 'project-manager' | 'engineer' | 'architect' | 'foreman' | 'safety-officer' | 'subcontractor' | 'client' | 'supplier';
+        RoleId: "admin" | "owner" | "admin-staff" | "accounting" | "procurement" | "storekeeper" | "auditor" | "project-manager" | "engineer" | "architect" | "foreman" | "safety-officer" | "subcontractor" | "client" | "supplier";
         UserRef: {
             id: string;
             name: string;
@@ -1127,13 +1256,14 @@ export interface components {
          *     - project.create: เปิดโครงการใหม่
          *     - project.manage: จัดการโครงการ เช่น บันทึกสัญญาและเริ่มแผนงาน
          *     - user.manage: จัดการบัญชีผู้ใช้ บทบาท และสิทธิ์ของบุคลากร
+         *     - payment.record: บันทึก/ยกเลิกการรับชำระเงินงวดงานของลูกค้า
          * @enum {string}
          */
-        Permission: 'progress.update' | 'personnel.sensitive' | 'finance.company' | 'approval.any' | 'project.create' | 'project.manage' | 'user.manage';
+        Permission: "progress.update" | "personnel.sensitive" | "finance.company" | "approval.any" | "project.create" | "project.manage" | "user.manage" | "payment.record";
         CurrentUser: {
             id: string;
             name: string;
-            roleId: components['schemas']['RoleId'];
+            roleId: components["schemas"]["RoleId"];
             roleLabel: string;
             /** @description โครงการที่เป็นสมาชิก (ว่าง = ทุกโครงการสำหรับทีมภายใน) */
             projectCodes: string[];
@@ -1152,24 +1282,24 @@ export interface components {
              * @description เวลาเข้าสู่ระบบครั้งก่อนหน้า
              */
             lastLoginAt: string;
-            permissions: components['schemas']['Permission'][];
+            permissions: components["schemas"]["Permission"][];
         };
         RoleCatalog: {
             groups: {
                 /** @enum {string} */
-                id: 'internal' | 'project' | 'external';
+                id: "internal" | "project" | "external";
                 label: string;
                 scope: string;
             }[];
             roles: {
-                id: components['schemas']['RoleId'];
+                id: components["schemas"]["RoleId"];
                 /** @enum {string} */
-                group: 'internal' | 'project' | 'external';
+                group: "internal" | "project" | "external";
                 label: string;
                 access: string;
                 restriction: string;
                 /** @description สิทธิ์ตั้งต้นของบทบาท (ปรับรายคนได้ที่บัญชีผู้ใช้) */
-                permissions: components['schemas']['Permission'][];
+                permissions: components["schemas"]["Permission"][];
                 suggested?: boolean;
                 optional?: boolean;
             }[];
@@ -1188,10 +1318,10 @@ export interface components {
             accessToken: string;
             /** Format: date-time */
             expiresAt: string;
-            user: components['schemas']['CurrentUser'];
+            user: components["schemas"]["CurrentUser"];
         };
         /** @enum {string} */
-        RegistrationStatus: 'pending' | 'approved' | 'rejected';
+        RegistrationStatus: "pending" | "approved" | "rejected";
         RegistrationInput: {
             fullName: string;
             /** Format: email */
@@ -1215,14 +1345,14 @@ export interface components {
             employeeCode?: string;
             position?: string;
             note?: string;
-            status: components['schemas']['RegistrationStatus'];
+            status: components["schemas"]["RegistrationStatus"];
             /** Format: date-time */
             submittedAt: string;
             /** @description บุคลากรที่หลังบ้านจับคู่ให้ (จากรหัสบุคลากร อีเมล หรือชื่อ) และยังไม่มีบัญชี */
             suggestedPersonnelId?: string;
             /** Format: date-time */
             decidedAt?: string;
-            decidedBy?: components['schemas']['UserRef'];
+            decidedBy?: components["schemas"]["UserRef"];
             rejectReason?: string;
             /** @description บัญชีที่สร้างเมื่ออนุมัติ */
             accountId?: string;
@@ -1233,7 +1363,7 @@ export interface components {
          *     - suspended: ระงับการเข้าสู่ระบบ (เก็บประวัติไว้)
          * @enum {string}
          */
-        UserAccountStatus: 'invited' | 'active' | 'suspended';
+        UserAccountStatus: "invited" | "active" | "suspended";
         /**
          * @description สิทธิ์ที่ใช้จริง = สิทธิ์ตั้งต้นของบทบาท + grantedPermissions − revokedPermissions
          *     บทบาทกลุ่มทีมประจำโครงการ (project) ต้องระบุ projectCodes อย่างน้อย 1 โครงการ; กลุ่มทีมภายใน (internal) เห็นทุกโครงการ ให้ส่ง projectCodes ว่าง
@@ -1244,18 +1374,18 @@ export interface components {
              * @description อีเมลที่ใช้เข้าสู่ระบบ (ซ้ำกับบัญชีอื่นไม่ได้ 409)
              */
             email: string;
-            roleId: components['schemas']['RoleId'];
+            roleId: components["schemas"]["RoleId"];
             projectCodes: string[];
             /** @description สิทธิ์ที่ให้เพิ่มจากบทบาท */
-            grantedPermissions: components['schemas']['Permission'][];
+            grantedPermissions: components["schemas"]["Permission"][];
             /** @description สิทธิ์ของบทบาทที่ถอนออกสำหรับคนนี้ */
-            revokedPermissions: components['schemas']['Permission'][];
+            revokedPermissions: components["schemas"]["Permission"][];
         };
-        UserAccountCreateInput: components['schemas']['UserAccountInput'] & {
+        UserAccountCreateInput: components["schemas"]["UserAccountInput"] & {
             /** @description บุคลากรที่ยังไม่มีบัญชี (1 คน 1 บัญชี ซ้ำได้ 409) */
             personnelId: string;
         };
-        UserAccount: components['schemas']['UserAccountInput'] & {
+        UserAccount: components["schemas"]["UserAccountInput"] & {
             id: string;
             personnelId: string;
             /** @description ชื่อจากทะเบียนบุคลากร */
@@ -1266,9 +1396,9 @@ export interface components {
             /** @description เบอร์โทรจากทะเบียนบุคลากร */
             phone?: string;
             roleLabel: string;
-            status: components['schemas']['UserAccountStatus'];
+            status: components["schemas"]["UserAccountStatus"];
             /** @description สิทธิ์ที่ใช้จริง (หลังบ้านคำนวณ) */
-            permissions: components['schemas']['Permission'][];
+            permissions: components["schemas"]["Permission"][];
             /** Format: date-time */
             createdAt: string;
             /**
@@ -1342,7 +1472,7 @@ export interface components {
          * @description pending-contract = เปิดโครงการแล้วแต่ยังไม่ได้บันทึกสัญญา (ยังไม่มีแผนงาน งวดงาน ภาพ เอกสาร)
          * @enum {string}
          */
-        ProjectStatus: 'pending-contract' | 'planning' | 'in-progress' | 'near-handover' | 'completed' | 'delayed';
+        ProjectStatus: "pending-contract" | "planning" | "in-progress" | "near-handover" | "completed" | "delayed";
         Project: {
             /** @example CR690001 */
             code: string;
@@ -1367,7 +1497,7 @@ export interface components {
             /** Format: date */
             contractSignedAt: string | null;
             progress: number;
-            status: components['schemas']['ProjectStatus'];
+            status: components["schemas"]["ProjectStatus"];
             /**
              * Format: date-time
              * @description วันที่เปิดโครงการ
@@ -1385,9 +1515,11 @@ export interface components {
             handedOverAt?: string | null;
             /**
              * Format: date
-             * @description วันสิ้นสุดการรับประกันผลงาน (หลังบ้านคำนวณจากวันส่งมอบ + ระยะประกัน)
+             * @description วันสิ้นสุดการรับประกันส่วนที่นานที่สุด (งานโครงสร้าง) — ดูแยกส่วนที่ warranties
              */
             warrantyUntil?: string | null;
+            /** @description การรับประกันแยกส่วน (งานสถาปัตยกรรม 1 ปี งานโครงสร้าง 5 ปี นับจากวันส่งมอบ) ว่างจนกว่าจะส่งมอบ */
+            warranties?: components["schemas"]["WarrantyCoverage"][];
             /** @description ยอดสุทธิของงานเพิ่ม-ลดที่อนุมัติแล้ว (บวก = เพิ่ม ลบ = ลด) */
             changeOrderTotal?: number;
             /** @description มูลค่าสัญญาปัจจุบัน = value + changeOrderTotal (null จนกว่าจะบันทึกสัญญา) */
@@ -1399,29 +1531,29 @@ export interface components {
          *     - design: แก้แบบ/เปลี่ยนวัสดุตามผู้ออกแบบ
          * @enum {string}
          */
-        ChangeOrderSource: 'customer' | 'site' | 'design';
+        ChangeOrderSource: "customer" | "site" | "design";
         /**
          * @description pending = รออนุมัติ, approved = อนุมัติแล้ว (ปรับมูลค่า/ไทม์ไลน์แล้ว), rejected = ไม่อนุมัติ, cancelled = ผู้ขอยกเลิก
          * @enum {string}
          */
-        ChangeOrderStatus: 'pending' | 'approved' | 'rejected' | 'cancelled';
+        ChangeOrderStatus: "pending" | "approved" | "rejected" | "cancelled";
         ChangeOrderItem: {
             name: string;
             /**
              * @description add = งานเพิ่ม (บวกมูลค่า), deduct = งานลด (หักมูลค่า)
              * @enum {string}
              */
-            kind: 'add' | 'deduct';
+            kind: "add" | "deduct";
             quantity: number;
             unit: string;
             unitPrice: number;
         };
         ChangeOrderInput: {
             title: string;
-            source: components['schemas']['ChangeOrderSource'];
+            source: components["schemas"]["ChangeOrderSource"];
             /** @description เหตุผล/รายละเอียดที่ขอเปลี่ยน */
             reason: string;
-            items: components['schemas']['ChangeOrderItem'][];
+            items: components["schemas"]["ChangeOrderItem"][];
             /** @description เลื่อนกำหนดส่งมอบ (วัน) เมื่ออนุมัติ — ลบ = เร็วขึ้น */
             scheduleImpactDays: number;
             /** @description เพิ่มงานเข้าไทม์ไลน์เมื่ออนุมัติ (ติดตามความคืบหน้าได้เหมือนงานอื่น) */
@@ -1433,16 +1565,16 @@ export interface components {
             /** @description ลูกค้ายืนยันรายการและราคาแล้ว (เช่น ลงนามใบเสนอราคางานเพิ่ม) */
             customerConfirmed: boolean;
         };
-        ChangeOrder: components['schemas']['ChangeOrderInput'] & {
+        ChangeOrder: components["schemas"]["ChangeOrderInput"] & {
             /** @example CO-CR690002-01 */
             id: string;
             projectCode: string;
-            status: components['schemas']['ChangeOrderStatus'];
+            status: components["schemas"]["ChangeOrderStatus"];
             addTotal: number;
             deductTotal: number;
             /** @description ยอดสุทธิ = addTotal − deductTotal */
             total: number;
-            requestedBy: components['schemas']['UserRef'];
+            requestedBy: components["schemas"]["UserRef"];
             /** Format: date-time */
             requestedAt: string;
             /** @description คำขออนุมัติในศูนย์อนุมัติ (อนุมัติ/ไม่อนุมัติผ่าน /approvals/{approvalId}) */
@@ -1451,7 +1583,7 @@ export interface components {
             customerConfirmedAt?: string;
             /** Format: date-time */
             decidedAt?: string;
-            decidedBy?: components['schemas']['UserRef'];
+            decidedBy?: components["schemas"]["UserRef"];
             decisionNote?: string;
             /** @description รหัสงานที่เพิ่มเข้าไทม์ไลน์เมื่ออนุมัติ */
             appliedTaskCode?: string;
@@ -1475,10 +1607,10 @@ export interface components {
             label: string;
             description?: string;
             /** @enum {string} */
-            type: 'single' | 'multiple' | 'boolean';
+            type: "single" | "multiple" | "boolean";
             /** @description ว่างเมื่อ type = boolean */
-            choices: components['schemas']['ConstructionOptionChoice'][];
-            default: components['schemas']['ConstructionOptionValue'];
+            choices: components["schemas"]["ConstructionOptionChoice"][];
+            default: components["schemas"]["ConstructionOptionValue"];
             /** @description ขั้นตอนในแผนงานที่ตัวเลือกนี้เพิ่ม/เปลี่ยนงาน (หลังบ้านคำนวณจากแม่แบบ) */
             affectsPhases: {
                 code: string;
@@ -1492,7 +1624,7 @@ export interface components {
         };
         /** @description ค่าของแต่ละตัวเลือก (key → ค่า) ตาม GET /settings/construction-options */
         ConstructionSetupOptions: {
-            [key: string]: components['schemas']['ConstructionOptionValue'];
+            [key: string]: components["schemas"]["ConstructionOptionValue"];
         };
         /** @description งานย่อยที่เพิ่มเองในโครงการนี้ (นอกแม่แบบ) */
         CustomTaskInput: {
@@ -1513,10 +1645,26 @@ export interface components {
             isHoldPoint: boolean;
         };
         ProjectSetupInput: {
-            options: components['schemas']['ConstructionSetupOptions'];
+            options: components["schemas"]["ConstructionSetupOptions"];
             /** @description รหัสงานย่อยที่ไม่ต้องทำในโครงการนี้ — ตัดจุดตรวจ (Hold Point) และหมุดหมาย (Milestone) ไม่ได้ (422); รหัสที่ไม่อยู่ในแผนตามตัวเลือก หลังบ้านตัดทิ้ง */
             excludedTasks?: string[];
-            customTasks?: components['schemas']['CustomTaskInput'][];
+            customTasks?: components["schemas"]["CustomTaskInput"][];
+            /**
+             * @description สัดส่วนเบิกจ่าย (% ของมูลค่าสัญญา) ของแต่ละงวด เรียงตาม ProjectSetup.paymentSchedule
+             *     ต้องมีครบทุกงวด แต่ละงวดมากกว่า 0 (ทศนิยมไม่เกิน 2 ตำแหน่ง) และรวมกันได้ 100 (422)
+             *     ไม่ส่ง = คงสัดส่วนที่บันทึกไว้ (ยังไม่เคยบันทึก = ค่าเริ่มต้น) — หน้าตัวอย่าง (preview) ไม่ตรวจและไม่ใช้ค่านี้
+             */
+            paymentPercents?: number[];
+        };
+        /** @description งวดเงินตามสัญญา เบิกได้เมื่อขั้นตอนที่ผูกไว้เสร็จทั้งหมด */
+        PaymentScheduleItem: {
+            no: number;
+            title: string;
+            phaseCodes: string[];
+            /** @description สัดส่วนที่ใช้ (% ของมูลค่าสัญญา) */
+            percent: number;
+            /** @description สัดส่วนตั้งต้นของแม่แบบ */
+            defaultPercent: number;
         };
         ProjectSetup: {
             configured: boolean;
@@ -1526,9 +1674,10 @@ export interface components {
             /** Format: date-time */
             configuredAt: string | null;
             configuredBy: string | null;
-            options: components['schemas']['ConstructionSetupOptions'];
+            options: components["schemas"]["ConstructionSetupOptions"];
             excludedTasks: string[];
-            customTasks: components['schemas']['CustomTaskInput'][];
+            customTasks: components["schemas"]["CustomTaskInput"][];
+            paymentSchedule: components["schemas"]["PaymentScheduleItem"][];
         };
         /** @description งานย่อยในแผน รวมงานที่ถูกตัดออก (included = false) เพื่อให้เลือกกลับได้ */
         SetupPreviewTask: {
@@ -1569,11 +1718,11 @@ export interface components {
                 start: string;
                 /** Format: date */
                 end: string;
-                tasks: components['schemas']['SetupPreviewTask'][];
+                tasks: components["schemas"]["SetupPreviewTask"][];
             }[];
         };
         /** @enum {string} */
-        TimelineStatus: 'done' | 'active' | 'pending';
+        TimelineStatus: "done" | "active" | "pending";
         TimelineTask: {
             code: string;
             name: string;
@@ -1584,7 +1733,7 @@ export interface components {
             /** Format: date */
             end: string;
             progress: number;
-            status: components['schemas']['TimelineStatus'];
+            status: components["schemas"]["TimelineStatus"];
             isHoldPoint: boolean;
             isMilestone: boolean;
             isPaymentMilestone: boolean;
@@ -1601,8 +1750,8 @@ export interface components {
             /** Format: date */
             end: string;
             progress: number;
-            status: components['schemas']['TimelineStatus'];
-            tasks: components['schemas']['TimelineTask'][];
+            status: components["schemas"]["TimelineStatus"];
+            tasks: components["schemas"]["TimelineTask"][];
             holdPoints: {
                 passed: number;
                 total: number;
@@ -1610,7 +1759,7 @@ export interface components {
         };
         ProjectTimeline: {
             progress: number;
-            phases: components['schemas']['TimelinePhase'][];
+            phases: components["schemas"]["TimelinePhase"][];
         };
         UploadedFile: {
             id: string;
@@ -1621,12 +1770,12 @@ export interface components {
             contentType: string;
         };
         /** @enum {string} */
-        Weather: 'sunny' | 'cloudy' | 'light-rain' | 'heavy-rain';
+        Weather: "sunny" | "cloudy" | "light-rain" | "heavy-rain";
         /** @enum {string} */
-        IssueSeverity: 'low' | 'medium' | 'high';
+        IssueSeverity: "low" | "medium" | "high";
         SiteIssue: {
             title: string;
-            severity: components['schemas']['IssueSeverity'];
+            severity: components["schemas"]["IssueSeverity"];
         };
         TaskProgressInput: {
             taskCode: string;
@@ -1639,32 +1788,32 @@ export interface components {
              * @description วันที่ทำงาน (ไม่เกินวันนี้)
              */
             reportDate: string;
-            weather: components['schemas']['Weather'];
+            weather: components["schemas"]["Weather"];
             /** @description จำนวนแรงงานในวันนั้น */
             workers: number;
             note?: string;
-            taskChanges?: components['schemas']['TaskProgressInput'][];
-            issues?: components['schemas']['SiteIssue'][];
+            taskChanges?: components["schemas"]["TaskProgressInput"][];
+            issues?: components["schemas"]["SiteIssue"][];
             /** @description id จาก POST /uploads (ต้องเป็นไฟล์รูป) */
             photoIds?: string[];
             /** @description เอกสารแนบ จะถูกเพิ่มในเอกสารของโครงการ (GET /projects/{code}/documents) */
-            documents?: components['schemas']['DocumentAttachmentInput'][];
+            documents?: components["schemas"]["DocumentAttachmentInput"][];
         };
         DocumentAttachmentInput: {
             /** @description id จาก POST /uploads */
             fileId: string;
-            category: components['schemas']['DocumentCategory'];
+            category: components["schemas"]["DocumentCategory"];
             /** @description ชื่อเอกสาร (ไม่ระบุ = ใช้ชื่อไฟล์) */
             name?: string;
         };
         InspectionInput: {
             /** @enum {string} */
-            result: 'passed' | 'failed';
+            result: "passed" | "failed";
             /** @description จำเป็นเมื่อไม่ผ่าน */
             note?: string;
             photoIds?: string[];
             /** @description เช่น รายงานผลตรวจ ผลทดสอบ */
-            documents?: components['schemas']['DocumentAttachmentInput'][];
+            documents?: components["schemas"]["DocumentAttachmentInput"][];
         };
         ProgressUpdate: {
             id: string;
@@ -1673,8 +1822,8 @@ export interface components {
             reportDate: string;
             /** Format: date-time */
             createdAt: string;
-            author: components['schemas']['UserRef'];
-            weather: components['schemas']['Weather'];
+            author: components["schemas"]["UserRef"];
+            weather: components["schemas"]["Weather"];
             workers: number;
             note?: string;
             taskChanges: {
@@ -1688,33 +1837,72 @@ export interface components {
                 taskCode: string;
                 taskName: string;
                 /** @enum {string} */
-                result: 'passed' | 'failed';
+                result: "passed" | "failed";
             };
-            issues: components['schemas']['SiteIssue'][];
-            photos: components['schemas']['UploadedFile'][];
+            issues: components["schemas"]["SiteIssue"][];
+            photos: components["schemas"]["UploadedFile"][];
             /** @description เอกสารที่แนบกับบันทึกนี้ */
-            documents: components['schemas']['ProjectDocument'][];
+            documents: components["schemas"]["ProjectDocument"][];
             /** @description % ภาพรวมโครงการหลังบันทึกนี้ */
             overallProgress: number;
         };
-        ProgressUpdatePage: components['schemas']['PageMeta'] & {
-            items: components['schemas']['ProgressUpdate'][];
+        ProgressUpdatePage: components["schemas"]["PageMeta"] & {
+            items: components["schemas"]["ProgressUpdate"][];
         };
         /** @enum {string} */
-        InstallmentStatus: 'paid' | 'due' | 'working' | 'upcoming';
+        InstallmentStatus: "paid" | "due" | "working" | "upcoming";
         Installment: {
             no: number;
             title: string;
             phaseSteps: number[];
             percent: number;
             amount: number;
-            status: components['schemas']['InstallmentStatus'];
+            status: components["schemas"]["InstallmentStatus"];
             /** Format: date */
             dueDate: string;
             /** Format: date */
             paidDate?: string | null;
             /** @description งวดของงานเพิ่ม-ลด (ไม่อยู่ในงวดตามสัญญาเดิม) */
             changeOrderId?: string;
+            payment?: components["schemas"]["InstallmentPayment"];
+        };
+        /** @enum {string} */
+        PaymentMethod: "transfer" | "cheque" | "cash";
+        InstallmentPaymentInput: {
+            /**
+             * Format: date
+             * @description วันที่ได้รับเงิน (ไม่เกินวันนี้ ไม่ก่อนวันเซ็นสัญญา)
+             */
+            paidDate: string;
+            /** @description ยอดที่ได้รับจริง (บาท) */
+            amount: number;
+            /**
+             * @description ภาษีหัก ณ ที่จ่ายที่ลูกค้าหักไว้ (บาท)
+             * @default 0
+             */
+            withholdingTax: number;
+            method: components["schemas"]["PaymentMethod"];
+            /** @description เลขที่อ้างอิง เช่น เลขที่ใบเสร็จ เลขเช็ค เลขอ้างอิงการโอน */
+            reference?: string;
+            /** @description จำเป็นเมื่อยอดรับ + ภาษีหัก ณ ที่จ่าย น้อยกว่ายอดงวด */
+            note?: string;
+            /** @description หลักฐานการชำระ เช่น สลิปโอนเงิน สำเนาเช็ค ใบเสร็จ (id จาก POST /uploads) */
+            evidenceIds: string[];
+        };
+        InstallmentPayment: {
+            id: string;
+            /** Format: date */
+            paidDate: string;
+            amount: number;
+            withholdingTax: number;
+            method: components["schemas"]["PaymentMethod"];
+            reference?: string;
+            note?: string;
+            /** @description ว่างได้เฉพาะข้อมูลตัวอย่างที่ระบบสร้าง */
+            evidence: components["schemas"]["UploadedFile"][];
+            recordedBy: components["schemas"]["UserRef"];
+            /** Format: date-time */
+            recordedAt: string;
         };
         SitePhoto: {
             id: string;
@@ -1729,8 +1917,8 @@ export interface components {
             phaseStep: number;
             phaseShortName: string;
         };
-        SitePhotoPage: components['schemas']['PageMeta'] & {
-            items: components['schemas']['SitePhoto'][];
+        SitePhotoPage: components["schemas"]["PageMeta"] & {
+            items: components["schemas"]["SitePhoto"][];
             /** @description จำนวนภาพแยกตามขั้นตอน (ไม่ขึ้นกับตัวกรอง phaseCode) ใช้ทำตัวกรอง */
             phases: {
                 phaseCode: string;
@@ -1740,15 +1928,15 @@ export interface components {
             }[];
         };
         /** @enum {string} */
-        DocumentCategory: 'contract' | 'drawing' | 'permit' | 'inspection' | 'billing' | 'handover';
+        DocumentCategory: "contract" | "drawing" | "permit" | "inspection" | "billing" | "handover";
         ProjectDocument: {
             id: string;
-            category: components['schemas']['DocumentCategory'];
+            category: components["schemas"]["DocumentCategory"];
             name: string;
             /** Format: date */
             date: string;
             /** @enum {string} */
-            fileType: 'pdf' | 'dwg' | 'xlsx' | 'docx' | 'image';
+            fileType: "pdf" | "dwg" | "xlsx" | "docx" | "image";
             sizeKb: number;
             /**
              * Format: uri
@@ -1764,12 +1952,11 @@ export interface components {
          * @description สาขางานของผู้รับเหมาช่วง (หน้าบ้านแปลเป็นข้อความไทย)
          * @enum {string}
          */
-        SubcontractorTrade:
-            'piling' | 'structure' | 'masonry' | 'roofing' | 'waterproofing' | 'electrical' | 'plumbing' | 'hvac' | 'aluminium' | 'tiling' | 'ceiling' | 'painting' | 'carpentry' | 'landscape' | 'solar' | 'pool' | 'lift' | 'fire' | 'other';
+        SubcontractorTrade: "piling" | "structure" | "masonry" | "roofing" | "waterproofing" | "electrical" | "plumbing" | "hvac" | "aluminium" | "tiling" | "ceiling" | "painting" | "carpentry" | "landscape" | "solar" | "pool" | "lift" | "fire" | "other";
         SubcontractorInput: {
             /** @description ชื่อบริษัท/ทีมช่าง */
             name: string;
-            trades: components['schemas']['SubcontractorTrade'][];
+            trades: components["schemas"]["SubcontractorTrade"][];
             contactName: string;
             /** @description ตัวเลข 9-10 หลัก ขึ้นต้นด้วย 0 */
             phone: string;
@@ -1784,9 +1971,9 @@ export interface components {
              * @default active
              * @enum {string}
              */
-            status: 'active' | 'inactive';
+            status: "active" | "inactive";
         };
-        Subcontractor: components['schemas']['SubcontractorInput'] & {
+        Subcontractor: components["schemas"]["SubcontractorInput"] & {
             id: string;
             /** @example SUB-001 */
             code: string;
@@ -1794,10 +1981,10 @@ export interface components {
             activeProjects: number;
         };
         /** @enum {string} */
-        StaffRole: 'project-manager' | 'engineer' | 'site-supervisor' | 'architect' | 'foreman' | 'safety-officer' | 'purchasing' | 'accounting';
+        StaffRole: "project-manager" | "engineer" | "site-supervisor" | "architect" | "foreman" | "safety-officer" | "purchasing" | "accounting";
         StaffAssignmentInput: {
             personnelId: string;
-            role: components['schemas']['StaffRole'];
+            role: components["schemas"]["StaffRole"];
             /** @description เช่น หน้าที่เฉพาะในโครงการนี้ */
             note?: string;
         };
@@ -1807,7 +1994,7 @@ export interface components {
             name: string;
             position?: string;
             phone?: string;
-            role: components['schemas']['StaffRole'];
+            role: components["schemas"]["StaffRole"];
             note?: string;
         };
         SubcontractorAssignmentInput: {
@@ -1828,7 +2015,7 @@ export interface components {
                 name: string;
                 contactName: string;
                 phone: string;
-                trades: components['schemas']['SubcontractorTrade'][];
+                trades: components["schemas"]["SubcontractorTrade"][];
             };
             scope: string;
             phaseCodes: string[];
@@ -1845,11 +2032,11 @@ export interface components {
             /** @description ความคืบหน้าของขั้นตอนที่รับผิดชอบ (ถ่วงตามระยะเวลา) */
             progress: number;
             /** @enum {string} */
-            status: 'upcoming' | 'working' | 'done';
+            status: "upcoming" | "working" | "done";
         };
         ProjectAssignments: {
-            staff: components['schemas']['StaffAssignment'][];
-            subcontractors: components['schemas']['SubcontractorAssignment'][];
+            staff: components["schemas"]["StaffAssignment"][];
+            subcontractors: components["schemas"]["SubcontractorAssignment"][];
         };
         TeamMember: {
             name: string;
@@ -1857,7 +2044,135 @@ export interface components {
             phone: string;
         };
         /** @enum {string} */
-        RoomKind: 'bedroom' | 'bathroom' | 'living' | 'dining' | 'kitchen' | 'garage' | 'stair' | 'void' | 'other';
+        RoomKind: "bedroom" | "bathroom" | "living" | "dining" | "kitchen" | "garage" | "stair" | "void" | "other";
+        /**
+         * @description โปรแกรมที่ใช้ออกแบบ (ใช้แสดงวิธีส่งออกไฟล์และแยกประเภทไฟล์ต้นฉบับ)
+         * @enum {string}
+         */
+        ModelSourceApp: "sketchup" | "revit" | "other";
+        /**
+         * @description รูปแบบไฟล์ที่เบราว์เซอร์แสดงผลได้ (ไฟล์ .skp / .rvt แสดงในเบราว์เซอร์ไม่ได้ ต้องส่งออกเป็นรูปแบบเหล่านี้)
+         *     - glb / gltf: มาตรฐานเว็บ (SketchUp และ Revit ส่งออกได้ผ่านปลั๊กอิน) — gltf ต้องเป็นไฟล์เดียว (ฝังข้อมูลไว้ในไฟล์)
+         *     - dae: COLLADA (SketchUp: File > Export > 3D Model)
+         *     - fbx: (Revit: เปิดมุมมอง 3D แล้ว File > Export > FBX / SketchUp Pro)
+         *     - obj: (SketchUp Pro และโปรแกรมอื่น) ไม่มีข้อมูลแกนตั้ง ให้ระบุ upAxis
+         * @enum {string}
+         */
+        ModelFormat: "glb" | "gltf" | "dae" | "fbx" | "obj";
+        /** @description ต้องมีอย่างน้อย 1 ไฟล์ — fileId (แสดงเป็น 3 มิติได้) หรือ sourceFileId (.skp / .rvt เก็บไว้ดาวน์โหลด ยังแสดงเป็น 3 มิติไม่ได้) */
+        ProjectModelInput: {
+            /** @description ไฟล์สำหรับแสดงผล (.glb .gltf .dae .fbx .obj) จาก POST /uploads */
+            fileId?: string;
+            /** @description ไฟล์ต้นฉบับ (.skp .rvt หรือ .ifc) จาก POST /uploads — .skp และ .ifc หลังบ้านแปลงเป็น 3 มิติให้ (IFC แยกตามงาน หมวด ชั้น ระบบ รวมเหล็กเสริม) */
+            sourceFileId?: string;
+            sourceApp: components["schemas"]["ModelSourceApp"];
+            /** @description ชื่อเวอร์ชัน เช่น แบบอนุมัติลูกค้า (ไม่ระบุ = แบบ 3D ฉบับที่ n) */
+            title?: string;
+            note?: string;
+            /**
+             * @description แกนตั้งของไฟล์ (ใช้กับ obj เท่านั้น รูปแบบอื่นอ่านจากไฟล์)
+             * @default y
+             * @enum {string}
+             */
+            upAxis: "y" | "z";
+        };
+        /**
+         * @description มุมของภาพทัศนียภาพ
+         * @enum {string}
+         */
+        RenderView: "front" | "back" | "left" | "right";
+        /** @description ข้อมูลแบบบ้านของโครงการที่ผู้ตั้งค่ากรอกเอง (ภาพเป็น id จาก POST /uploads ต้องเป็นไฟล์รูป) */
+        ProjectHouseInput: {
+            name: string;
+            description?: string;
+            /** @description พื้นที่ใช้สอย (ตร.ม.) */
+            usableArea?: number;
+            /** @description ความกว้างตัวบ้าน (ม.) */
+            width?: number;
+            /** @description ความลึกตัวบ้าน (ม.) */
+            depth?: number;
+            floors?: number;
+            bedrooms?: number;
+            bathrooms?: number;
+            kitchens?: number;
+            parking?: number;
+            /** @description ภาพแปลนรายชั้น ตามลำดับที่แสดง */
+            floorPlans: {
+                /** @example ชั้น 1 */
+                label: string;
+                fileId: string;
+            }[];
+            /** @description ภาพทัศนียภาพ 4 มุม (ไม่ส่งมุมใด = ไม่มีภาพมุมนั้น) */
+            renders: {
+                front?: string;
+                back?: string;
+                left?: string;
+                right?: string;
+            };
+        };
+        ProjectHouse: {
+            /** @description false = ยังไม่ได้ตั้งค่า (ค่าที่ส่งมาเติมจากแบบบ้านในคลังถ้าเลือกไว้) */
+            configured: boolean;
+            name: string;
+            description?: string;
+            usableArea?: number;
+            width?: number;
+            depth?: number;
+            floors?: number;
+            bedrooms?: number;
+            bathrooms?: number;
+            kitchens?: number;
+            parking?: number;
+            floorPlans: {
+                label: string;
+                image: components["schemas"]["UploadedFile"];
+            }[];
+            renders: {
+                front?: components["schemas"]["UploadedFile"];
+                back?: components["schemas"]["UploadedFile"];
+                left?: components["schemas"]["UploadedFile"];
+                right?: components["schemas"]["UploadedFile"];
+            };
+            updatedBy?: components["schemas"]["UserRef"];
+            /** Format: date-time */
+            updatedAt?: string;
+        };
+        /**
+         * @description การแปลงไฟล์ต้นฉบับ (.skp หรือ .ifc) เป็น .glb ที่หลังบ้าน (มีเฉพาะเวอร์ชันที่แนบไฟล์ต้นฉบับโดยไม่มีไฟล์สำหรับแสดงผล)
+         *     .skp ใช้ SketchUp C API บนเซิร์ฟเวอร์ (เปิดได้เฉพาะไฟล์จากรุ่นเดียวกันหรือเก่ากว่า) ส่วน .ifc ใช้ web-ifc
+         *     - queued / converting: รอคิว / กำลังแปลง (หน้าบ้านโหลดรายการใหม่เป็นระยะ)
+         *     - done: แปลงแล้ว ได้ไฟล์ .glb ใน file
+         *     - failed: แปลงไม่สำเร็จ (ดู message) สั่งแปลงใหม่ได้
+         *     - unavailable: เซิร์ฟเวอร์ไม่มี SketchUp สำหรับแปลงไฟล์ .skp
+         */
+        ModelConversion: {
+            /** @enum {string} */
+            status: "queued" | "converting" | "done" | "failed" | "unavailable";
+            message?: string;
+            /** @description จำนวนสามเหลี่ยมของโมเดลที่แปลงได้ */
+            triangles?: number;
+            /** Format: date-time */
+            finishedAt?: string;
+        };
+        /** @description แบบบ้าน 3 มิติของโครงการ 1 เวอร์ชัน (ล่าสุด = แบบที่ใช้อยู่) */
+        ProjectModel: {
+            id: string;
+            version: number;
+            title: string;
+            sourceApp: components["schemas"]["ModelSourceApp"];
+            /** @description ไม่มี = มีเฉพาะไฟล์ต้นฉบับ (ยังแสดงเป็น 3 มิติไม่ได้) */
+            format?: components["schemas"]["ModelFormat"];
+            /** @description ไฟล์สำหรับแสดงผล (ไม่มี = มีเฉพาะไฟล์ต้นฉบับ) */
+            file?: components["schemas"]["UploadedFile"];
+            sourceFile?: components["schemas"]["UploadedFile"];
+            conversion?: components["schemas"]["ModelConversion"];
+            /** @enum {string} */
+            upAxis: "y" | "z";
+            note?: string;
+            uploadedBy: components["schemas"]["UserRef"];
+            /** Format: date-time */
+            uploadedAt: string;
+        };
         HousePlan: {
             code: string;
             name: string;
@@ -1882,7 +2197,7 @@ export interface components {
                 label: string;
                 rooms: {
                     name: string;
-                    kind: components['schemas']['RoomKind'];
+                    kind: components["schemas"]["RoomKind"];
                     x: number;
                     y: number;
                     w: number;
@@ -1966,11 +2281,11 @@ export interface components {
             workPermitExpiresAt?: string;
             socialSecurityNumber?: string;
             issuedEquipment?: string;
-            documents?: components['schemas']['PersonnelDocument'][];
-            trainings?: components['schemas']['PersonnelTraining'][];
-            sensitive?: components['schemas']['PersonnelSensitive'];
+            documents?: components["schemas"]["PersonnelDocument"][];
+            trainings?: components["schemas"]["PersonnelTraining"][];
+            sensitive?: components["schemas"]["PersonnelSensitive"];
         };
-        Personnel: components['schemas']['PersonnelInput'] & {
+        Personnel: components["schemas"]["PersonnelInput"] & {
             id: string;
             /**
              * @description หลังบ้านออกให้เมื่อเพิ่มบุคลากร
@@ -2004,14 +2319,14 @@ export interface components {
             expired: boolean;
         };
         /** @enum {string} */
-        ApprovalType: 'pr' | 'po' | 'subcontract' | 'change-order' | 'petty-cash' | 'rental';
+        ApprovalType: "pr" | "po" | "subcontract" | "change-order" | "petty-cash" | "rental";
         /** @enum {string} */
-        ApprovalStatus: 'pending' | 'approved' | 'rejected';
+        ApprovalStatus: "pending" | "approved" | "rejected";
         /**
          * @description ผู้มีอำนาจอนุมัติตามเกณฑ์ (หลังบ้านคำนวณจากยอดและประเภท)
          * @enum {string}
          */
-        ApprovalLevel: 'project-manager' | 'owner';
+        ApprovalLevel: "project-manager" | "owner";
         ApprovalItem: {
             name: string;
             quantity: number;
@@ -2020,32 +2335,32 @@ export interface components {
         };
         ApprovalStep: {
             /** @enum {string} */
-            action: 'submitted' | 'approved' | 'rejected';
-            user: components['schemas']['UserRef'];
+            action: "submitted" | "approved" | "rejected";
+            user: components["schemas"]["UserRef"];
             /** Format: date-time */
             at: string;
             note?: string;
         };
         Approval: {
             id: string;
-            type: components['schemas']['ApprovalType'];
+            type: components["schemas"]["ApprovalType"];
             projectCode: string;
             title: string;
             reason?: string;
             /** @description ยอดรวม = ผลรวม quantity × unitPrice */
             amount: number;
-            requestedBy: components['schemas']['UserRef'];
+            requestedBy: components["schemas"]["UserRef"];
             /** Format: date-time */
             requestedAt: string;
-            status: components['schemas']['ApprovalStatus'];
-            approvalLevel: components['schemas']['ApprovalLevel'];
-            items: components['schemas']['ApprovalItem'][];
-            history: components['schemas']['ApprovalStep'][];
+            status: components["schemas"]["ApprovalStatus"];
+            approvalLevel: components["schemas"]["ApprovalLevel"];
+            items: components["schemas"]["ApprovalItem"][];
+            history: components["schemas"]["ApprovalStep"][];
             /** @description คำขอนี้มาจากงานเพิ่ม-ลดของโครงการ (อนุมัติแล้วหลังบ้านปรับมูลค่า/ไทม์ไลน์ให้) */
             changeOrderId?: string;
         };
-        ApprovalPage: components['schemas']['PageMeta'] & {
-            items: components['schemas']['Approval'][];
+        ApprovalPage: components["schemas"]["PageMeta"] & {
+            items: components["schemas"]["Approval"][];
         };
         ApprovalSummary: {
             pending: number;
@@ -2062,31 +2377,31 @@ export interface components {
             note: string;
         };
         BulkApproveResult: {
-            approved: components['schemas']['Approval'][];
+            approved: components["schemas"]["Approval"][];
             skipped: {
                 id: string;
                 reason: string;
             }[];
         };
         /** @enum {string} */
-        AuditModule: 'approval' | 'project' | 'personnel' | 'procurement' | 'finance' | 'system';
+        AuditModule: "approval" | "project" | "personnel" | "procurement" | "finance" | "system";
         AuditEntry: {
             id: string;
             /** Format: date-time */
             at: string;
-            user: components['schemas']['UserRef'];
-            module: components['schemas']['AuditModule'];
+            user: components["schemas"]["UserRef"];
+            module: components["schemas"]["AuditModule"];
             /** @description ข้อความการกระทำ (ภาษาไทย) */
             action: string;
             /** @description เลขที่/รหัสของสิ่งที่ถูกกระทำ */
             target: string;
             detail?: string;
         };
-        AuditLogPage: components['schemas']['PageMeta'] & {
-            items: components['schemas']['AuditEntry'][];
+        AuditLogPage: components["schemas"]["PageMeta"] & {
+            items: components["schemas"]["AuditEntry"][];
         };
         /** @enum {string} */
-        ProjectHealth: 'normal' | 'behind' | 'over-budget' | 'loss';
+        ProjectHealth: "normal" | "behind" | "over-budget" | "loss";
         ProjectFinance: {
             projectCode: string;
             customerName: string;
@@ -2105,20 +2420,50 @@ export interface components {
             forecastProfit: number;
             cashReceived: number;
             receivable: number;
-            health: components['schemas']['ProjectHealth'];
+            health: components["schemas"]["ProjectHealth"];
         };
         /**
          * @description pending-contract = รอทำสัญญา, active = กำลังดำเนินการ (มีสัญญาแล้ว ยังไม่ส่งมอบ),
          *     in-hand = โครงการในมือ (รอทำสัญญา + กำลังดำเนินการ), completed = ส่งมอบแล้ว,
-         *     warranty = ส่งมอบแล้วและยังอยู่ในระยะประกัน
+         *     warranty = ส่งมอบแล้วและยังมีการรับประกันอย่างน้อย 1 ส่วนที่ยังมีผล (งานโครงสร้างรับประกันนานที่สุด)
          * @enum {string}
          */
-        ProjectGroup: 'in-hand' | 'pending-contract' | 'active' | 'completed' | 'warranty';
+        ProjectGroup: "in-hand" | "pending-contract" | "active" | "completed" | "warranty";
+        /**
+         * @description architectural = งานสถาปัตยกรรม (1 ปี), structural = งานโครงสร้าง (5 ปี)
+         * @enum {string}
+         */
+        WarrantyType: "architectural" | "structural";
+        /** @description เงื่อนไขการรับประกันผลงานหลังส่งมอบของบริษัท */
+        WarrantyTerm: {
+            type: components["schemas"]["WarrantyType"];
+            /** @example งานโครงสร้าง */
+            label: string;
+            /** @description ระยะรับประกันนับจากวันส่งมอบ (เดือน) */
+            months: number;
+            /** @description ขอบเขตงานที่รับประกัน */
+            scope: string;
+        };
+        /** @description การรับประกันแต่ละส่วนของโครงการที่ส่งมอบแล้ว */
+        WarrantyCoverage: components["schemas"]["WarrantyTerm"] & {
+            /**
+             * Format: date
+             * @description วันส่งมอบ
+             */
+            startDate: string;
+            /**
+             * Format: date
+             * @description วันสุดท้ายที่รับประกัน
+             */
+            endDate: string;
+            /** @description จำนวนวันที่เหลือ (ติดลบ = หมดประกันแล้ว) */
+            daysLeft: number;
+            active: boolean;
+        };
         ProjectPortfolio: {
             /** Format: date-time */
             asOf: string;
-            /** @description ระยะรับประกันผลงานหลังส่งมอบ (เดือน) */
-            warrantyMonths: number;
+            warrantyTerms: components["schemas"]["WarrantyTerm"][];
             counts: {
                 total: number;
                 inHand: number;
@@ -2130,13 +2475,13 @@ export interface components {
             /** @description แยกโครงการที่กำลังดำเนินการตามสถานะ */
             activeByStatus: {
                 planning: number;
-                'in-progress': number;
-                'near-handover': number;
+                "in-progress": number;
+                "near-handover": number;
                 delayed: number;
             };
             /** @description มูลค่าสัญญาของโครงการที่กำลังดำเนินการ (เฉพาะสิทธิ์ finance.company) */
             inHandValue?: number;
-            /** @description โครงการที่ยังอยู่ในประกัน เรียงตามวันหมดประกันที่ใกล้ที่สุด */
+            /** @description โครงการที่ยังอยู่ในประกัน เรียงตามการรับประกันที่ใกล้หมดที่สุด (warrantyUntil/daysLeft/expiringType = ส่วนที่ยังมีผลและจะหมดก่อน) */
             warranties: {
                 code: string;
                 name: string;
@@ -2146,6 +2491,8 @@ export interface components {
                 /** Format: date */
                 warrantyUntil: string;
                 daysLeft: number;
+                expiringType: components["schemas"]["WarrantyType"];
+                coverages: components["schemas"]["WarrantyCoverage"][];
             }[];
         };
         DashboardSummary: {
@@ -2163,7 +2510,7 @@ export interface components {
                 cashReceived: number;
                 receivable: number;
             };
-            projects: components['schemas']['ProjectFinance'][];
+            projects: components["schemas"]["ProjectFinance"][];
         };
         MonthlyCashFlow: {
             /**
@@ -2182,7 +2529,7 @@ export interface components {
                 [name: string]: unknown;
             };
             content: {
-                'application/problem+json': components['schemas']['Problem'];
+                "application/problem+json": components["schemas"]["Problem"];
             };
         };
         /** @description บทบาทนี้ไม่มีสิทธิ์ */
@@ -2191,7 +2538,7 @@ export interface components {
                 [name: string]: unknown;
             };
             content: {
-                'application/problem+json': components['schemas']['Problem'];
+                "application/problem+json": components["schemas"]["Problem"];
             };
         };
         /** @description ไม่พบข้อมูล */
@@ -2200,7 +2547,7 @@ export interface components {
                 [name: string]: unknown;
             };
             content: {
-                'application/problem+json': components['schemas']['Problem'];
+                "application/problem+json": components["schemas"]["Problem"];
             };
         };
         /** @description สถานะข้อมูลเปลี่ยนไปแล้ว เช่น คำขอถูกตัดสินไปก่อนหน้า */
@@ -2209,7 +2556,7 @@ export interface components {
                 [name: string]: unknown;
             };
             content: {
-                'application/problem+json': components['schemas']['Problem'];
+                "application/problem+json": components["schemas"]["Problem"];
             };
         };
         /** @description ข้อมูลไม่ถูกต้อง */
@@ -2218,7 +2565,7 @@ export interface components {
                 [name: string]: unknown;
             };
             content: {
-                'application/problem+json': components['schemas']['Problem'];
+                "application/problem+json": components["schemas"]["Problem"];
             };
         };
     };
@@ -2244,7 +2591,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['LoginInput'];
+                "application/json": components["schemas"]["LoginInput"];
             };
         };
         responses: {
@@ -2254,19 +2601,19 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['LoginResult'];
+                    "application/json": components["schemas"]["LoginResult"];
                 };
             };
-            401: components['responses']['Unauthorized'];
-            403: components['responses']['Forbidden'];
-            422: components['responses']['ValidationError'];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["ValidationError"];
             /** @description พยายามเข้าสู่ระบบผิดหลายครั้ง */
             429: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/problem+json': components['schemas']['Problem'];
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -2286,10 +2633,10 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['CurrentUser'];
+                    "application/json": components["schemas"]["CurrentUser"];
                 };
             };
-            401: components['responses']['Unauthorized'];
+            401: components["responses"]["Unauthorized"];
         };
     };
     logout: {
@@ -2319,7 +2666,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['RegistrationInput'];
+                "application/json": components["schemas"]["RegistrationInput"];
             };
         };
         responses: {
@@ -2329,23 +2676,23 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': {
+                    "application/json": {
                         id: string;
                         /** @constant */
-                        status: 'pending';
+                        status: "pending";
                         /** Format: date-time */
                         submittedAt: string;
                     };
                 };
             };
-            409: components['responses']['Conflict'];
-            422: components['responses']['ValidationError'];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationError"];
         };
     };
     listRegistrations: {
         parameters: {
             query?: {
-                status?: components['schemas']['RegistrationStatus'];
+                status?: components["schemas"]["RegistrationStatus"];
             };
             header?: never;
             path?: never;
@@ -2359,10 +2706,10 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['Registration'][];
+                    "application/json": components["schemas"]["Registration"][];
                 };
             };
-            403: components['responses']['Forbidden'];
+            403: components["responses"]["Forbidden"];
         };
     };
     approveRegistration: {
@@ -2376,7 +2723,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['UserAccountInput'] & {
+                "application/json": components["schemas"]["UserAccountInput"] & {
                     personnelId: string;
                 };
             };
@@ -2388,13 +2735,13 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['UserAccount'];
+                    "application/json": components["schemas"]["UserAccount"];
                 };
             };
-            403: components['responses']['Forbidden'];
-            404: components['responses']['NotFound'];
-            409: components['responses']['Conflict'];
-            422: components['responses']['ValidationError'];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationError"];
         };
     };
     rejectRegistration: {
@@ -2408,7 +2755,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                'application/json': {
+                "application/json": {
                     reason: string;
                 };
             };
@@ -2420,13 +2767,13 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['Registration'];
+                    "application/json": components["schemas"]["Registration"];
                 };
             };
-            403: components['responses']['Forbidden'];
-            404: components['responses']['NotFound'];
-            409: components['responses']['Conflict'];
-            422: components['responses']['ValidationError'];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationError"];
         };
     };
     listUsers: {
@@ -2444,10 +2791,10 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['UserRef'][];
+                    "application/json": components["schemas"]["UserRef"][];
                 };
             };
-            401: components['responses']['Unauthorized'];
+            401: components["responses"]["Unauthorized"];
         };
     };
     listRoles: {
@@ -2465,7 +2812,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['RoleCatalog'];
+                    "application/json": components["schemas"]["RoleCatalog"];
                 };
             };
         };
@@ -2475,8 +2822,8 @@ export interface operations {
             query?: {
                 /** @description ค้นหาชื่อ รหัสบุคลากร อีเมล */
                 q?: string;
-                roleId?: components['schemas']['RoleId'];
-                status?: components['schemas']['UserAccountStatus'];
+                roleId?: components["schemas"]["RoleId"];
+                status?: components["schemas"]["UserAccountStatus"];
                 /** @description บัญชีของบุคลากรคนนี้ (มีได้ไม่เกิน 1) */
                 personnelId?: string;
             };
@@ -2492,10 +2839,10 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['UserAccount'][];
+                    "application/json": components["schemas"]["UserAccount"][];
                 };
             };
-            403: components['responses']['Forbidden'];
+            403: components["responses"]["Forbidden"];
         };
     };
     createUserAccount: {
@@ -2507,7 +2854,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['UserAccountCreateInput'];
+                "application/json": components["schemas"]["UserAccountCreateInput"];
             };
         };
         responses: {
@@ -2517,12 +2864,12 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['UserAccount'];
+                    "application/json": components["schemas"]["UserAccount"];
                 };
             };
-            403: components['responses']['Forbidden'];
-            409: components['responses']['Conflict'];
-            422: components['responses']['ValidationError'];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationError"];
         };
     };
     updateUserAccount: {
@@ -2536,7 +2883,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['UserAccountInput'];
+                "application/json": components["schemas"]["UserAccountInput"];
             };
         };
         responses: {
@@ -2546,13 +2893,13 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['UserAccount'];
+                    "application/json": components["schemas"]["UserAccount"];
                 };
             };
-            403: components['responses']['Forbidden'];
-            404: components['responses']['NotFound'];
-            409: components['responses']['Conflict'];
-            422: components['responses']['ValidationError'];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationError"];
         };
     };
     suspendUserAccount: {
@@ -2566,7 +2913,7 @@ export interface operations {
         };
         requestBody?: {
             content: {
-                'application/json': {
+                "application/json": {
                     /** @description เหตุผล (บันทึกใน Audit Log) */
                     reason?: string;
                 };
@@ -2579,12 +2926,12 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['UserAccount'];
+                    "application/json": components["schemas"]["UserAccount"];
                 };
             };
-            403: components['responses']['Forbidden'];
-            404: components['responses']['NotFound'];
-            409: components['responses']['Conflict'];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
     activateUserAccount: {
@@ -2604,12 +2951,12 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['UserAccount'];
+                    "application/json": components["schemas"]["UserAccount"];
                 };
             };
-            403: components['responses']['Forbidden'];
-            404: components['responses']['NotFound'];
-            409: components['responses']['Conflict'];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
     resetUserPassword: {
@@ -2629,12 +2976,12 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['UserAccount'];
+                    "application/json": components["schemas"]["UserAccount"];
                 };
             };
-            403: components['responses']['Forbidden'];
-            404: components['responses']['NotFound'];
-            409: components['responses']['Conflict'];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
     getApprovalSettings: {
@@ -2652,7 +2999,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['ApprovalSettings'];
+                    "application/json": components["schemas"]["ApprovalSettings"];
                 };
             };
         };
@@ -2666,7 +3013,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['ApprovalSettings'];
+                "application/json": components["schemas"]["ApprovalSettings"];
             };
         };
         responses: {
@@ -2676,19 +3023,19 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['ApprovalSettings'];
+                    "application/json": components["schemas"]["ApprovalSettings"];
                 };
             };
-            403: components['responses']['Forbidden'];
-            422: components['responses']['ValidationError'];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["ValidationError"];
         };
     };
     listProjects: {
         parameters: {
             query?: {
-                status?: components['schemas']['ProjectStatus'];
+                status?: components["schemas"]["ProjectStatus"];
                 /** @description กลุ่มโครงการ (ดู ProjectGroup) */
-                group?: components['schemas']['ProjectGroup'];
+                group?: components["schemas"]["ProjectGroup"];
                 /** @description ค้นหารหัส ชื่อลูกค้า ผู้รับผิดชอบ */
                 q?: string;
             };
@@ -2704,7 +3051,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['Project'][];
+                    "application/json": components["schemas"]["Project"][];
                 };
             };
         };
@@ -2718,7 +3065,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['ProjectInput'];
+                "application/json": components["schemas"]["ProjectInput"];
             };
         };
         responses: {
@@ -2728,11 +3075,11 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['Project'];
+                    "application/json": components["schemas"]["Project"];
                 };
             };
-            403: components['responses']['Forbidden'];
-            422: components['responses']['ValidationError'];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["ValidationError"];
         };
     };
     listProjectRegions: {
@@ -2750,7 +3097,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['ProjectRegion'][];
+                    "application/json": components["schemas"]["ProjectRegion"][];
                 };
             };
         };
@@ -2770,7 +3117,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['ConstructionOptionGroup'][];
+                    "application/json": components["schemas"]["ConstructionOptionGroup"][];
                 };
             };
         };
@@ -2790,7 +3137,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HousePlan'][];
+                    "application/json": components["schemas"]["HousePlan"][];
                 };
             };
         };
@@ -2800,7 +3147,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                code: components['parameters']['ProjectCode'];
+                code: components["parameters"]["ProjectCode"];
             };
             cookie?: never;
         };
@@ -2812,10 +3159,10 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['Project'];
+                    "application/json": components["schemas"]["Project"];
                 };
             };
-            404: components['responses']['NotFound'];
+            404: components["responses"]["NotFound"];
         };
     };
     recordProjectContract: {
@@ -2823,13 +3170,13 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                code: components['parameters']['ProjectCode'];
+                code: components["parameters"]["ProjectCode"];
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['ContractInput'];
+                "application/json": components["schemas"]["ContractInput"];
             };
         };
         responses: {
@@ -2839,13 +3186,13 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['Project'];
+                    "application/json": components["schemas"]["Project"];
                 };
             };
-            403: components['responses']['Forbidden'];
-            404: components['responses']['NotFound'];
-            409: components['responses']['Conflict'];
-            422: components['responses']['ValidationError'];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationError"];
         };
     };
     getProjectSetup: {
@@ -2853,7 +3200,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                code: components['parameters']['ProjectCode'];
+                code: components["parameters"]["ProjectCode"];
             };
             cookie?: never;
         };
@@ -2865,11 +3212,11 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['ProjectSetup'];
+                    "application/json": components["schemas"]["ProjectSetup"];
                 };
             };
-            404: components['responses']['NotFound'];
-            409: components['responses']['Conflict'];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
     saveProjectSetup: {
@@ -2877,13 +3224,13 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                code: components['parameters']['ProjectCode'];
+                code: components["parameters"]["ProjectCode"];
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['ProjectSetupInput'];
+                "application/json": components["schemas"]["ProjectSetupInput"];
             };
         };
         responses: {
@@ -2893,13 +3240,13 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['ProjectSetup'];
+                    "application/json": components["schemas"]["ProjectSetup"];
                 };
             };
-            403: components['responses']['Forbidden'];
-            404: components['responses']['NotFound'];
-            409: components['responses']['Conflict'];
-            422: components['responses']['ValidationError'];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationError"];
         };
     };
     previewProjectSetup: {
@@ -2907,13 +3254,13 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                code: components['parameters']['ProjectCode'];
+                code: components["parameters"]["ProjectCode"];
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['ProjectSetupInput'];
+                "application/json": components["schemas"]["ProjectSetupInput"];
             };
         };
         responses: {
@@ -2923,12 +3270,12 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['SetupPreview'];
+                    "application/json": components["schemas"]["SetupPreview"];
                 };
             };
-            404: components['responses']['NotFound'];
-            409: components['responses']['Conflict'];
-            422: components['responses']['ValidationError'];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationError"];
         };
     };
     getProjectTimeline: {
@@ -2936,7 +3283,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                code: components['parameters']['ProjectCode'];
+                code: components["parameters"]["ProjectCode"];
             };
             cookie?: never;
         };
@@ -2948,22 +3295,22 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['ProjectTimeline'];
+                    "application/json": components["schemas"]["ProjectTimeline"];
                 };
             };
-            404: components['responses']['NotFound'];
+            404: components["responses"]["NotFound"];
         };
     };
     listProgressUpdates: {
         parameters: {
             query?: {
                 /** @description เริ่มที่ 1 */
-                page?: components['parameters']['Page'];
-                pageSize?: components['parameters']['PageSize'];
+                page?: components["parameters"]["Page"];
+                pageSize?: components["parameters"]["PageSize"];
             };
             header?: never;
             path: {
-                code: components['parameters']['ProjectCode'];
+                code: components["parameters"]["ProjectCode"];
             };
             cookie?: never;
         };
@@ -2975,10 +3322,10 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['ProgressUpdatePage'];
+                    "application/json": components["schemas"]["ProgressUpdatePage"];
                 };
             };
-            404: components['responses']['NotFound'];
+            404: components["responses"]["NotFound"];
         };
     };
     createProgressUpdate: {
@@ -2986,13 +3333,13 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                code: components['parameters']['ProjectCode'];
+                code: components["parameters"]["ProjectCode"];
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['ProgressUpdateInput'];
+                "application/json": components["schemas"]["ProgressUpdateInput"];
             };
         };
         responses: {
@@ -3002,12 +3349,12 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['ProgressUpdate'];
+                    "application/json": components["schemas"]["ProgressUpdate"];
                 };
             };
-            403: components['responses']['Forbidden'];
-            404: components['responses']['NotFound'];
-            422: components['responses']['ValidationError'];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationError"];
         };
     };
     recordInspection: {
@@ -3015,14 +3362,14 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                code: components['parameters']['ProjectCode'];
+                code: components["parameters"]["ProjectCode"];
                 taskCode: string;
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['InspectionInput'];
+                "application/json": components["schemas"]["InspectionInput"];
             };
         };
         responses: {
@@ -3032,13 +3379,13 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['ProgressUpdate'];
+                    "application/json": components["schemas"]["ProgressUpdate"];
                 };
             };
-            403: components['responses']['Forbidden'];
-            404: components['responses']['NotFound'];
-            409: components['responses']['Conflict'];
-            422: components['responses']['ValidationError'];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationError"];
         };
     };
     uploadFile: {
@@ -3050,10 +3397,10 @@ export interface operations {
         };
         requestBody: {
             content: {
-                'multipart/form-data': {
+                "multipart/form-data": {
                     /**
                      * Format: binary
-                     * @description ไม่เกิน 10 MB — รูป (JPG/PNG/WebP) หรือเอกสาร (PDF, Excel, Word, DWG) รูปหน้างาน (photoIds) ต้องเป็นรูปเท่านั้น
+                     * @description รูป (JPG/PNG/WebP) หรือเอกสาร (PDF, Excel, Word, DWG) ไม่เกิน 10 MB — แบบ 3 มิติ (GLB, glTF, DAE, FBX, OBJ, SKP, RVT) ไม่เกิน 200 MB — รูปหน้างาน (photoIds) ต้องเป็นรูปเท่านั้น
                      */
                     file: string;
                 };
@@ -3066,11 +3413,11 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['UploadedFile'];
+                    "application/json": components["schemas"]["UploadedFile"];
                 };
             };
-            413: components['responses']['ValidationError'];
-            422: components['responses']['ValidationError'];
+            413: components["responses"]["ValidationError"];
+            422: components["responses"]["ValidationError"];
         };
     };
     listChangeOrders: {
@@ -3078,7 +3425,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                code: components['parameters']['ProjectCode'];
+                code: components["parameters"]["ProjectCode"];
             };
             cookie?: never;
         };
@@ -3090,11 +3437,11 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['ChangeOrder'][];
+                    "application/json": components["schemas"]["ChangeOrder"][];
                 };
             };
-            404: components['responses']['NotFound'];
-            409: components['responses']['Conflict'];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
     createChangeOrder: {
@@ -3102,13 +3449,13 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                code: components['parameters']['ProjectCode'];
+                code: components["parameters"]["ProjectCode"];
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['ChangeOrderInput'];
+                "application/json": components["schemas"]["ChangeOrderInput"];
             };
         };
         responses: {
@@ -3118,12 +3465,12 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['ChangeOrder'];
+                    "application/json": components["schemas"]["ChangeOrder"];
                 };
             };
-            403: components['responses']['Forbidden'];
-            409: components['responses']['Conflict'];
-            422: components['responses']['ValidationError'];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationError"];
         };
     };
     confirmChangeOrderByCustomer: {
@@ -3131,7 +3478,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                code: components['parameters']['ProjectCode'];
+                code: components["parameters"]["ProjectCode"];
                 id: string;
             };
             cookie?: never;
@@ -3144,12 +3491,12 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['ChangeOrder'];
+                    "application/json": components["schemas"]["ChangeOrder"];
                 };
             };
-            403: components['responses']['Forbidden'];
-            404: components['responses']['NotFound'];
-            409: components['responses']['Conflict'];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
     cancelChangeOrder: {
@@ -3157,14 +3504,14 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                code: components['parameters']['ProjectCode'];
+                code: components["parameters"]["ProjectCode"];
                 id: string;
             };
             cookie?: never;
         };
         requestBody?: {
             content: {
-                'application/json': {
+                "application/json": {
                     reason?: string;
                 };
             };
@@ -3176,12 +3523,12 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['ChangeOrder'];
+                    "application/json": components["schemas"]["ChangeOrder"];
                 };
             };
-            403: components['responses']['Forbidden'];
-            404: components['responses']['NotFound'];
-            409: components['responses']['Conflict'];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
     listProjectInstallments: {
@@ -3189,7 +3536,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                code: components['parameters']['ProjectCode'];
+                code: components["parameters"]["ProjectCode"];
             };
             cookie?: never;
         };
@@ -3201,72 +3548,18 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['Installment'][];
+                    "application/json": components["schemas"]["Installment"][];
                 };
             };
-            404: components['responses']['NotFound'];
+            404: components["responses"]["NotFound"];
         };
     };
-    listProjectPhotos: {
-        parameters: {
-            query?: {
-                phaseCode?: string;
-                /** @description เริ่มที่ 1 */
-                page?: components['parameters']['Page'];
-                pageSize?: components['parameters']['PageSize'];
-            };
-            header?: never;
-            path: {
-                code: components['parameters']['ProjectCode'];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    'application/json': components['schemas']['SitePhotoPage'];
-                };
-            };
-            404: components['responses']['NotFound'];
-        };
-    };
-    listProjectDocuments: {
-        parameters: {
-            query?: {
-                category?: components['schemas']['DocumentCategory'];
-                q?: string;
-            };
-            header?: never;
-            path: {
-                code: components['parameters']['ProjectCode'];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    'application/json': components['schemas']['ProjectDocument'][];
-                };
-            };
-            404: components['responses']['NotFound'];
-        };
-    };
-    getProjectAssignments: {
+    listProjectModels: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                code: components['parameters']['ProjectCode'];
+                code: components["parameters"]["ProjectCode"];
             };
             cookie?: never;
         };
@@ -3278,56 +3571,76 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['ProjectAssignments'];
+                    "application/json": components["schemas"]["ProjectModel"][];
                 };
             };
-            404: components['responses']['NotFound'];
-            409: components['responses']['Conflict'];
+            404: components["responses"]["NotFound"];
         };
     };
-    addProjectStaff: {
+    createProjectModel: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                code: components['parameters']['ProjectCode'];
+                code: components["parameters"]["ProjectCode"];
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['StaffAssignmentInput'];
+                "application/json": components["schemas"]["ProjectModelInput"];
             };
         };
         responses: {
-            /** @description เพิ่มแล้ว */
+            /** @description บันทึกแล้ว */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['StaffAssignment'];
+                    "application/json": components["schemas"]["ProjectModel"];
                 };
             };
-            403: components['responses']['Forbidden'];
-            404: components['responses']['NotFound'];
-            409: components['responses']['Conflict'];
-            422: components['responses']['ValidationError'];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationError"];
         };
     };
-    updateProjectStaff: {
+    getProjectHouse: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                code: components['parameters']['ProjectCode'];
-                assignmentId: string;
+                code: components["parameters"]["ProjectCode"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectHouse"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    saveProjectHouse: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['StaffAssignmentInput'];
+                "application/json": components["schemas"]["ProjectHouseInput"];
             };
         };
         responses: {
@@ -3337,13 +3650,265 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['StaffAssignment'];
+                    "application/json": components["schemas"]["ProjectHouse"];
                 };
             };
-            403: components['responses']['Forbidden'];
-            404: components['responses']['NotFound'];
-            409: components['responses']['Conflict'];
-            422: components['responses']['ValidationError'];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationError"];
+        };
+    };
+    convertProjectModel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description เข้าคิวแปลงแล้ว */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectModel"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    deleteProjectModel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ลบแล้ว */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    recordInstallmentPayment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+                /** @description เลขงวด */
+                no: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InstallmentPaymentInput"];
+            };
+        };
+        responses: {
+            /** @description บันทึกแล้ว */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Installment"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationError"];
+        };
+    };
+    cancelInstallmentPayment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+                no: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description ยกเลิกแล้ว งวดกลับเป็นสถานะตามความคืบหน้า */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Installment"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationError"];
+        };
+    };
+    listProjectPhotos: {
+        parameters: {
+            query?: {
+                phaseCode?: string;
+                /** @description เริ่มที่ 1 */
+                page?: components["parameters"]["Page"];
+                pageSize?: components["parameters"]["PageSize"];
+            };
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SitePhotoPage"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listProjectDocuments: {
+        parameters: {
+            query?: {
+                category?: components["schemas"]["DocumentCategory"];
+                q?: string;
+            };
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectDocument"][];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getProjectAssignments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectAssignments"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    addProjectStaff: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StaffAssignmentInput"];
+            };
+        };
+        responses: {
+            /** @description เพิ่มแล้ว */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StaffAssignment"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationError"];
+        };
+    };
+    updateProjectStaff: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+                assignmentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StaffAssignmentInput"];
+            };
+        };
+        responses: {
+            /** @description บันทึกแล้ว */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StaffAssignment"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationError"];
         };
     };
     removeProjectStaff: {
@@ -3351,7 +3916,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                code: components['parameters']['ProjectCode'];
+                code: components["parameters"]["ProjectCode"];
                 assignmentId: string;
             };
             cookie?: never;
@@ -3365,9 +3930,9 @@ export interface operations {
                 };
                 content?: never;
             };
-            403: components['responses']['Forbidden'];
-            404: components['responses']['NotFound'];
-            409: components['responses']['Conflict'];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
     addProjectSubcontractor: {
@@ -3375,13 +3940,13 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                code: components['parameters']['ProjectCode'];
+                code: components["parameters"]["ProjectCode"];
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['SubcontractorAssignmentInput'];
+                "application/json": components["schemas"]["SubcontractorAssignmentInput"];
             };
         };
         responses: {
@@ -3391,13 +3956,13 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['SubcontractorAssignment'];
+                    "application/json": components["schemas"]["SubcontractorAssignment"];
                 };
             };
-            403: components['responses']['Forbidden'];
-            404: components['responses']['NotFound'];
-            409: components['responses']['Conflict'];
-            422: components['responses']['ValidationError'];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationError"];
         };
     };
     updateProjectSubcontractor: {
@@ -3405,14 +3970,14 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                code: components['parameters']['ProjectCode'];
+                code: components["parameters"]["ProjectCode"];
                 assignmentId: string;
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['SubcontractorAssignmentInput'];
+                "application/json": components["schemas"]["SubcontractorAssignmentInput"];
             };
         };
         responses: {
@@ -3422,13 +3987,13 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['SubcontractorAssignment'];
+                    "application/json": components["schemas"]["SubcontractorAssignment"];
                 };
             };
-            403: components['responses']['Forbidden'];
-            404: components['responses']['NotFound'];
-            409: components['responses']['Conflict'];
-            422: components['responses']['ValidationError'];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationError"];
         };
     };
     removeProjectSubcontractor: {
@@ -3436,7 +4001,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                code: components['parameters']['ProjectCode'];
+                code: components["parameters"]["ProjectCode"];
                 assignmentId: string;
             };
             cookie?: never;
@@ -3450,9 +4015,9 @@ export interface operations {
                 };
                 content?: never;
             };
-            403: components['responses']['Forbidden'];
-            404: components['responses']['NotFound'];
-            409: components['responses']['Conflict'];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
     listSubcontractors: {
@@ -3460,8 +4025,8 @@ export interface operations {
             query?: {
                 /** @description ค้นหาชื่อ รหัส ผู้ติดต่อ */
                 q?: string;
-                trade?: components['schemas']['SubcontractorTrade'];
-                status?: 'active' | 'inactive';
+                trade?: components["schemas"]["SubcontractorTrade"];
+                status?: "active" | "inactive";
             };
             header?: never;
             path?: never;
@@ -3475,7 +4040,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['Subcontractor'][];
+                    "application/json": components["schemas"]["Subcontractor"][];
                 };
             };
         };
@@ -3489,7 +4054,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['SubcontractorInput'];
+                "application/json": components["schemas"]["SubcontractorInput"];
             };
         };
         responses: {
@@ -3499,12 +4064,12 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['Subcontractor'];
+                    "application/json": components["schemas"]["Subcontractor"];
                 };
             };
-            403: components['responses']['Forbidden'];
-            409: components['responses']['Conflict'];
-            422: components['responses']['ValidationError'];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationError"];
         };
     };
     updateSubcontractor: {
@@ -3518,7 +4083,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['SubcontractorInput'];
+                "application/json": components["schemas"]["SubcontractorInput"];
             };
         };
         responses: {
@@ -3528,13 +4093,13 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['Subcontractor'];
+                    "application/json": components["schemas"]["Subcontractor"];
                 };
             };
-            403: components['responses']['Forbidden'];
-            404: components['responses']['NotFound'];
-            409: components['responses']['Conflict'];
-            422: components['responses']['ValidationError'];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationError"];
         };
     };
     listProjectTeam: {
@@ -3542,7 +4107,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                code: components['parameters']['ProjectCode'];
+                code: components["parameters"]["ProjectCode"];
             };
             cookie?: never;
         };
@@ -3554,10 +4119,10 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['TeamMember'][];
+                    "application/json": components["schemas"]["TeamMember"][];
                 };
             };
-            404: components['responses']['NotFound'];
+            404: components["responses"]["NotFound"];
         };
     };
     getHousePlan: {
@@ -3577,10 +4142,10 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HousePlan'];
+                    "application/json": components["schemas"]["HousePlan"];
                 };
             };
-            404: components['responses']['NotFound'];
+            404: components["responses"]["NotFound"];
         };
     };
     listPersonnel: {
@@ -3600,7 +4165,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['Personnel'][];
+                    "application/json": components["schemas"]["Personnel"][];
                 };
             };
         };
@@ -3614,7 +4179,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['PersonnelInput'];
+                "application/json": components["schemas"]["PersonnelInput"];
             };
         };
         responses: {
@@ -3624,10 +4189,10 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['Personnel'];
+                    "application/json": components["schemas"]["Personnel"];
                 };
             };
-            422: components['responses']['ValidationError'];
+            422: components["responses"]["ValidationError"];
         };
     };
     getPersonnel: {
@@ -3647,10 +4212,10 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['Personnel'];
+                    "application/json": components["schemas"]["Personnel"];
                 };
             };
-            404: components['responses']['NotFound'];
+            404: components["responses"]["NotFound"];
         };
     };
     updatePersonnel: {
@@ -3664,7 +4229,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['PersonnelInput'];
+                "application/json": components["schemas"]["PersonnelInput"];
             };
         };
         responses: {
@@ -3674,11 +4239,11 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['Personnel'];
+                    "application/json": components["schemas"]["Personnel"];
                 };
             };
-            404: components['responses']['NotFound'];
-            422: components['responses']['ValidationError'];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationError"];
         };
     };
     listLicenseAlerts: {
@@ -3698,7 +4263,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['LicenseAlert'][];
+                    "application/json": components["schemas"]["LicenseAlert"][];
                 };
             };
         };
@@ -3706,16 +4271,16 @@ export interface operations {
     listApprovals: {
         parameters: {
             query?: {
-                status?: components['schemas']['ApprovalStatus'];
-                type?: components['schemas']['ApprovalType'];
+                status?: components["schemas"]["ApprovalStatus"];
+                type?: components["schemas"]["ApprovalType"];
                 projectCode?: string;
                 /** @description ค้นหาเลขที่ รายการ ผู้ขอ */
                 q?: string;
                 /** @description `priority` = รายการที่ต้องให้เจ้าของอนุมัติและยอดสูงก่อน */
-                sort?: 'newest' | 'priority';
+                sort?: "newest" | "priority";
                 /** @description เริ่มที่ 1 */
-                page?: components['parameters']['Page'];
-                pageSize?: components['parameters']['PageSize'];
+                page?: components["parameters"]["Page"];
+                pageSize?: components["parameters"]["PageSize"];
             };
             header?: never;
             path?: never;
@@ -3729,7 +4294,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['ApprovalPage'];
+                    "application/json": components["schemas"]["ApprovalPage"];
                 };
             };
         };
@@ -3749,7 +4314,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['ApprovalSummary'];
+                    "application/json": components["schemas"]["ApprovalSummary"];
                 };
             };
         };
@@ -3759,7 +4324,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                id: components['parameters']['ApprovalId'];
+                id: components["parameters"]["ApprovalId"];
             };
             cookie?: never;
         };
@@ -3771,10 +4336,10 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['Approval'];
+                    "application/json": components["schemas"]["Approval"];
                 };
             };
-            404: components['responses']['NotFound'];
+            404: components["responses"]["NotFound"];
         };
     };
     approveApproval: {
@@ -3782,13 +4347,13 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                id: components['parameters']['ApprovalId'];
+                id: components["parameters"]["ApprovalId"];
             };
             cookie?: never;
         };
         requestBody?: {
             content: {
-                'application/json': components['schemas']['DecisionInput'];
+                "application/json": components["schemas"]["DecisionInput"];
             };
         };
         responses: {
@@ -3798,12 +4363,12 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['Approval'];
+                    "application/json": components["schemas"]["Approval"];
                 };
             };
-            403: components['responses']['Forbidden'];
-            404: components['responses']['NotFound'];
-            409: components['responses']['Conflict'];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
     rejectApproval: {
@@ -3811,13 +4376,13 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                id: components['parameters']['ApprovalId'];
+                id: components["parameters"]["ApprovalId"];
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['RejectInput'];
+                "application/json": components["schemas"]["RejectInput"];
             };
         };
         responses: {
@@ -3827,13 +4392,13 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['Approval'];
+                    "application/json": components["schemas"]["Approval"];
                 };
             };
-            403: components['responses']['Forbidden'];
-            404: components['responses']['NotFound'];
-            409: components['responses']['Conflict'];
-            422: components['responses']['ValidationError'];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationError"];
         };
     };
     bulkApprove: {
@@ -3845,7 +4410,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                'application/json': {
+                "application/json": {
                     ids: string[];
                     note?: string;
                 };
@@ -3858,24 +4423,24 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['BulkApproveResult'];
+                    "application/json": components["schemas"]["BulkApproveResult"];
                 };
             };
-            422: components['responses']['ValidationError'];
+            422: components["responses"]["ValidationError"];
         };
     };
     listAuditLogs: {
         parameters: {
             query?: {
-                module?: components['schemas']['AuditModule'];
+                module?: components["schemas"]["AuditModule"];
                 userId?: string;
                 /** @description ค้นหาการกระทำ รายการ รายละเอียด */
                 q?: string;
                 from?: string;
                 to?: string;
                 /** @description เริ่มที่ 1 */
-                page?: components['parameters']['Page'];
-                pageSize?: components['parameters']['PageSize'];
+                page?: components["parameters"]["Page"];
+                pageSize?: components["parameters"]["PageSize"];
             };
             header?: never;
             path?: never;
@@ -3889,16 +4454,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['AuditLogPage'];
+                    "application/json": components["schemas"]["AuditLogPage"];
                 };
             };
-            403: components['responses']['Forbidden'];
+            403: components["responses"]["Forbidden"];
         };
     };
     exportAuditLogs: {
         parameters: {
             query?: {
-                module?: components['schemas']['AuditModule'];
+                module?: components["schemas"]["AuditModule"];
                 userId?: string;
                 q?: string;
             };
@@ -3914,10 +4479,10 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'text/csv': string;
+                    "text/csv": string;
                 };
             };
-            403: components['responses']['Forbidden'];
+            403: components["responses"]["Forbidden"];
         };
     };
     getDashboardSummary: {
@@ -3935,10 +4500,10 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['DashboardSummary'];
+                    "application/json": components["schemas"]["DashboardSummary"];
                 };
             };
-            403: components['responses']['Forbidden'];
+            403: components["responses"]["Forbidden"];
         };
     };
     getProjectPortfolio: {
@@ -3956,7 +4521,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['ProjectPortfolio'];
+                    "application/json": components["schemas"]["ProjectPortfolio"];
                 };
             };
         };
@@ -3978,10 +4543,10 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['MonthlyCashFlow'][];
+                    "application/json": components["schemas"]["MonthlyCashFlow"][];
                 };
             };
-            403: components['responses']['Forbidden'];
+            403: components["responses"]["Forbidden"];
         };
     };
 }

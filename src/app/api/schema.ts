@@ -422,7 +422,7 @@ export interface paths {
         get: operations["getProjectSetup"];
         /**
          * บันทึกการตั้งค่างานก่อสร้างและสร้างไทม์ไลน์ (ต้องมีสิทธิ์ project.manage)
-         * @description หลังบ้านคัดงานจากแม่แบบตามตัวเลือก จัดวันที่ให้พอดีกับระยะสัญญา สร้างไทม์ไลน์และงวดงานใหม่ และบันทึก Audit Log
+         * @description หลังบ้านคัดงานจากแม่แบบตามตัวเลือก จัดวันที่ให้พอดีกับระยะสัญญา สร้างไทม์ไลน์และงวดงานใหม่ (ตามสัดส่วน paymentPercents) และบันทึก Audit Log
          *     ตัวเลือกที่ถูกซ่อน (visibleWhen ไม่ตรง) หลังบ้านปรับเป็นค่าเริ่มต้นเอง
          *     409 ถ้ายังไม่บันทึกสัญญา หรือเริ่มรายงานความคืบหน้าแล้ว (locked)
          */
@@ -615,6 +615,135 @@ export interface paths {
         get: operations["listProjectInstallments"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{code}/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+            };
+            cookie?: never;
+        };
+        /**
+         * แบบบ้าน 3 มิติของโครงการ ทุกเวอร์ชัน (ล่าสุดก่อน)
+         * @description แนบได้ตั้งแต่เปิดโครงการ (ไม่ต้องรอบันทึกสัญญา)
+         */
+        get: operations["listProjectModels"];
+        put?: never;
+        /** อัปโหลดแบบบ้าน 3 มิติเวอร์ชันใหม่ (ต้องมีสิทธิ์ project.manage) */
+        post: operations["createProjectModel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{code}/house": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+            };
+            cookie?: never;
+        };
+        /** ข้อมูลแบบบ้านของโครงการ (รายละเอียด ภาพแปลนรายชั้น ภาพทัศนียภาพ 4 มุม) */
+        get: operations["getProjectHouse"];
+        /** บันทึกข้อมูลแบบบ้านของโครงการ (ต้องมีสิทธิ์ project.manage) */
+        put: operations["saveProjectHouse"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{code}/models/{id}/convert": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** สั่งแปลงไฟล์ต้นฉบับ .skp เป็น 3 มิติใหม่ (เช่น หลังแปลงไม่สำเร็จ) — ต้องมีสิทธิ์ project.manage */
+        post: operations["convertProjectModel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{code}/models/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** ลบแบบ 3 มิติ 1 เวอร์ชัน (ต้องมีสิทธิ์ project.manage) — บันทึก Audit Log */
+        delete: operations["deleteProjectModel"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{code}/installments/{no}/payment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+                /** @description เลขงวด */
+                no: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * บันทึกรับชำระเงินงวดงานพร้อมหลักฐาน (ต้องมีสิทธิ์ payment.record)
+         * @description งวดจะเป็น paid ทันที และหลักฐานจะแสดงในเอกสารของโครงการหมวด billing
+         *     ยอดรับ + ภาษีหัก ณ ที่จ่าย ต้องไม่เกินยอดงวด ถ้าน้อยกว่าต้องระบุเหตุผลใน note
+         *     409 ถ้างวดนี้บันทึกรับชำระแล้ว หรือเป็นงวดงานลด (ยอดติดลบ หักจากงวดอื่น)
+         */
+        post: operations["recordInstallmentPayment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{code}/installments/{no}/payment/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+                no: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** ยกเลิกการบันทึกรับชำระ (เช่น บันทึกผิดงวด) — เก็บประวัติไว้ใน Audit Log (ต้องมีสิทธิ์ payment.record) */
+        post: operations["cancelInstallmentPayment"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1127,9 +1256,10 @@ export interface components {
          *     - project.create: เปิดโครงการใหม่
          *     - project.manage: จัดการโครงการ เช่น บันทึกสัญญาและเริ่มแผนงาน
          *     - user.manage: จัดการบัญชีผู้ใช้ บทบาท และสิทธิ์ของบุคลากร
+         *     - payment.record: บันทึก/ยกเลิกการรับชำระเงินงวดงานของลูกค้า
          * @enum {string}
          */
-        Permission: "progress.update" | "personnel.sensitive" | "finance.company" | "approval.any" | "project.create" | "project.manage" | "user.manage";
+        Permission: "progress.update" | "personnel.sensitive" | "finance.company" | "approval.any" | "project.create" | "project.manage" | "user.manage" | "payment.record";
         CurrentUser: {
             id: string;
             name: string;
@@ -1385,9 +1515,11 @@ export interface components {
             handedOverAt?: string | null;
             /**
              * Format: date
-             * @description วันสิ้นสุดการรับประกันผลงาน (หลังบ้านคำนวณจากวันส่งมอบ + ระยะประกัน)
+             * @description วันสิ้นสุดการรับประกันส่วนที่นานที่สุด (งานโครงสร้าง) — ดูแยกส่วนที่ warranties
              */
             warrantyUntil?: string | null;
+            /** @description การรับประกันแยกส่วน (งานสถาปัตยกรรม 1 ปี งานโครงสร้าง 5 ปี นับจากวันส่งมอบ) ว่างจนกว่าจะส่งมอบ */
+            warranties?: components["schemas"]["WarrantyCoverage"][];
             /** @description ยอดสุทธิของงานเพิ่ม-ลดที่อนุมัติแล้ว (บวก = เพิ่ม ลบ = ลด) */
             changeOrderTotal?: number;
             /** @description มูลค่าสัญญาปัจจุบัน = value + changeOrderTotal (null จนกว่าจะบันทึกสัญญา) */
@@ -1517,6 +1649,22 @@ export interface components {
             /** @description รหัสงานย่อยที่ไม่ต้องทำในโครงการนี้ — ตัดจุดตรวจ (Hold Point) และหมุดหมาย (Milestone) ไม่ได้ (422); รหัสที่ไม่อยู่ในแผนตามตัวเลือก หลังบ้านตัดทิ้ง */
             excludedTasks?: string[];
             customTasks?: components["schemas"]["CustomTaskInput"][];
+            /**
+             * @description สัดส่วนเบิกจ่าย (% ของมูลค่าสัญญา) ของแต่ละงวด เรียงตาม ProjectSetup.paymentSchedule
+             *     ต้องมีครบทุกงวด แต่ละงวดมากกว่า 0 (ทศนิยมไม่เกิน 2 ตำแหน่ง) และรวมกันได้ 100 (422)
+             *     ไม่ส่ง = คงสัดส่วนที่บันทึกไว้ (ยังไม่เคยบันทึก = ค่าเริ่มต้น) — หน้าตัวอย่าง (preview) ไม่ตรวจและไม่ใช้ค่านี้
+             */
+            paymentPercents?: number[];
+        };
+        /** @description งวดเงินตามสัญญา เบิกได้เมื่อขั้นตอนที่ผูกไว้เสร็จทั้งหมด */
+        PaymentScheduleItem: {
+            no: number;
+            title: string;
+            phaseCodes: string[];
+            /** @description สัดส่วนที่ใช้ (% ของมูลค่าสัญญา) */
+            percent: number;
+            /** @description สัดส่วนตั้งต้นของแม่แบบ */
+            defaultPercent: number;
         };
         ProjectSetup: {
             configured: boolean;
@@ -1529,6 +1677,7 @@ export interface components {
             options: components["schemas"]["ConstructionSetupOptions"];
             excludedTasks: string[];
             customTasks: components["schemas"]["CustomTaskInput"][];
+            paymentSchedule: components["schemas"]["PaymentScheduleItem"][];
         };
         /** @description งานย่อยในแผน รวมงานที่ถูกตัดออก (included = false) เพื่อให้เลือกกลับได้ */
         SetupPreviewTask: {
@@ -1715,6 +1864,45 @@ export interface components {
             paidDate?: string | null;
             /** @description งวดของงานเพิ่ม-ลด (ไม่อยู่ในงวดตามสัญญาเดิม) */
             changeOrderId?: string;
+            payment?: components["schemas"]["InstallmentPayment"];
+        };
+        /** @enum {string} */
+        PaymentMethod: "transfer" | "cheque" | "cash";
+        InstallmentPaymentInput: {
+            /**
+             * Format: date
+             * @description วันที่ได้รับเงิน (ไม่เกินวันนี้ ไม่ก่อนวันเซ็นสัญญา)
+             */
+            paidDate: string;
+            /** @description ยอดที่ได้รับจริง (บาท) */
+            amount: number;
+            /**
+             * @description ภาษีหัก ณ ที่จ่ายที่ลูกค้าหักไว้ (บาท)
+             * @default 0
+             */
+            withholdingTax: number;
+            method: components["schemas"]["PaymentMethod"];
+            /** @description เลขที่อ้างอิง เช่น เลขที่ใบเสร็จ เลขเช็ค เลขอ้างอิงการโอน */
+            reference?: string;
+            /** @description จำเป็นเมื่อยอดรับ + ภาษีหัก ณ ที่จ่าย น้อยกว่ายอดงวด */
+            note?: string;
+            /** @description หลักฐานการชำระ เช่น สลิปโอนเงิน สำเนาเช็ค ใบเสร็จ (id จาก POST /uploads) */
+            evidenceIds: string[];
+        };
+        InstallmentPayment: {
+            id: string;
+            /** Format: date */
+            paidDate: string;
+            amount: number;
+            withholdingTax: number;
+            method: components["schemas"]["PaymentMethod"];
+            reference?: string;
+            note?: string;
+            /** @description ว่างได้เฉพาะข้อมูลตัวอย่างที่ระบบสร้าง */
+            evidence: components["schemas"]["UploadedFile"][];
+            recordedBy: components["schemas"]["UserRef"];
+            /** Format: date-time */
+            recordedAt: string;
         };
         SitePhoto: {
             id: string;
@@ -1857,6 +2045,134 @@ export interface components {
         };
         /** @enum {string} */
         RoomKind: "bedroom" | "bathroom" | "living" | "dining" | "kitchen" | "garage" | "stair" | "void" | "other";
+        /**
+         * @description โปรแกรมที่ใช้ออกแบบ (ใช้แสดงวิธีส่งออกไฟล์และแยกประเภทไฟล์ต้นฉบับ)
+         * @enum {string}
+         */
+        ModelSourceApp: "sketchup" | "revit" | "other";
+        /**
+         * @description รูปแบบไฟล์ที่เบราว์เซอร์แสดงผลได้ (ไฟล์ .skp / .rvt แสดงในเบราว์เซอร์ไม่ได้ ต้องส่งออกเป็นรูปแบบเหล่านี้)
+         *     - glb / gltf: มาตรฐานเว็บ (SketchUp และ Revit ส่งออกได้ผ่านปลั๊กอิน) — gltf ต้องเป็นไฟล์เดียว (ฝังข้อมูลไว้ในไฟล์)
+         *     - dae: COLLADA (SketchUp: File > Export > 3D Model)
+         *     - fbx: (Revit: เปิดมุมมอง 3D แล้ว File > Export > FBX / SketchUp Pro)
+         *     - obj: (SketchUp Pro และโปรแกรมอื่น) ไม่มีข้อมูลแกนตั้ง ให้ระบุ upAxis
+         * @enum {string}
+         */
+        ModelFormat: "glb" | "gltf" | "dae" | "fbx" | "obj";
+        /** @description ต้องมีอย่างน้อย 1 ไฟล์ — fileId (แสดงเป็น 3 มิติได้) หรือ sourceFileId (.skp / .rvt เก็บไว้ดาวน์โหลด ยังแสดงเป็น 3 มิติไม่ได้) */
+        ProjectModelInput: {
+            /** @description ไฟล์สำหรับแสดงผล (.glb .gltf .dae .fbx .obj) จาก POST /uploads */
+            fileId?: string;
+            /** @description ไฟล์ต้นฉบับ (.skp .rvt หรือ .ifc) จาก POST /uploads — .skp และ .ifc หลังบ้านแปลงเป็น 3 มิติให้ (IFC แยกตามงาน หมวด ชั้น ระบบ รวมเหล็กเสริม) */
+            sourceFileId?: string;
+            sourceApp: components["schemas"]["ModelSourceApp"];
+            /** @description ชื่อเวอร์ชัน เช่น แบบอนุมัติลูกค้า (ไม่ระบุ = แบบ 3D ฉบับที่ n) */
+            title?: string;
+            note?: string;
+            /**
+             * @description แกนตั้งของไฟล์ (ใช้กับ obj เท่านั้น รูปแบบอื่นอ่านจากไฟล์)
+             * @default y
+             * @enum {string}
+             */
+            upAxis: "y" | "z";
+        };
+        /**
+         * @description มุมของภาพทัศนียภาพ
+         * @enum {string}
+         */
+        RenderView: "front" | "back" | "left" | "right";
+        /** @description ข้อมูลแบบบ้านของโครงการที่ผู้ตั้งค่ากรอกเอง (ภาพเป็น id จาก POST /uploads ต้องเป็นไฟล์รูป) */
+        ProjectHouseInput: {
+            name: string;
+            description?: string;
+            /** @description พื้นที่ใช้สอย (ตร.ม.) */
+            usableArea?: number;
+            /** @description ความกว้างตัวบ้าน (ม.) */
+            width?: number;
+            /** @description ความลึกตัวบ้าน (ม.) */
+            depth?: number;
+            floors?: number;
+            bedrooms?: number;
+            bathrooms?: number;
+            kitchens?: number;
+            parking?: number;
+            /** @description ภาพแปลนรายชั้น ตามลำดับที่แสดง */
+            floorPlans: {
+                /** @example ชั้น 1 */
+                label: string;
+                fileId: string;
+            }[];
+            /** @description ภาพทัศนียภาพ 4 มุม (ไม่ส่งมุมใด = ไม่มีภาพมุมนั้น) */
+            renders: {
+                front?: string;
+                back?: string;
+                left?: string;
+                right?: string;
+            };
+        };
+        ProjectHouse: {
+            /** @description false = ยังไม่ได้ตั้งค่า (ค่าที่ส่งมาเติมจากแบบบ้านในคลังถ้าเลือกไว้) */
+            configured: boolean;
+            name: string;
+            description?: string;
+            usableArea?: number;
+            width?: number;
+            depth?: number;
+            floors?: number;
+            bedrooms?: number;
+            bathrooms?: number;
+            kitchens?: number;
+            parking?: number;
+            floorPlans: {
+                label: string;
+                image: components["schemas"]["UploadedFile"];
+            }[];
+            renders: {
+                front?: components["schemas"]["UploadedFile"];
+                back?: components["schemas"]["UploadedFile"];
+                left?: components["schemas"]["UploadedFile"];
+                right?: components["schemas"]["UploadedFile"];
+            };
+            updatedBy?: components["schemas"]["UserRef"];
+            /** Format: date-time */
+            updatedAt?: string;
+        };
+        /**
+         * @description การแปลงไฟล์ต้นฉบับ (.skp หรือ .ifc) เป็น .glb ที่หลังบ้าน (มีเฉพาะเวอร์ชันที่แนบไฟล์ต้นฉบับโดยไม่มีไฟล์สำหรับแสดงผล)
+         *     .skp ใช้ SketchUp C API บนเซิร์ฟเวอร์ (เปิดได้เฉพาะไฟล์จากรุ่นเดียวกันหรือเก่ากว่า) ส่วน .ifc ใช้ web-ifc
+         *     - queued / converting: รอคิว / กำลังแปลง (หน้าบ้านโหลดรายการใหม่เป็นระยะ)
+         *     - done: แปลงแล้ว ได้ไฟล์ .glb ใน file
+         *     - failed: แปลงไม่สำเร็จ (ดู message) สั่งแปลงใหม่ได้
+         *     - unavailable: เซิร์ฟเวอร์ไม่มี SketchUp สำหรับแปลงไฟล์ .skp
+         */
+        ModelConversion: {
+            /** @enum {string} */
+            status: "queued" | "converting" | "done" | "failed" | "unavailable";
+            message?: string;
+            /** @description จำนวนสามเหลี่ยมของโมเดลที่แปลงได้ */
+            triangles?: number;
+            /** Format: date-time */
+            finishedAt?: string;
+        };
+        /** @description แบบบ้าน 3 มิติของโครงการ 1 เวอร์ชัน (ล่าสุด = แบบที่ใช้อยู่) */
+        ProjectModel: {
+            id: string;
+            version: number;
+            title: string;
+            sourceApp: components["schemas"]["ModelSourceApp"];
+            /** @description ไม่มี = มีเฉพาะไฟล์ต้นฉบับ (ยังแสดงเป็น 3 มิติไม่ได้) */
+            format?: components["schemas"]["ModelFormat"];
+            /** @description ไฟล์สำหรับแสดงผล (ไม่มี = มีเฉพาะไฟล์ต้นฉบับ) */
+            file?: components["schemas"]["UploadedFile"];
+            sourceFile?: components["schemas"]["UploadedFile"];
+            conversion?: components["schemas"]["ModelConversion"];
+            /** @enum {string} */
+            upAxis: "y" | "z";
+            note?: string;
+            uploadedBy: components["schemas"]["UserRef"];
+            /** Format: date-time */
+            uploadedAt: string;
+        };
         HousePlan: {
             code: string;
             name: string;
@@ -2109,15 +2425,45 @@ export interface components {
         /**
          * @description pending-contract = รอทำสัญญา, active = กำลังดำเนินการ (มีสัญญาแล้ว ยังไม่ส่งมอบ),
          *     in-hand = โครงการในมือ (รอทำสัญญา + กำลังดำเนินการ), completed = ส่งมอบแล้ว,
-         *     warranty = ส่งมอบแล้วและยังอยู่ในระยะประกัน
+         *     warranty = ส่งมอบแล้วและยังมีการรับประกันอย่างน้อย 1 ส่วนที่ยังมีผล (งานโครงสร้างรับประกันนานที่สุด)
          * @enum {string}
          */
         ProjectGroup: "in-hand" | "pending-contract" | "active" | "completed" | "warranty";
+        /**
+         * @description architectural = งานสถาปัตยกรรม (1 ปี), structural = งานโครงสร้าง (5 ปี)
+         * @enum {string}
+         */
+        WarrantyType: "architectural" | "structural";
+        /** @description เงื่อนไขการรับประกันผลงานหลังส่งมอบของบริษัท */
+        WarrantyTerm: {
+            type: components["schemas"]["WarrantyType"];
+            /** @example งานโครงสร้าง */
+            label: string;
+            /** @description ระยะรับประกันนับจากวันส่งมอบ (เดือน) */
+            months: number;
+            /** @description ขอบเขตงานที่รับประกัน */
+            scope: string;
+        };
+        /** @description การรับประกันแต่ละส่วนของโครงการที่ส่งมอบแล้ว */
+        WarrantyCoverage: components["schemas"]["WarrantyTerm"] & {
+            /**
+             * Format: date
+             * @description วันส่งมอบ
+             */
+            startDate: string;
+            /**
+             * Format: date
+             * @description วันสุดท้ายที่รับประกัน
+             */
+            endDate: string;
+            /** @description จำนวนวันที่เหลือ (ติดลบ = หมดประกันแล้ว) */
+            daysLeft: number;
+            active: boolean;
+        };
         ProjectPortfolio: {
             /** Format: date-time */
             asOf: string;
-            /** @description ระยะรับประกันผลงานหลังส่งมอบ (เดือน) */
-            warrantyMonths: number;
+            warrantyTerms: components["schemas"]["WarrantyTerm"][];
             counts: {
                 total: number;
                 inHand: number;
@@ -2135,7 +2481,7 @@ export interface components {
             };
             /** @description มูลค่าสัญญาของโครงการที่กำลังดำเนินการ (เฉพาะสิทธิ์ finance.company) */
             inHandValue?: number;
-            /** @description โครงการที่ยังอยู่ในประกัน เรียงตามวันหมดประกันที่ใกล้ที่สุด */
+            /** @description โครงการที่ยังอยู่ในประกัน เรียงตามการรับประกันที่ใกล้หมดที่สุด (warrantyUntil/daysLeft/expiringType = ส่วนที่ยังมีผลและจะหมดก่อน) */
             warranties: {
                 code: string;
                 name: string;
@@ -2145,6 +2491,8 @@ export interface components {
                 /** Format: date */
                 warrantyUntil: string;
                 daysLeft: number;
+                expiringType: components["schemas"]["WarrantyType"];
+                coverages: components["schemas"]["WarrantyCoverage"][];
             }[];
         };
         DashboardSummary: {
@@ -3052,7 +3400,7 @@ export interface operations {
                 "multipart/form-data": {
                     /**
                      * Format: binary
-                     * @description ไม่เกิน 10 MB — รูป (JPG/PNG/WebP) หรือเอกสาร (PDF, Excel, Word, DWG) รูปหน้างาน (photoIds) ต้องเป็นรูปเท่านั้น
+                     * @description รูป (JPG/PNG/WebP) หรือเอกสาร (PDF, Excel, Word, DWG) ไม่เกิน 10 MB — แบบ 3 มิติ (GLB, glTF, DAE, FBX, OBJ, SKP, RVT) ไม่เกิน 200 MB — รูปหน้างาน (photoIds) ต้องเป็นรูปเท่านั้น
                      */
                     file: string;
                 };
@@ -3204,6 +3552,224 @@ export interface operations {
                 };
             };
             404: components["responses"]["NotFound"];
+        };
+    };
+    listProjectModels: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectModel"][];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    createProjectModel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProjectModelInput"];
+            };
+        };
+        responses: {
+            /** @description บันทึกแล้ว */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectModel"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationError"];
+        };
+    };
+    getProjectHouse: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectHouse"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    saveProjectHouse: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProjectHouseInput"];
+            };
+        };
+        responses: {
+            /** @description บันทึกแล้ว */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectHouse"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationError"];
+        };
+    };
+    convertProjectModel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description เข้าคิวแปลงแล้ว */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectModel"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    deleteProjectModel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ลบแล้ว */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    recordInstallmentPayment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+                /** @description เลขงวด */
+                no: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InstallmentPaymentInput"];
+            };
+        };
+        responses: {
+            /** @description บันทึกแล้ว */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Installment"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationError"];
+        };
+    };
+    cancelInstallmentPayment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+                no: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description ยกเลิกแล้ว งวดกลับเป็นสถานะตามความคืบหน้า */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Installment"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationError"];
         };
     };
     listProjectPhotos: {

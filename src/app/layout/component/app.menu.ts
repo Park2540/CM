@@ -127,7 +127,7 @@ export class AppMenu {
                         icon: 'pi pi-fw pi-verified',
                         path: '/warranty',
                         items: [
-                            { label: 'โครงการที่รับประกัน', icon: 'pi pi-fw pi-shield' },
+                            { label: 'โครงการที่รับประกัน', icon: 'pi pi-fw pi-shield', routerLink: ['/warranty'] },
                             { label: 'รายการแจ้งซ่อม', icon: 'pi pi-fw pi-wrench' }
                         ]
                     }

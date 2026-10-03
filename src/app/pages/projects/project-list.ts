@@ -88,9 +88,9 @@ const GROUPS: ProjectGroup[] = ['in-hand', 'pending-contract', 'active', 'comple
                         <td><p-progressbar [value]="project.progress" [showValue]="true" [style]="{ height: '1.25rem' }" /></td>
                         <td>
                             <p-tag [value]="statusLabel[project.status]" [severity]="getProjectSeverity(project.status)" />
-                            @if (project.warrantyUntil) {
-                                <div class="text-xs mt-1" [class.text-muted-color]="project.warrantyUntil < today">
-                                    {{ project.warrantyUntil < today ? 'หมดประกันแล้ว' : 'ประกันถึง ' + (project.warrantyUntil | date: 'dd/MM/yyyy') }}
+                            @for (coverage of project.warranties ?? []; track coverage.type) {
+                                <div class="text-xs mt-1" [class.text-muted-color]="!coverage.active">
+                                    {{ coverage.label }}: {{ coverage.active ? 'ประกันถึง ' + (coverage.endDate | date: 'dd/MM/yyyy') : 'หมดประกันแล้ว' }}
                                 </div>
                             }
                         </td>
@@ -137,7 +137,6 @@ export class ProjectList {
 
     readonly groups = GROUPS;
     readonly groupLabel = PROJECT_GROUP_LABEL;
-    readonly today = new Intl.DateTimeFormat('en-CA').format(new Date());
     /** กลุ่มที่เลือกอยู่ใน URL (?group=) ให้ลิงก์จาก Dashboard เปิดมาพร้อมตัวกรอง */
     readonly group = toSignal(this.route.queryParamMap.pipe(map((params) => ((GROUPS as string[]).includes(params.get('group') ?? '') ? (params.get('group') as ProjectGroup) : null))), { initialValue: null });
 

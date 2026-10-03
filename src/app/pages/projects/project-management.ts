@@ -22,13 +22,14 @@ import { HousePlanService } from '@/app/pages/service/house-plan.service';
 import { CurrentWorkCard, HoldPointsCard, MilestonesCard, OwnerAction, OwnerActionsCard, PaymentSummaryCard, RecentPhotosCard, TeamCard } from './components/project-cards';
 import { ProjectDocumentsTab } from './components/project-documents-tab';
 import { ProjectTeamTab } from './components/project-team-tab';
-import { ProjectPaymentsTab } from './components/project-payments-tab';
+import { PaymentChange, ProjectPaymentsTab } from './components/project-payments-tab';
 import { ProjectPhotosTab } from './components/project-photos-tab';
 import { ProjectPlanTab } from './components/project-plan-tab';
 import { ProjectStepsOverview } from './components/project-steps-overview';
 import { ProjectTimelineTab } from './components/project-timeline-tab';
 import { ProjectChangeOrdersTab } from './components/project-change-orders-tab';
 import { ChangeOrderService } from '@/app/pages/service/change-order.service';
+import { ProjectModel } from '@/app/pages/service/project-model.service';
 import { PROJECT_TABS, ProjectTab } from './components/project-ui';
 import { ThaiDatePipe } from './thai-date.pipe';
 import { apiResource } from '@/app/api/api-resource';
@@ -144,6 +145,21 @@ const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
                         @if (progress() >= 100) {
                             <div class="text-sm text-muted-color">สถานะ</div>
                             <div class="text-2xl font-bold text-green-600 dark:text-green-400">ส่งมอบแล้ว</div>
+                            @if (project.warranties?.length) {
+                                <ul class="list-none p-0 m-0 mt-2 flex flex-col gap-1 text-sm" aria-label="การรับประกัน">
+                                    @for (coverage of project.warranties; track coverage.type) {
+                                        <li [class.text-muted-color]="!coverage.active">
+                                            <i class="pi pi-shield text-xs mr-1" aria-hidden="true"></i>{{ coverage.label }}
+                                            @if (coverage.active) {
+                                                ถึง {{ coverage.endDate | thaiDate }}
+                                            } @else {
+                                                หมดประกันแล้ว
+                                            }
+                                        </li>
+                                    }
+                                </ul>
+                                <a routerLink="/warranty" class="text-xs text-primary">ดูโครงการที่รับประกัน</a>
+                            }
                         } @else if (daysToDelivery() >= 0) {
                             <div class="text-sm text-muted-color">เหลือเวลาถึงกำหนดส่งมอบ</div>
                             <div class="text-3xl font-bold">{{ daysToDelivery() }} วัน</div>
@@ -220,12 +236,10 @@ const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
                             <app-project-updates-tab [projectCode]="project.code" [canUpdate]="canUpdate()" [refreshKey]="refreshKey()" (requestUpdate)="openUpdateForm()" />
                         }
                         @case ('plan') {
-                            @if (housePlan(); as plan) {
-                                <app-project-plan-tab [plan]="plan" (openDocuments)="setTab('documents')" />
-                            } @else if (housePlanResource.isLoading()) {
+                            @if (housePlanResource.isLoading()) {
                                 <div class="card text-center text-muted-color py-12"><i class="pi pi-spin pi-spinner mr-2"></i>กำลังโหลดแบบบ้าน...</div>
                             } @else {
-                                <div class="card text-center text-muted-color py-12">ยังไม่ได้กำหนดแบบบ้านของโครงการนี้</div>
+                                <app-project-plan-tab [projectCode]="project.code" [plan]="housePlan()" [canManage]="canManage()" (openDocuments)="setTab('documents')" (modelsChanged)="onModelsChanged($event)" (houseChanged)="onHouseChanged()" />
                             }
                         }
                         @case ('photos') {
@@ -235,7 +249,7 @@ const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
                             <app-project-team-tab [projectCode]="project.code" [phases]="timeline.phases" [canManage]="canManage()" (changed)="onTeamChanged()" />
                         }
                         @case ('payments') {
-                            <app-project-payments-tab [installments]="installments()" [contractValue]="project.revisedValue ?? project.value" />
+                            <app-project-payments-tab [projectCode]="project.code" [installments]="installments()" [contractValue]="project.revisedValue ?? project.value" [canRecord]="canRecordPayment()" (changed)="onPaymentChanged($event)" />
                         }
                         @case ('changes') {
                             <app-project-change-orders-tab
@@ -382,8 +396,9 @@ const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
                 </section>
             </div>
 
-            @if (housePlan(); as plan) {
-                <app-project-plan-tab [plan]="plan" [showDocumentsLink]="false" />
+            <!-- แนบแบบ 3 มิติได้ตั้งแต่ยังไม่เซ็นสัญญา (เช่น แบบที่เสนอลูกค้า) -->
+            @if (!housePlanResource.isLoading()) {
+                <app-project-plan-tab [projectCode]="project.code" [plan]="housePlan()" [canManage]="canManage()" [showDocumentsLink]="false" (modelsChanged)="onModelsChanged($event)" (houseChanged)="onHouseChanged()" />
             }
 
             @if (contractFormOpen()) {
@@ -497,6 +512,7 @@ export class ProjectManagement {
     readonly pendingChangeCount = computed(() => this.changeOrders().filter((order) => order.status === 'pending').length);
     /** งานเพิ่ม-ลดต้องให้ผู้อนุมัติทุกยอดตัดสิน (หลังบ้านตรวจซ้ำ) */
     readonly canApproveChanges = computed(() => this.auth.can('approval.any'));
+    readonly canRecordPayment = computed(() => this.auth.can('payment.record'));
     readonly abs = Math.abs;
     readonly team = this.teamResource.value;
     readonly recentPhotos = this.recentPhotosResource.value;
@@ -546,7 +562,6 @@ export class ProjectManagement {
         this.router.navigate(['/projects', project.code, 'setup']);
     }
 
-    /** ทีมงานเปลี่ยน: โหลดรายชื่อติดต่อและผู้รับผิดชอบหลักของโครงการใหม่ */
     /** งานเพิ่ม-ลดเปลี่ยน: มูลค่าสัญญา กำหนดส่งมอบ ไทม์ไลน์ และงวดเงินอาจเปลี่ยนตาม */
     onChangeOrdersChanged() {
         this.projectResource.reload();
@@ -554,6 +569,29 @@ export class ProjectManagement {
         this.refreshKey.update((key) => key + 1);
     }
 
+    /** บันทึก/ยกเลิกรับชำระ: โหลดงวดเงินและเอกสาร (หลักฐานอยู่ในหมวดใบแจ้งหนี้/ใบเสร็จ) ใหม่ */
+    onPaymentChanged({ kind, installment }: PaymentChange) {
+        this.refreshKey.update((key) => key + 1);
+        this.messages.add(
+            kind === 'recorded'
+                ? { severity: 'success', summary: `บันทึกรับชำระงวดที่ ${installment.no} แล้ว`, detail: `฿${(installment.payment?.amount ?? 0).toLocaleString('th-TH')} · หลักฐานอยู่ในแท็บเอกสาร` }
+                : { severity: 'info', summary: `ยกเลิกการรับชำระงวดที่ ${installment.no} แล้ว` }
+        );
+    }
+
+    onHouseChanged() {
+        this.messages.add({ severity: 'success', summary: 'บันทึกข้อมูลแบบบ้านแล้ว' });
+    }
+
+    onModelsChanged({ kind, model }: { kind: 'uploaded' | 'deleted'; model: ProjectModel }) {
+        this.messages.add(
+            kind === 'uploaded'
+                ? { severity: 'success', summary: `บันทึกแบบ 3 มิติ ฉบับที่ ${model.version} แล้ว`, detail: model.title }
+                : { severity: 'info', summary: `ลบแบบ 3 มิติ ฉบับที่ ${model.version} แล้ว` }
+        );
+    }
+
+    /** ทีมงานเปลี่ยน: โหลดรายชื่อติดต่อและผู้รับผิดชอบหลักของโครงการใหม่ */
     onTeamChanged() {
         this.teamResource.reload();
         this.projectResource.reload();

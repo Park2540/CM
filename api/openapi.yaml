@@ -509,7 +509,7 @@ paths:
             tags: [projects]
             summary: บันทึกการตั้งค่างานก่อสร้างและสร้างไทม์ไลน์ (ต้องมีสิทธิ์ project.manage)
             description: |
-                หลังบ้านคัดงานจากแม่แบบตามตัวเลือก จัดวันที่ให้พอดีกับระยะสัญญา สร้างไทม์ไลน์และงวดงานใหม่ และบันทึก Audit Log
+                หลังบ้านคัดงานจากแม่แบบตามตัวเลือก จัดวันที่ให้พอดีกับระยะสัญญา สร้างไทม์ไลน์และงวดงานใหม่ (ตามสัดส่วน paymentPercents) และบันทึก Audit Log
                 ตัวเลือกที่ถูกซ่อน (visibleWhen ไม่ตรง) หลังบ้านปรับเป็นค่าเริ่มต้นเอง
                 409 ถ้ายังไม่บันทึกสัญญา หรือเริ่มรายงานความคืบหน้าแล้ว (locked)
             operationId: saveProjectSetup
@@ -644,7 +644,7 @@ paths:
                             type: object
                             required: [file]
                             properties:
-                                file: { type: string, format: binary, description: 'ไม่เกิน 10 MB — รูป (JPG/PNG/WebP) หรือเอกสาร (PDF, Excel, Word, DWG) รูปหน้างาน (photoIds) ต้องเป็นรูปเท่านั้น' }
+                                file: { type: string, format: binary, description: 'รูป (JPG/PNG/WebP) หรือเอกสาร (PDF, Excel, Word, DWG) ไม่เกิน 10 MB — แบบ 3 มิติ (GLB, glTF, DAE, FBX, OBJ, SKP, RVT) ไม่เกิน 200 MB — รูปหน้างาน (photoIds) ต้องเป็นรูปเท่านั้น' }
             responses:
                 '201':
                     description: อัปโหลดแล้ว
@@ -755,6 +755,162 @@ paths:
                                 type: array
                                 items: { $ref: '#/components/schemas/Installment' }
                 '404': { $ref: '#/components/responses/NotFound' }
+
+    /projects/{code}/models:
+        parameters:
+            - $ref: '#/components/parameters/ProjectCode'
+        get:
+            tags: [projects]
+            summary: แบบบ้าน 3 มิติของโครงการ ทุกเวอร์ชัน (ล่าสุดก่อน)
+            description: แนบได้ตั้งแต่เปิดโครงการ (ไม่ต้องรอบันทึกสัญญา)
+            operationId: listProjectModels
+            responses:
+                '200':
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                type: array
+                                items: { $ref: '#/components/schemas/ProjectModel' }
+                '404': { $ref: '#/components/responses/NotFound' }
+        post:
+            tags: [projects]
+            summary: อัปโหลดแบบบ้าน 3 มิติเวอร์ชันใหม่ (ต้องมีสิทธิ์ project.manage)
+            operationId: createProjectModel
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema: { $ref: '#/components/schemas/ProjectModelInput' }
+            responses:
+                '201':
+                    description: บันทึกแล้ว
+                    content:
+                        application/json:
+                            schema: { $ref: '#/components/schemas/ProjectModel' }
+                '403': { $ref: '#/components/responses/Forbidden' }
+                '404': { $ref: '#/components/responses/NotFound' }
+                '422': { $ref: '#/components/responses/ValidationError' }
+
+    /projects/{code}/house:
+        parameters:
+            - $ref: '#/components/parameters/ProjectCode'
+        get:
+            tags: [projects]
+            summary: ข้อมูลแบบบ้านของโครงการ (รายละเอียด ภาพแปลนรายชั้น ภาพทัศนียภาพ 4 มุม)
+            operationId: getProjectHouse
+            responses:
+                '200':
+                    description: OK
+                    content:
+                        application/json:
+                            schema: { $ref: '#/components/schemas/ProjectHouse' }
+                '404': { $ref: '#/components/responses/NotFound' }
+        put:
+            tags: [projects]
+            summary: บันทึกข้อมูลแบบบ้านของโครงการ (ต้องมีสิทธิ์ project.manage)
+            operationId: saveProjectHouse
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema: { $ref: '#/components/schemas/ProjectHouseInput' }
+            responses:
+                '200':
+                    description: บันทึกแล้ว
+                    content:
+                        application/json:
+                            schema: { $ref: '#/components/schemas/ProjectHouse' }
+                '403': { $ref: '#/components/responses/Forbidden' }
+                '404': { $ref: '#/components/responses/NotFound' }
+                '422': { $ref: '#/components/responses/ValidationError' }
+
+    /projects/{code}/models/{id}/convert:
+        parameters:
+            - $ref: '#/components/parameters/ProjectCode'
+            - { name: id, in: path, required: true, schema: { type: string } }
+        post:
+            tags: [projects]
+            summary: สั่งแปลงไฟล์ต้นฉบับ .skp เป็น 3 มิติใหม่ (เช่น หลังแปลงไม่สำเร็จ) — ต้องมีสิทธิ์ project.manage
+            operationId: convertProjectModel
+            responses:
+                '202':
+                    description: เข้าคิวแปลงแล้ว
+                    content:
+                        application/json:
+                            schema: { $ref: '#/components/schemas/ProjectModel' }
+                '403': { $ref: '#/components/responses/Forbidden' }
+                '404': { $ref: '#/components/responses/NotFound' }
+                '409': { $ref: '#/components/responses/Conflict' }
+
+    /projects/{code}/models/{id}:
+        parameters:
+            - $ref: '#/components/parameters/ProjectCode'
+            - { name: id, in: path, required: true, schema: { type: string } }
+        delete:
+            tags: [projects]
+            summary: ลบแบบ 3 มิติ 1 เวอร์ชัน (ต้องมีสิทธิ์ project.manage) — บันทึก Audit Log
+            operationId: deleteProjectModel
+            responses:
+                '204': { description: ลบแล้ว }
+                '403': { $ref: '#/components/responses/Forbidden' }
+                '404': { $ref: '#/components/responses/NotFound' }
+
+    /projects/{code}/installments/{no}/payment:
+        parameters:
+            - $ref: '#/components/parameters/ProjectCode'
+            - { name: no, in: path, required: true, schema: { type: integer }, description: เลขงวด }
+        post:
+            tags: [projects]
+            summary: บันทึกรับชำระเงินงวดงานพร้อมหลักฐาน (ต้องมีสิทธิ์ payment.record)
+            description: |
+                งวดจะเป็น paid ทันที และหลักฐานจะแสดงในเอกสารของโครงการหมวด billing
+                ยอดรับ + ภาษีหัก ณ ที่จ่าย ต้องไม่เกินยอดงวด ถ้าน้อยกว่าต้องระบุเหตุผลใน note
+                409 ถ้างวดนี้บันทึกรับชำระแล้ว หรือเป็นงวดงานลด (ยอดติดลบ หักจากงวดอื่น)
+            operationId: recordInstallmentPayment
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema: { $ref: '#/components/schemas/InstallmentPaymentInput' }
+            responses:
+                '201':
+                    description: บันทึกแล้ว
+                    content:
+                        application/json:
+                            schema: { $ref: '#/components/schemas/Installment' }
+                '403': { $ref: '#/components/responses/Forbidden' }
+                '404': { $ref: '#/components/responses/NotFound' }
+                '409': { $ref: '#/components/responses/Conflict' }
+                '422': { $ref: '#/components/responses/ValidationError' }
+
+    /projects/{code}/installments/{no}/payment/cancel:
+        parameters:
+            - $ref: '#/components/parameters/ProjectCode'
+            - { name: no, in: path, required: true, schema: { type: integer } }
+        post:
+            tags: [projects]
+            summary: ยกเลิกการบันทึกรับชำระ (เช่น บันทึกผิดงวด) — เก็บประวัติไว้ใน Audit Log (ต้องมีสิทธิ์ payment.record)
+            operationId: cancelInstallmentPayment
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required: [reason]
+                            properties:
+                                reason: { type: string, minLength: 1, maxLength: 500 }
+            responses:
+                '200':
+                    description: ยกเลิกแล้ว งวดกลับเป็นสถานะตามความคืบหน้า
+                    content:
+                        application/json:
+                            schema: { $ref: '#/components/schemas/Installment' }
+                '403': { $ref: '#/components/responses/Forbidden' }
+                '404': { $ref: '#/components/responses/NotFound' }
+                '409': { $ref: '#/components/responses/Conflict' }
+                '422': { $ref: '#/components/responses/ValidationError' }
 
     /projects/{code}/photos:
         parameters:
@@ -1390,7 +1546,8 @@ components:
                 - project.create: เปิดโครงการใหม่
                 - project.manage: จัดการโครงการ เช่น บันทึกสัญญาและเริ่มแผนงาน
                 - user.manage: จัดการบัญชีผู้ใช้ บทบาท และสิทธิ์ของบุคลากร
-            enum: [progress.update, personnel.sensitive, finance.company, approval.any, project.create, project.manage, user.manage]
+                - payment.record: บันทึก/ยกเลิกการรับชำระเงินงวดงานของลูกค้า
+            enum: [progress.update, personnel.sensitive, finance.company, approval.any, project.create, project.manage, user.manage, payment.record]
         CurrentUser:
             type: object
             required: [id, name, roleId, roleLabel, projectCodes, email, lastLoginAt, permissions]
@@ -1614,7 +1771,11 @@ components:
                 createdAt: { type: string, format: date-time, description: วันที่เปิดโครงการ }
                 setupConfiguredAt: { type: [string, 'null'], format: date-time, description: เวลาที่ตั้งค่างานก่อสร้าง (null = ยังไม่ตั้งค่า ยังไม่มีไทม์ไลน์) }
                 handedOverAt: { type: [string, 'null'], format: date, description: วันที่ส่งมอบงานจริง (null = ยังไม่ส่งมอบ) }
-                warrantyUntil: { type: [string, 'null'], format: date, description: วันสิ้นสุดการรับประกันผลงาน (หลังบ้านคำนวณจากวันส่งมอบ + ระยะประกัน) }
+                warrantyUntil: { type: [string, 'null'], format: date, description: วันสิ้นสุดการรับประกันส่วนที่นานที่สุด (งานโครงสร้าง) — ดูแยกส่วนที่ warranties }
+                warranties:
+                    type: array
+                    description: การรับประกันแยกส่วน (งานสถาปัตยกรรม 1 ปี งานโครงสร้าง 5 ปี นับจากวันส่งมอบ) ว่างจนกว่าจะส่งมอบ
+                    items: { $ref: '#/components/schemas/WarrantyCoverage' }
                 changeOrderTotal: { type: number, description: ยอดสุทธิของงานเพิ่ม-ลดที่อนุมัติแล้ว (บวก = เพิ่ม ลบ = ลด) }
                 revisedValue: { type: [number, 'null'], description: มูลค่าสัญญาปัจจุบัน = value + changeOrderTotal (null จนกว่าจะบันทึกสัญญา) }
 
@@ -1754,9 +1915,26 @@ components:
                     type: array
                     maxItems: 50
                     items: { $ref: '#/components/schemas/CustomTaskInput' }
+                paymentPercents:
+                    type: array
+                    description: |
+                        สัดส่วนเบิกจ่าย (% ของมูลค่าสัญญา) ของแต่ละงวด เรียงตาม ProjectSetup.paymentSchedule
+                        ต้องมีครบทุกงวด แต่ละงวดมากกว่า 0 (ทศนิยมไม่เกิน 2 ตำแหน่ง) และรวมกันได้ 100 (422)
+                        ไม่ส่ง = คงสัดส่วนที่บันทึกไว้ (ยังไม่เคยบันทึก = ค่าเริ่มต้น) — หน้าตัวอย่าง (preview) ไม่ตรวจและไม่ใช้ค่านี้
+                    items: { type: number, exclusiveMinimum: 0, maximum: 100 }
+        PaymentScheduleItem:
+            type: object
+            description: งวดเงินตามสัญญา เบิกได้เมื่อขั้นตอนที่ผูกไว้เสร็จทั้งหมด
+            required: [no, title, phaseCodes, percent, defaultPercent]
+            properties:
+                no: { type: integer }
+                title: { type: string }
+                phaseCodes: { type: array, items: { type: string } }
+                percent: { type: number, description: สัดส่วนที่ใช้ (% ของมูลค่าสัญญา) }
+                defaultPercent: { type: number, description: สัดส่วนตั้งต้นของแม่แบบ }
         ProjectSetup:
             type: object
-            required: [configured, locked, configuredAt, configuredBy, options, excludedTasks, customTasks]
+            required: [configured, locked, configuredAt, configuredBy, options, excludedTasks, customTasks, paymentSchedule]
             properties:
                 configured: { type: boolean }
                 locked: { type: boolean, description: true เมื่อเริ่มรายงานความคืบหน้าแล้ว แก้การตั้งค่าไม่ได้ }
@@ -1766,6 +1944,7 @@ components:
                 options: { $ref: '#/components/schemas/ConstructionSetupOptions' }
                 excludedTasks: { type: array, items: { type: string } }
                 customTasks: { type: array, items: { $ref: '#/components/schemas/CustomTaskInput' } }
+                paymentSchedule: { type: array, items: { $ref: '#/components/schemas/PaymentScheduleItem' } }
         SetupPreviewTask:
             type: object
             description: งานย่อยในแผน รวมงานที่ถูกตัดออก (included = false) เพื่อให้เลือกกลับได้
@@ -1998,6 +2177,43 @@ components:
                 dueDate: { type: string, format: date }
                 paidDate: { type: [string, 'null'], format: date }
                 changeOrderId: { type: string, description: งวดของงานเพิ่ม-ลด (ไม่อยู่ในงวดตามสัญญาเดิม) }
+                payment: { $ref: '#/components/schemas/InstallmentPayment' }
+        PaymentMethod:
+            type: string
+            enum: [transfer, cheque, cash]
+        InstallmentPaymentInput:
+            type: object
+            required: [paidDate, amount, method, evidenceIds]
+            properties:
+                paidDate: { type: string, format: date, description: วันที่ได้รับเงิน (ไม่เกินวันนี้ ไม่ก่อนวันเซ็นสัญญา) }
+                amount: { type: number, exclusiveMinimum: 0, description: ยอดที่ได้รับจริง (บาท) }
+                withholdingTax: { type: number, minimum: 0, default: 0, description: ภาษีหัก ณ ที่จ่ายที่ลูกค้าหักไว้ (บาท) }
+                method: { $ref: '#/components/schemas/PaymentMethod' }
+                reference: { type: string, maxLength: 100, description: เลขที่อ้างอิง เช่น เลขที่ใบเสร็จ เลขเช็ค เลขอ้างอิงการโอน }
+                note: { type: string, maxLength: 500, description: จำเป็นเมื่อยอดรับ + ภาษีหัก ณ ที่จ่าย น้อยกว่ายอดงวด }
+                evidenceIds:
+                    type: array
+                    minItems: 1
+                    maxItems: 10
+                    description: หลักฐานการชำระ เช่น สลิปโอนเงิน สำเนาเช็ค ใบเสร็จ (id จาก POST /uploads)
+                    items: { type: string }
+        InstallmentPayment:
+            type: object
+            required: [id, paidDate, amount, withholdingTax, method, evidence, recordedBy, recordedAt]
+            properties:
+                id: { type: string }
+                paidDate: { type: string, format: date }
+                amount: { type: number }
+                withholdingTax: { type: number }
+                method: { $ref: '#/components/schemas/PaymentMethod' }
+                reference: { type: string }
+                note: { type: string }
+                evidence:
+                    type: array
+                    description: ว่างได้เฉพาะข้อมูลตัวอย่างที่ระบบสร้าง
+                    items: { $ref: '#/components/schemas/UploadedFile' }
+                recordedBy: { $ref: '#/components/schemas/UserRef' }
+                recordedAt: { type: string, format: date-time }
 
         SitePhoto:
             type: object
@@ -2146,6 +2362,131 @@ components:
         RoomKind:
             type: string
             enum: [bedroom, bathroom, living, dining, kitchen, garage, stair, void, other]
+        ModelSourceApp:
+            type: string
+            description: โปรแกรมที่ใช้ออกแบบ (ใช้แสดงวิธีส่งออกไฟล์และแยกประเภทไฟล์ต้นฉบับ)
+            enum: [sketchup, revit, other]
+        ModelFormat:
+            type: string
+            description: |
+                รูปแบบไฟล์ที่เบราว์เซอร์แสดงผลได้ (ไฟล์ .skp / .rvt แสดงในเบราว์เซอร์ไม่ได้ ต้องส่งออกเป็นรูปแบบเหล่านี้)
+                - glb / gltf: มาตรฐานเว็บ (SketchUp และ Revit ส่งออกได้ผ่านปลั๊กอิน) — gltf ต้องเป็นไฟล์เดียว (ฝังข้อมูลไว้ในไฟล์)
+                - dae: COLLADA (SketchUp: File > Export > 3D Model)
+                - fbx: (Revit: เปิดมุมมอง 3D แล้ว File > Export > FBX / SketchUp Pro)
+                - obj: (SketchUp Pro และโปรแกรมอื่น) ไม่มีข้อมูลแกนตั้ง ให้ระบุ upAxis
+            enum: [glb, gltf, dae, fbx, obj]
+        ProjectModelInput:
+            type: object
+            description: ต้องมีอย่างน้อย 1 ไฟล์ — fileId (แสดงเป็น 3 มิติได้) หรือ sourceFileId (.skp / .rvt เก็บไว้ดาวน์โหลด ยังแสดงเป็น 3 มิติไม่ได้)
+            required: [sourceApp]
+            properties:
+                fileId: { type: string, description: ไฟล์สำหรับแสดงผล (.glb .gltf .dae .fbx .obj) จาก POST /uploads }
+                sourceFileId: { type: string, description: 'ไฟล์ต้นฉบับ (.skp .rvt หรือ .ifc) จาก POST /uploads — .skp และ .ifc หลังบ้านแปลงเป็น 3 มิติให้ (IFC แยกตามงาน หมวด ชั้น ระบบ รวมเหล็กเสริม)' }
+                sourceApp: { $ref: '#/components/schemas/ModelSourceApp' }
+                title: { type: string, maxLength: 120, description: ชื่อเวอร์ชัน เช่น แบบอนุมัติลูกค้า (ไม่ระบุ = แบบ 3D ฉบับที่ n) }
+                note: { type: string, maxLength: 500 }
+                upAxis: { type: string, enum: [y, z], default: y, description: แกนตั้งของไฟล์ (ใช้กับ obj เท่านั้น รูปแบบอื่นอ่านจากไฟล์) }
+        RenderView:
+            type: string
+            description: มุมของภาพทัศนียภาพ
+            enum: [front, back, left, right]
+        ProjectHouseInput:
+            type: object
+            description: ข้อมูลแบบบ้านของโครงการที่ผู้ตั้งค่ากรอกเอง (ภาพเป็น id จาก POST /uploads ต้องเป็นไฟล์รูป)
+            required: [name, floorPlans, renders]
+            properties:
+                name: { type: string, minLength: 1, maxLength: 200 }
+                description: { type: string, maxLength: 2000 }
+                usableArea: { type: number, minimum: 0, description: พื้นที่ใช้สอย (ตร.ม.) }
+                width: { type: number, minimum: 0, description: ความกว้างตัวบ้าน (ม.) }
+                depth: { type: number, minimum: 0, description: ความลึกตัวบ้าน (ม.) }
+                floors: { type: integer, minimum: 1, maximum: 10 }
+                bedrooms: { type: integer, minimum: 0, maximum: 50 }
+                bathrooms: { type: integer, minimum: 0, maximum: 50 }
+                kitchens: { type: integer, minimum: 0, maximum: 20 }
+                parking: { type: integer, minimum: 0, maximum: 50 }
+                floorPlans:
+                    type: array
+                    maxItems: 10
+                    description: ภาพแปลนรายชั้น ตามลำดับที่แสดง
+                    items:
+                        type: object
+                        required: [label, fileId]
+                        properties:
+                            label: { type: string, minLength: 1, maxLength: 60, examples: [ชั้น 1] }
+                            fileId: { type: string }
+                renders:
+                    type: object
+                    description: ภาพทัศนียภาพ 4 มุม (ไม่ส่งมุมใด = ไม่มีภาพมุมนั้น)
+                    properties:
+                        front: { type: string }
+                        back: { type: string }
+                        left: { type: string }
+                        right: { type: string }
+        ProjectHouse:
+            type: object
+            required: [configured, name, floorPlans, renders]
+            properties:
+                configured: { type: boolean, description: false = ยังไม่ได้ตั้งค่า (ค่าที่ส่งมาเติมจากแบบบ้านในคลังถ้าเลือกไว้) }
+                name: { type: string }
+                description: { type: string }
+                usableArea: { type: number }
+                width: { type: number }
+                depth: { type: number }
+                floors: { type: integer }
+                bedrooms: { type: integer }
+                bathrooms: { type: integer }
+                kitchens: { type: integer }
+                parking: { type: integer }
+                floorPlans:
+                    type: array
+                    items:
+                        type: object
+                        required: [label, image]
+                        properties:
+                            label: { type: string }
+                            image: { $ref: '#/components/schemas/UploadedFile' }
+                renders:
+                    type: object
+                    properties:
+                        front: { $ref: '#/components/schemas/UploadedFile' }
+                        back: { $ref: '#/components/schemas/UploadedFile' }
+                        left: { $ref: '#/components/schemas/UploadedFile' }
+                        right: { $ref: '#/components/schemas/UploadedFile' }
+                updatedBy: { $ref: '#/components/schemas/UserRef' }
+                updatedAt: { type: string, format: date-time }
+        ModelConversion:
+            type: object
+            description: |
+                การแปลงไฟล์ต้นฉบับ (.skp หรือ .ifc) เป็น .glb ที่หลังบ้าน (มีเฉพาะเวอร์ชันที่แนบไฟล์ต้นฉบับโดยไม่มีไฟล์สำหรับแสดงผล)
+                .skp ใช้ SketchUp C API บนเซิร์ฟเวอร์ (เปิดได้เฉพาะไฟล์จากรุ่นเดียวกันหรือเก่ากว่า) ส่วน .ifc ใช้ web-ifc
+                - queued / converting: รอคิว / กำลังแปลง (หน้าบ้านโหลดรายการใหม่เป็นระยะ)
+                - done: แปลงแล้ว ได้ไฟล์ .glb ใน file
+                - failed: แปลงไม่สำเร็จ (ดู message) สั่งแปลงใหม่ได้
+                - unavailable: เซิร์ฟเวอร์ไม่มี SketchUp สำหรับแปลงไฟล์ .skp
+            required: [status]
+            properties:
+                status: { type: string, enum: [queued, converting, done, failed, unavailable] }
+                message: { type: string }
+                triangles: { type: integer, description: จำนวนสามเหลี่ยมของโมเดลที่แปลงได้ }
+                finishedAt: { type: string, format: date-time }
+        ProjectModel:
+            type: object
+            description: แบบบ้าน 3 มิติของโครงการ 1 เวอร์ชัน (ล่าสุด = แบบที่ใช้อยู่)
+            required: [id, version, title, sourceApp, upAxis, uploadedBy, uploadedAt]
+            properties:
+                id: { type: string }
+                version: { type: integer }
+                title: { type: string }
+                sourceApp: { $ref: '#/components/schemas/ModelSourceApp' }
+                format: { $ref: '#/components/schemas/ModelFormat', description: ไม่มี = มีเฉพาะไฟล์ต้นฉบับ (ยังแสดงเป็น 3 มิติไม่ได้) }
+                file: { $ref: '#/components/schemas/UploadedFile', description: ไฟล์สำหรับแสดงผล (ไม่มี = มีเฉพาะไฟล์ต้นฉบับ) }
+                sourceFile: { $ref: '#/components/schemas/UploadedFile' }
+                conversion: { $ref: '#/components/schemas/ModelConversion' }
+                upAxis: { type: string, enum: [y, z] }
+                note: { type: string }
+                uploadedBy: { $ref: '#/components/schemas/UserRef' }
+                uploadedAt: { type: string, format: date-time }
         HousePlan:
             type: object
             required: [code, name, description, width, depth, floorHeight, parking, floors]
@@ -2438,14 +2779,40 @@ components:
             description: |
                 pending-contract = รอทำสัญญา, active = กำลังดำเนินการ (มีสัญญาแล้ว ยังไม่ส่งมอบ),
                 in-hand = โครงการในมือ (รอทำสัญญา + กำลังดำเนินการ), completed = ส่งมอบแล้ว,
-                warranty = ส่งมอบแล้วและยังอยู่ในระยะประกัน
+                warranty = ส่งมอบแล้วและยังมีการรับประกันอย่างน้อย 1 ส่วนที่ยังมีผล (งานโครงสร้างรับประกันนานที่สุด)
             enum: [in-hand, pending-contract, active, completed, warranty]
+        WarrantyType:
+            type: string
+            description: architectural = งานสถาปัตยกรรม (1 ปี), structural = งานโครงสร้าง (5 ปี)
+            enum: [architectural, structural]
+        WarrantyTerm:
+            type: object
+            description: เงื่อนไขการรับประกันผลงานหลังส่งมอบของบริษัท
+            required: [type, label, months, scope]
+            properties:
+                type: { $ref: '#/components/schemas/WarrantyType' }
+                label: { type: string, examples: [งานโครงสร้าง] }
+                months: { type: integer, description: ระยะรับประกันนับจากวันส่งมอบ (เดือน) }
+                scope: { type: string, description: ขอบเขตงานที่รับประกัน }
+        WarrantyCoverage:
+            description: การรับประกันแต่ละส่วนของโครงการที่ส่งมอบแล้ว
+            allOf:
+                - $ref: '#/components/schemas/WarrantyTerm'
+                - type: object
+                  required: [startDate, endDate, daysLeft, active]
+                  properties:
+                      startDate: { type: string, format: date, description: วันส่งมอบ }
+                      endDate: { type: string, format: date, description: วันสุดท้ายที่รับประกัน }
+                      daysLeft: { type: integer, description: จำนวนวันที่เหลือ (ติดลบ = หมดประกันแล้ว) }
+                      active: { type: boolean }
         ProjectPortfolio:
             type: object
-            required: [asOf, warrantyMonths, counts, activeByStatus, warranties]
+            required: [asOf, warrantyTerms, counts, activeByStatus, warranties]
             properties:
                 asOf: { type: string, format: date-time }
-                warrantyMonths: { type: integer, description: ระยะรับประกันผลงานหลังส่งมอบ (เดือน) }
+                warrantyTerms:
+                    type: array
+                    items: { $ref: '#/components/schemas/WarrantyTerm' }
                 counts:
                     type: object
                     required: [total, inHand, pendingContract, active, completed, warranty]
@@ -2468,10 +2835,10 @@ components:
                 inHandValue: { type: number, description: มูลค่าสัญญาของโครงการที่กำลังดำเนินการ (เฉพาะสิทธิ์ finance.company) }
                 warranties:
                     type: array
-                    description: โครงการที่ยังอยู่ในประกัน เรียงตามวันหมดประกันที่ใกล้ที่สุด
+                    description: โครงการที่ยังอยู่ในประกัน เรียงตามการรับประกันที่ใกล้หมดที่สุด (warrantyUntil/daysLeft/expiringType = ส่วนที่ยังมีผลและจะหมดก่อน)
                     items:
                         type: object
-                        required: [code, name, customerName, handedOverAt, warrantyUntil, daysLeft]
+                        required: [code, name, customerName, handedOverAt, warrantyUntil, daysLeft, expiringType, coverages]
                         properties:
                             code: { type: string }
                             name: { type: string }
@@ -2479,6 +2846,10 @@ components:
                             handedOverAt: { type: string, format: date }
                             warrantyUntil: { type: string, format: date }
                             daysLeft: { type: integer }
+                            expiringType: { $ref: '#/components/schemas/WarrantyType' }
+                            coverages:
+                                type: array
+                                items: { $ref: '#/components/schemas/WarrantyCoverage' }
         DashboardSummary:
             type: object
             required: [asOf, totals, projects]

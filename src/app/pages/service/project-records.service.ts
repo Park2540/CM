@@ -10,6 +10,15 @@ export type ProjectDocument = ApiSchemas['ProjectDocument'];
 export type DocumentFileType = ProjectDocument['fileType'];
 
 export type Installment = Omit<ApiSchemas['Installment'], 'dueDate' | 'paidDate'> & { dueDate: Date; paidDate: Date | null };
+export type InstallmentPayment = ApiSchemas['InstallmentPayment'];
+export type InstallmentPaymentInput = ApiSchemas['InstallmentPaymentInput'];
+export type PaymentMethod = ApiSchemas['PaymentMethod'];
+
+export const PAYMENT_METHOD_LABEL: Record<PaymentMethod, string> = {
+    transfer: 'โอนเงิน',
+    cheque: 'เช็ค',
+    cash: 'เงินสด'
+};
 export type SitePhoto = ApiSchemas['SitePhoto'] & { date: Date };
 export type PhotoPhaseCount = ApiSchemas['SitePhotoPage']['phases'][number];
 export interface SitePhotoPage {
@@ -39,6 +48,7 @@ export const DOCUMENT_FILE_ICON: Record<DocumentFileType, string> = {
 };
 
 const dateOnly = (value: string) => new Date(`${value}T00:00:00Z`);
+const installmentFromApi = (row: ApiSchemas['Installment']): Installment => ({ ...row, dueDate: dateOnly(row.dueDate), paidDate: row.paidDate ? dateOnly(row.paidDate) : null });
 
 /** งวดงาน ภาพถ่าย เอกสาร และทีมงานของโครงการ (/projects/{code}/...) */
 @Injectable({ providedIn: 'root' })
@@ -50,7 +60,16 @@ export class ProjectRecordsService {
     }
 
     installments(code: string): Observable<Installment[]> {
-        return this.http.get<ApiSchemas['Installment'][]>(this.url(code, '/installments')).pipe(map((rows) => rows.map((row) => ({ ...row, dueDate: dateOnly(row.dueDate), paidDate: row.paidDate ? dateOnly(row.paidDate) : null }))));
+        return this.http.get<ApiSchemas['Installment'][]>(this.url(code, '/installments')).pipe(map((rows) => rows.map(installmentFromApi)));
+    }
+
+    /** บันทึกรับชำระงวดพร้อมหลักฐาน (สิทธิ์ payment.record) */
+    recordPayment(code: string, no: number, input: InstallmentPaymentInput): Observable<Installment> {
+        return this.http.post<ApiSchemas['Installment']>(this.url(code, `/installments/${no}/payment`), input).pipe(map(installmentFromApi));
+    }
+
+    cancelPayment(code: string, no: number, reason: string): Observable<Installment> {
+        return this.http.post<ApiSchemas['Installment']>(this.url(code, `/installments/${no}/payment/cancel`), { reason }).pipe(map(installmentFromApi));
     }
 
     photos(code: string, query: { phaseCode?: string | null; page?: number; pageSize?: number } = {}): Observable<SitePhotoPage> {

@@ -14,6 +14,7 @@ import { ProjectCreate } from './app/pages/projects/project-create';
 import { ProjectList } from './app/pages/projects/project-list';
 import { ProjectManagement } from './app/pages/projects/project-management';
 import { ProjectSetup } from './app/pages/projects/project-setup';
+import { WarrantyList } from './app/pages/warranty/warranty-list';
 
 export const appRoutes: Routes = [
     {
@@ -30,6 +31,7 @@ export const appRoutes: Routes = [
             { path: 'projects/new', component: ProjectCreate },
             { path: 'projects/:code', component: ProjectManagement },
             { path: 'projects/:code/setup', component: ProjectSetup },
+            { path: 'warranty', component: WarrantyList },
             { path: 'approvals', component: ApprovalCenter },
             { path: 'system/users', component: Users },
             { path: 'system/roles', component: Roles },

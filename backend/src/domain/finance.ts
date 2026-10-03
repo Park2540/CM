@@ -1,6 +1,6 @@
 import type { ApiSchemas } from '../api/api.js';
 import { isContracted } from './shared.js';
-import { generatedRecords } from './project-records.js';
+import { apiInstallments } from './project-records.js';
 import { listProjects } from './projects.js';
 
 type ProjectFinance = ApiSchemas['ProjectFinance'];
@@ -28,14 +28,14 @@ function projectData() {
     return (
         listProjects()
             .filter(isContracted)
-            // งวดงานสร้างหลังตั้งค่างานก่อสร้าง ก่อนหน้านั้นนับเฉพาะมูลค่าสัญญา
-            .map((project) => ({ project, records: generatedRecords(project.code) ?? { installments: [] } }))
+            // งวดงาน (รวมงานเพิ่ม-ลด) สร้างหลังตั้งค่างานก่อสร้าง ก่อนหน้านั้นนับเฉพาะมูลค่าสัญญา
+            .map((project) => ({ project, installments: apiInstallments(project.code) ?? [] }))
     );
 }
 
 export function projectFinance(): ProjectFinance[] {
     const today = todayUtc().getTime();
-    return projectData().map(({ project, records }) => {
+    return projectData().map(({ project, installments }) => {
         const { budgetRatio, costOverrun } = SAMPLE_COST_ASSUMPTIONS[project.code] ?? DEFAULT_ASSUMPTION;
         const progress = project.progress / 100;
         // รวมงานเพิ่ม-ลดที่อนุมัติแล้ว
@@ -63,8 +63,9 @@ export function projectFinance(): ProjectFinance[] {
             grossProfit,
             margin: earnedRevenue ? (grossProfit / earnedRevenue) * 100 : 0,
             forecastProfit,
-            cashReceived: records.installments.filter((item) => item.status === 'paid').reduce((sum, item) => sum + item.amount, 0),
-            receivable: records.installments.filter((item) => item.status === 'due').reduce((sum, item) => sum + item.amount, 0),
+            // เงินที่ได้รับจริงตามการบันทึกรับชำระ (ไม่รวมภาษีหัก ณ ที่จ่าย)
+            cashReceived: installments.reduce((sum, item) => sum + (item.payment?.amount ?? 0), 0),
+            receivable: installments.filter((item) => item.status === 'due' && item.amount > 0).reduce((sum, item) => sum + item.amount, 0),
             health
         };
     });
@@ -100,12 +101,10 @@ export function monthlyCashFlow(monthsShown: number): ApiSchemas['MonthlyCashFlo
     const byKey = new Map(months.map((month) => [month.month, month]));
     const finance = new Map(projectFinance().map((row) => [row.projectCode, row]));
 
-    for (const { project, records } of projectData()) {
-        for (const installment of records.installments) {
-            if (installment.paidDate) {
-                const month = byKey.get(monthKey(installment.paidDate));
-                if (month) month.cashIn += installment.amount;
-            }
+    for (const { project, installments } of projectData()) {
+        for (const { payment } of installments) {
+            const month = payment && byKey.get(payment.paidDate.slice(0, 7));
+            if (month) month.cashIn += payment.amount;
         }
         const actualCost = finance.get(project.code)?.actualCost ?? 0;
         const start = Date.parse(`${project.startDate}T00:00:00Z`);

@@ -22,7 +22,7 @@ export const ROLE_CATALOG: ApiSchemas['RoleCatalog'] = {
             label: 'เจ้าของบริษัท',
             access: 'ทุกระบบย่อยและทุกโครงการ อนุมัติทุกยอด ดู Dashboard กำไร-ขาดทุน',
             restriction: 'ไม่มี (แต่ทุกการกระทำมีบันทึกประวัติ)',
-            permissions: ['progress.update', 'personnel.sensitive', 'finance.company', 'approval.any', 'project.create', 'project.manage', 'user.manage']
+            permissions: ['progress.update', 'personnel.sensitive', 'finance.company', 'approval.any', 'project.create', 'project.manage', 'user.manage', 'payment.record']
         },
         { id: 'admin-staff', group: 'internal', label: 'ธุรการ', access: 'เอกสาร สัญญา จดหมายโต้ตอบ ทะเบียนบุคลากร ทะเบียนครุภัณฑ์ (ดู/แก้ข้อมูลทั่วไป)', restriction: 'ไม่เห็นราคาต้นทุนและกำไร', permissions: [] },
         {
@@ -31,7 +31,7 @@ export const ROLE_CATALOG: ApiSchemas['RoleCatalog'] = {
             label: 'บัญชี/การเงิน',
             access: 'ตรวจใบแจ้งหนี้ (3-way match) จ่ายเงิน ลูกหนี้-เจ้าหนี้ งวดงาน ภาษี ค่าเช่าสะสม',
             restriction: 'ไม่สร้างหรืออนุมัติ PR/PO',
-            permissions: ['finance.company', 'personnel.sensitive']
+            permissions: ['finance.company', 'personnel.sensitive', 'payment.record']
         },
         { id: 'procurement', group: 'internal', label: 'ฝ่ายจัดซื้อ', access: 'PR ทุกโครงการ ขอราคา เปรียบเทียบ ออก PO ทำสัญญาเช่า ฐานข้อมูลผู้ขาย', restriction: 'ไม่อนุมัติ ไม่จ่ายเงิน', permissions: [] },
         { id: 'storekeeper', group: 'internal', label: 'ผู้ดูแลคลัง/เครื่องมือ', access: 'รับของ สต็อก ยืม-คืนเครื่องมือ ทะเบียนครุภัณฑ์ ป้าย QR', restriction: 'ไม่เห็นราคา', permissions: [], suggested: true },

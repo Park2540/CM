@@ -9,7 +9,7 @@ import { ApprovalService, APPROVAL_TYPE_LABEL } from '@/app/pages/service/approv
 import { AuditLogService } from '@/app/pages/service/audit-log.service';
 import { CompanyFinanceService, ProjectHealth } from '@/app/pages/service/company-finance.service';
 import { todayAsDate } from '@/app/pages/service/project-timeline.service';
-import { PROJECT_STATUS_LABEL, ProjectGroup, ProjectService, ProjectStatus, getProjectSeverity } from '@/app/pages/service/project.service';
+import { PROJECT_STATUS_LABEL, ProjectGroup, ProjectService, ProjectStatus, WARRANTY_EXPIRING_DAYS, WarrantyType, getProjectSeverity, warrantyPeriod } from '@/app/pages/service/project.service';
 import { TagModule } from 'primeng/tag';
 import { ThaiDatePipe } from '@/app/pages/projects/thai-date.pipe';
 import { problemMessage } from '@/app/api/api';
@@ -113,8 +113,11 @@ export function formatBaht(value: number, compact = false): string {
 
                     <!-- ประกันใกล้หมด -->
                     <div class="col-span-12 xl:col-span-4 xl:border-l xl:border-surface xl:pl-6">
-                        <h3 class="text-base font-semibold m-0 mb-1">โครงการในระยะประกัน</h3>
-                        <p class="text-xs text-muted-color mt-0 mb-3">รับประกันผลงาน {{ portfolio()?.warrantyMonths ?? '–' }} เดือนหลังส่งมอบ · ใกล้หมดก่อนอยู่บนสุด</p>
+                        <div class="flex items-center justify-between gap-2 mb-1">
+                            <h3 class="text-base font-semibold m-0">โครงการในระยะประกัน</h3>
+                            <a routerLink="/warranty" class="text-sm text-primary">ดูทั้งหมด</a>
+                        </div>
+                        <p class="text-xs text-muted-color mt-0 mb-3">{{ warrantyTermsText() }} หลังส่งมอบ · ใกล้หมดก่อนอยู่บนสุด</p>
                         <ul class="list-none p-0 m-0">
                             @for (item of warranties(); track item.code) {
                                 <li class="border-b border-surface last:border-b-0">
@@ -124,9 +127,9 @@ export function formatBaht(value: number, compact = false): string {
                                             <span class="block text-xs text-muted-color truncate">{{ item.customerName }} · ส่งมอบ {{ item.handedOverAt | thaiDate }}</span>
                                         </span>
                                         <span class="text-right shrink-0">
-                                            <span class="block text-xs text-muted-color">ถึง {{ item.warrantyUntil | thaiDate }}</span>
-                                            <span class="block text-sm font-semibold" [ngClass]="item.daysLeft <= 60 ? 'text-orange-600 dark:text-orange-400' : ''">
-                                                @if (item.daysLeft <= 60) {
+                                            <span class="block text-xs text-muted-color">{{ termLabel(item.expiringType) }} ถึง {{ item.warrantyUntil | thaiDate }}</span>
+                                            <span class="block text-sm font-semibold" [ngClass]="item.daysLeft <= expiringDays ? 'text-orange-600 dark:text-orange-400' : ''">
+                                                @if (item.daysLeft <= expiringDays) {
                                                     <i class="pi pi-exclamation-circle text-xs mr-1" aria-hidden="true"></i>
                                                 }
                                                 เหลือ {{ item.daysLeft }} วัน
@@ -349,6 +352,16 @@ export class Dashboard {
     readonly portfolioResource = apiResource({ stream: () => this.projects.portfolio() });
     readonly portfolio = computed(() => (this.portfolioResource.hasValue() ? this.portfolioResource.value() : undefined));
     readonly warranties = computed(() => (this.portfolio()?.warranties ?? []).slice(0, 5));
+    readonly expiringDays = WARRANTY_EXPIRING_DAYS;
+    /** เช่น "ประกันงานสถาปัตยกรรม 1 ปี · งานโครงสร้าง 5 ปี" */
+    readonly warrantyTermsText = computed(() => {
+        const terms = this.portfolio()?.warrantyTerms ?? [];
+        return terms.length ? 'ประกัน' + terms.map((term) => `${term.label} ${warrantyPeriod(term.months)}`).join(' · ') : 'ประกันผลงาน';
+    });
+
+    termLabel(type: WarrantyType) {
+        return this.portfolio()?.warrantyTerms.find((term) => term.type === type)?.label ?? '';
+    }
     readonly statusLabel = PROJECT_STATUS_LABEL;
     readonly getProjectSeverity = getProjectSeverity;
     readonly activeStatuses: Exclude<ProjectStatus, 'pending-contract' | 'completed'>[] = ['planning', 'in-progress', 'near-handover', 'delayed'];
@@ -378,7 +391,7 @@ export class Dashboard {
                 label: 'อยู่ในประกัน',
                 icon: 'pi-shield',
                 count: count(counts?.warranty),
-                hint: data ? `ประกัน ${data.warrantyMonths} เดือนหลังส่งมอบ` : ''
+                hint: data ? this.warrantyTermsText() : ''
             }
         ];
     });

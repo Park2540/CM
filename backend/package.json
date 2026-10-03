@@ -12,8 +12,10 @@
   },
   "dependencies": {
     "express": "^5.2.1",
+    "koffi": "^2.16.3",
     "mongoose": "^8.24.4",
-    "multer": "^2.4.0"
+    "multer": "^2.4.0",
+    "web-ifc": "^0.0.78"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",

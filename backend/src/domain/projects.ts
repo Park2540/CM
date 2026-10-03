@@ -7,6 +7,7 @@ import { recordAudit } from './audit-logs.js';
 import { defaultOptions, toPlanOptions } from './construction-options.js';
 import { PROJECT_SEED } from './project-seed.js';
 import { ContractedProject, isContracted } from './shared.js';
+import { PAYMENT_SCHEDULE } from './records-generator.js';
 
 type Timeline = ApiSchemas['ProjectTimeline'];
 type Task = ApiSchemas['TimelineTask'];
@@ -47,21 +48,57 @@ export function currentProject(code: string): ApiSchemas['Project'] | undefined 
 function projectState(code: string): ApiSchemas['Project'] | undefined {
     const seed = findSeed(code);
     if (!seed) return undefined;
-    const notHandedOver = { handedOverAt: null, warrantyUntil: null };
+    const notHandedOver = { handedOverAt: null, warrantyUntil: null, warranties: [] };
     if (!isContracted(seed)) return { ...seed, ...notHandedOver, progress: 0, status: 'pending-contract', setupConfiguredAt: null };
     const setupConfiguredAt = setups.get(code)?.configuredAt ?? null;
     if (!setupConfiguredAt) return { ...seed, ...notHandedOver, progress: 0, status: 'planning', setupConfiguredAt };
     const progress = getTimeline(code)?.progress ?? seed.progress;
     if (progress >= 100) {
         seed.handedOverAt ??= todayIso();
-        return { ...seed, progress, status: 'completed', setupConfiguredAt, handedOverAt: seed.handedOverAt, warrantyUntil: addMonths(seed.handedOverAt, WARRANTY_MONTHS) };
+        const warranties = warrantyCoverages(seed.handedOverAt);
+        // วันหมดประกันรวม = ส่วนที่รับประกันนานที่สุด (งานโครงสร้าง)
+        const warrantyUntil = warranties.map((coverage) => coverage.endDate).sort().at(-1)!;
+        return { ...seed, progress, status: 'completed', setupConfiguredAt, handedOverAt: seed.handedOverAt, warrantyUntil, warranties };
     }
-    const status: ApiSchemas['ProjectStatus'] = seed.deliveryDate < todayIso() ? 'delayed' : seed.status === 'completed' ? 'in-progress' : seed.status;
-    return { ...seed, ...notHandedOver, progress, status, setupConfiguredAt };
+    return { ...seed, ...notHandedOver, progress, status: projectStatusOf(progress, seed.deliveryDate), setupConfiguredAt };
 }
 
-/** ระยะรับประกันผลงานหลังส่งมอบ (เดือน) — ภายหลังย้ายไปตั้งค่าบริษัท */
-export const WARRANTY_MONTHS = 12;
+/** ความคืบหน้าที่ถือว่าใกล้ส่งมอบ (%) */
+const NEAR_HANDOVER_PROGRESS = 90;
+
+/** สถานะของโครงการที่กำลังก่อสร้าง คำนวณจากความคืบหน้าจริงและกำหนดส่งมอบ (เลยกำหนด = ล่าช้า) */
+function projectStatusOf(progress: number, deliveryDate: string): ApiSchemas['ProjectStatus'] {
+    if (deliveryDate < todayIso()) return 'delayed';
+    if (progress >= NEAR_HANDOVER_PROGRESS) return 'near-handover';
+    return progress > 0 ? 'in-progress' : 'planning';
+}
+
+/** การรับประกันผลงานหลังส่งมอบ แยกตามส่วนของงาน — ภายหลังย้ายไปตั้งค่าบริษัท */
+export const WARRANTY_TERMS: ApiSchemas['WarrantyTerm'][] = [
+    {
+        type: 'architectural',
+        label: 'งานสถาปัตยกรรม',
+        months: 12,
+        scope: 'งานสถาปัตยกรรมและงานตกแต่ง เช่น ผนัง ฝ้า พื้น สี ประตู-หน้าต่าง สุขภัณฑ์ และงานระบบไฟฟ้า-ประปา'
+    },
+    {
+        type: 'structural',
+        label: 'งานโครงสร้าง',
+        months: 60,
+        scope: 'โครงสร้างหลักของอาคาร เช่น เสาเข็ม ฐานราก เสา คาน พื้นโครงสร้าง และโครงหลังคา'
+    }
+];
+
+const DAY_MS_WARRANTY = 86_400_000;
+
+/** การรับประกันแต่ละส่วนนับจากวันส่งมอบ (หมดประกันเมื่อเลยวันสุดท้าย) */
+export function warrantyCoverages(handedOverAt: string): ApiSchemas['WarrantyCoverage'][] {
+    const today = todayIso();
+    return WARRANTY_TERMS.map((term) => {
+        const endDate = addMonths(handedOverAt, term.months);
+        return { ...term, startDate: handedOverAt, endDate, daysLeft: Math.round((Date.parse(endDate) - Date.parse(today)) / DAY_MS_WARRANTY), active: endDate >= today };
+    });
+}
 
 function addMonths(isoDate: string, months: number): string {
     const [year, month, day] = isoDate.split('-').map(Number);
@@ -80,23 +117,21 @@ export function inGroup(project: ApiSchemas['Project'], group: ApiSchemas['Proje
         case 'completed':
             return project.status === 'completed';
         case 'warranty':
-            return project.status === 'completed' && !!project.warrantyUntil && project.warrantyUntil >= todayIso();
+            return project.status === 'completed' && (project.warranties ?? []).some((coverage) => coverage.active);
     }
 }
 
 export const listProjects = () => PROJECT_SEED.map((project) => currentProject(project.code)!);
 
-const DAY_MS_PORTFOLIO = 86_400_000;
 
 /** จำนวนโครงการตามกลุ่มสำหรับ Dashboard */
 export function projectPortfolio(includeValue: boolean): ApiSchemas['ProjectPortfolio'] {
     const projects = listProjects();
     const count = (group: ApiSchemas['ProjectGroup']) => projects.filter((project) => inGroup(project, group)).length;
     const active = projects.filter((project) => inGroup(project, 'active'));
-    const today = todayIso();
     return {
         asOf: new Date().toISOString(),
-        warrantyMonths: WARRANTY_MONTHS,
+        warrantyTerms: WARRANTY_TERMS,
         counts: { total: projects.length, inHand: count('in-hand'), pendingContract: count('pending-contract'), active: active.length, completed: count('completed'), warranty: count('warranty') },
         activeByStatus: {
             planning: active.filter((project) => project.status === 'planning').length,
@@ -107,14 +142,21 @@ export function projectPortfolio(includeValue: boolean): ApiSchemas['ProjectPort
         ...(includeValue ? { inHandValue: active.reduce((sum, project) => sum + (project.value ?? 0), 0) } : {}),
         warranties: projects
             .filter((project) => inGroup(project, 'warranty'))
-            .map((project) => ({
-                code: project.code,
-                name: project.name,
-                customerName: project.customerName,
-                handedOverAt: project.handedOverAt!,
-                warrantyUntil: project.warrantyUntil!,
-                daysLeft: Math.round((Date.parse(project.warrantyUntil!) - Date.parse(today)) / DAY_MS_PORTFOLIO)
-            }))
+            .map((project) => {
+                const coverages = project.warranties ?? [];
+                // ส่วนที่ยังมีผลและจะหมดก่อน (ปีแรก = งานสถาปัตยกรรม หลังจากนั้น = งานโครงสร้าง)
+                const expiring = coverages.filter((coverage) => coverage.active).sort((a, b) => a.endDate.localeCompare(b.endDate))[0]!;
+                return {
+                    code: project.code,
+                    name: project.name,
+                    customerName: project.customerName,
+                    handedOverAt: project.handedOverAt!,
+                    warrantyUntil: expiring.endDate,
+                    daysLeft: expiring.daysLeft,
+                    expiringType: expiring.type,
+                    coverages
+                };
+            })
             .sort((a, b) => a.warrantyUntil.localeCompare(b.warrantyUntil))
     };
 }
@@ -232,7 +274,14 @@ interface StoredSetup {
     options: ApiSchemas['ConstructionSetupOptions'];
     excludedTasks: string[];
     customTasks: ApiSchemas['CustomTaskInput'][];
+    /** สัดส่วนงวดเงินตาม PAYMENT_SCHEDULE (ไม่มี = ค่าตั้งต้น เช่น ข้อมูลที่บันทึกก่อนมีฟิลด์นี้) */
+    paymentPercents?: number[];
 }
+
+const DEFAULT_PAYMENT_PERCENTS = PAYMENT_SCHEDULE.map((item) => item.percent);
+
+/** สัดส่วนงวดเงินที่ใช้กับโครงการ (ใช้สร้างงวดงาน) */
+export const paymentPercentsOf = (code: string): number[] => setups.get(code)?.paymentPercents ?? DEFAULT_PAYMENT_PERCENTS;
 
 /** การตั้งค่างานก่อสร้างรายโครงการ — โครงการตัวอย่างที่มีสัญญาแล้วถือว่าตั้งค่าตามแบบบ้านไว้แล้ว */
 const setups = new Map<string, StoredSetup>(
@@ -247,8 +296,12 @@ const overridesOf = (setup: StoredSetup): TaskOverrides => ({ excluded: setup.ex
 /** แก้การตั้งค่าไม่ได้เมื่อเริ่มรายงานความคืบหน้าแล้ว (ไทม์ไลน์เดิมจะถูกแทนที่ทั้งหมด) */
 function lockReason(code: string): string | undefined {
     if (!setups.has(code)) return undefined;
-    const started = getTimeline(code)?.phases.some((phase) => phase.tasks.some((task) => task.progress > 0)) || getUpdates(code).length > 0;
-    return started ? 'เริ่มรายงานความคืบหน้าแล้ว แก้การตั้งค่าไม่ได้ (ไทม์ไลน์ใช้งานอยู่)' : undefined;
+    const tasks = getTimeline(code)?.phases.flatMap((phase) => phase.tasks) ?? [];
+    const started = tasks.some((task) => task.progress > 0) || getUpdates(code).length > 0;
+    if (started) return 'เริ่มรายงานความคืบหน้าแล้ว แก้การตั้งค่าไม่ได้ (ไทม์ไลน์ใช้งานอยู่)';
+    // งานจากงานเพิ่ม-ลดที่อนุมัติแล้ว (รหัส xx.COn) จะหายไปถ้าสร้างไทม์ไลน์ใหม่
+    if (tasks.some((task) => task.code.includes('.CO'))) return 'มีงานเพิ่ม-ลดที่อนุมัติแล้วอยู่ในไทม์ไลน์ แก้การตั้งค่าไม่ได้';
+    return undefined;
 }
 
 export function getSetup(code: string): ApiSchemas['ProjectSetup'] {
@@ -262,8 +315,30 @@ export function getSetup(code: string): ApiSchemas['ProjectSetup'] {
         configuredBy: stored?.configuredBy ?? null,
         options: stored?.options ?? defaultOptions(findSeed(code)?.housePlanCode),
         excludedTasks: stored?.excludedTasks ?? [],
-        customTasks: stored?.customTasks ?? []
+        customTasks: stored?.customTasks ?? [],
+        paymentSchedule: PAYMENT_SCHEDULE.map((item, index) => ({ no: index + 1, title: item.title, phaseCodes: item.phaseCodes, percent: paymentPercentsOf(code)[index]!, defaultPercent: item.percent }))
     };
+}
+
+/**
+ * ตรวจสัดส่วนงวดเงิน: ครบทุกงวด แต่ละงวด > 0 ทศนิยมไม่เกิน 2 ตำแหน่ง และรวมได้ 100
+ * ไม่ส่งมา = คงค่าที่บันทึกไว้
+ */
+export function normalizePaymentPercents(code: string, input: unknown): { percents: number[]; errors: Record<string, string> } {
+    const errors: Record<string, string> = {};
+    if (input === undefined) return { percents: paymentPercentsOf(code), errors };
+    if (!Array.isArray(input) || input.length !== PAYMENT_SCHEDULE.length) {
+        errors['paymentPercents'] = `ต้องระบุสัดส่วนครบ ${PAYMENT_SCHEDULE.length} งวด`;
+        return { percents: [], errors };
+    }
+    const percents = input.map(Number);
+    percents.forEach((percent, index) => {
+        if (!Number.isFinite(percent) || percent <= 0 || percent > 100) errors[`paymentPercents.${index}`] = 'สัดส่วนต้องมากกว่า 0 และไม่เกิน 100';
+        else if (Math.abs(Math.round(percent * 100) - percent * 100) > 1e-6) errors[`paymentPercents.${index}`] = 'ทศนิยมได้ไม่เกิน 2 ตำแหน่ง';
+    });
+    const total = percents.reduce((sum, percent) => sum + Math.round(percent * 100), 0) / 100;
+    if (!Object.keys(errors).length && total !== 100) errors['paymentPercents'] = `สัดส่วนรวมต้องได้ 100% (ตอนนี้ ${total}%)`;
+    return { percents, errors };
 }
 
 export const isSetupLocked = (code: string) => !!lockReason(code);
@@ -303,14 +378,21 @@ export function normalizeOverrides(options: ApiSchemas['ConstructionSetupOptions
 }
 
 /** บันทึกการตั้งค่าและสร้างไทม์ไลน์ใหม่ (ผ่าน normalizeOptions/normalizeOverrides แล้ว) */
-export function saveSetup(code: string, options: ApiSchemas['ConstructionSetupOptions'], overrides: TaskOverrides, by: string): ApiSchemas['ProjectSetup'] {
+export function saveSetup(code: string, options: ApiSchemas['ConstructionSetupOptions'], overrides: TaskOverrides, paymentPercents: number[], by: string): ApiSchemas['ProjectSetup'] {
     const isNew = !setups.has(code);
-    setups.set(code, { configuredAt: new Date().toISOString(), configuredBy: by, options, excludedTasks: overrides.excluded, customTasks: overrides.custom });
+    const paymentChanged = paymentPercents.join() !== paymentPercentsOf(code).join();
+    setups.set(code, { configuredAt: new Date().toISOString(), configuredBy: by, options, excludedTasks: overrides.excluded, customTasks: overrides.custom, paymentPercents });
     timelines.delete(code);
     updates.delete(code);
     const timeline = getTimeline(code)!;
     const taskCount = timeline.phases.reduce((sum, phase) => sum + phase.tasks.length, 0);
-    const adjusted = [overrides.excluded.length ? `ตัดออก ${overrides.excluded.length} งาน` : '', overrides.custom.length ? `เพิ่มเอง ${overrides.custom.length} งาน` : ''].filter(Boolean).join(' ');
+    const adjusted = [
+        overrides.excluded.length ? `ตัดออก ${overrides.excluded.length} งาน` : '',
+        overrides.custom.length ? `เพิ่มเอง ${overrides.custom.length} งาน` : '',
+        paymentChanged ? `สัดส่วนงวดเงิน ${paymentPercents.join('/')}%` : ''
+    ]
+        .filter(Boolean)
+        .join(' ');
     recordAudit({ module: 'project', action: isNew ? 'ตั้งค่างานก่อสร้าง' : 'แก้ไขการตั้งค่างานก่อสร้าง', target: code, detail: `สร้างไทม์ไลน์ ${timeline.phases.length} ขั้นตอน ${taskCount} งาน${adjusted ? ` (${adjusted})` : ''}` });
     return getSetup(code);
 }
