@@ -1,4 +1,4 @@
-# CM
+# CM Planning
 
 ระบบบริหารงานก่อสร้าง PP Prime Construction (หน้าบ้าน) — Angular 21, PrimeNG 21, Tailwind CSS v4 สร้างจาก template [Sakai-NG](https://github.com/primefaces/sakai-ng)
 

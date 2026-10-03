@@ -1,6 +1,6 @@
 {
-  "name": "sakai-ng",
-  "version": "21.0.0",
+  "name": "cm-planning",
+  "version": "0.1.0",
   "scripts": {
     "ng": "ng",
     "start": "ng serve",
