@@ -1,43 +1,16 @@
-# See https://docs.github.com/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
-
-# Compiled output
+# ผลลัพธ์จากการ build และแคช
 /dist
-/tmp
 /out-tsc
-/bazel-out
-
-# Node
+/.angular/cache
 /node_modules
+
+# log
 npm-debug.log
 yarn-error.log
 
-# IDEs and editors
+# editor และระบบปฏิบัติการ
 .idea/
-.project
-.classpath
-.c9/
-*.launch
-.settings/
-*.sublime-workspace
-
-# Visual Studio Code
-.vscode/*
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
-.history/*
-
-# Miscellaneous
-/.angular/cache
-.sass-cache/
-/connect.lock
-/coverage
-/libpeerconnection.log
-testem.log
-/typings
 .vscode
-
-# System files
+.history/*
 .DS_Store
 Thumbs.db
