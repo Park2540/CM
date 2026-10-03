@@ -1,7 +1,6 @@
 import { NgClass } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, computed, inject, signal } from '@angular/core';
-import { rxResource } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { ButtonModule } from 'primeng/button';
@@ -13,6 +12,7 @@ import { AuthService } from '@/app/pages/service/auth.service';
 import { HousePlan, HousePlanService, countRooms, usableArea } from '@/app/pages/service/house-plan.service';
 import { PersonnelService } from '@/app/pages/service/personnel.service';
 import { ProjectService } from '@/app/pages/service/project.service';
+import { apiResource } from '@/app/api/api-resource';
 
 /**
  * เปิดโครงการ (POST /projects) — เก็บเฉพาะข้อมูลเบื้องต้น: ลูกค้า ผู้รับผิดชอบ และแบบบ้านที่ลูกค้าต้องการ
@@ -257,9 +257,9 @@ export class ProjectCreate {
     private readonly personnelService = inject(PersonnelService);
 
     readonly canCreate = computed(() => this.auth.can('project.create'));
-    readonly plans = rxResource({ stream: () => this.housePlanService.list(), defaultValue: [] });
-    readonly regions = rxResource({ stream: () => this.projectService.regions(), defaultValue: [] });
-    readonly personnel = rxResource({ stream: () => this.personnelService.list(), defaultValue: [] });
+    readonly plans = apiResource({ stream: () => this.housePlanService.list(), defaultValue: [] });
+    readonly regions = apiResource({ stream: () => this.projectService.regions(), defaultValue: [] });
+    readonly personnel = apiResource({ stream: () => this.personnelService.list(), defaultValue: [] });
 
     readonly customerName = signal('');
     readonly phone = signal('');

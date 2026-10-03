@@ -1,6 +1,5 @@
 import { NgClass } from '@angular/common';
 import { Component, computed, inject, input, signal } from '@angular/core';
-import { rxResource } from '@angular/core/rxjs-interop';
 import { ButtonModule } from 'primeng/button';
 import { IconFieldModule } from 'primeng/iconfield';
 import { InputIconModule } from 'primeng/inputicon';
@@ -8,6 +7,7 @@ import { InputTextModule } from 'primeng/inputtext';
 import { problemMessage } from '@/app/api/api';
 import { DOCUMENT_CATEGORIES, DOCUMENT_CATEGORY_LABEL, DocumentCategory, DocumentFileType, ProjectRecordsService } from '@/app/pages/service/project-records.service';
 import { ThaiDatePipe } from '../thai-date.pipe';
+import { apiResource } from '@/app/api/api-resource';
 
 @Component({
     selector: 'app-project-documents-tab',
@@ -89,7 +89,7 @@ export class ProjectDocumentsTab {
     readonly refreshKey = input(0);
 
     // รายการเอกสารต่อโครงการมีไม่มาก จึงโหลดทั้งหมดครั้งเดียวแล้วกรอง/นับในหน้าจอ
-    readonly documentsResource = rxResource({
+    readonly documentsResource = apiResource({
         params: () => ({ code: this.projectCode(), refresh: this.refreshKey() }),
         stream: ({ params }) => this.records.documents(params.code),
         defaultValue: []

@@ -1,11 +1,11 @@
 import { NgClass } from '@angular/common';
 import { Component, computed, inject, input, linkedSignal, output } from '@angular/core';
-import { rxResource } from '@angular/core/rxjs-interop';
 import { ButtonModule } from 'primeng/button';
 import { problemMessage } from '@/app/api/api';
 import { ProjectProgressService, SEVERITY_OPTIONS, WEATHER_OPTIONS } from '@/app/pages/service/project-progress.service';
 import { DOCUMENT_CATEGORY_LABEL, DOCUMENT_FILE_ICON } from '@/app/pages/service/project-records.service';
 import { ThaiDatePipe } from '../thai-date.pipe';
+import { apiResource } from '@/app/api/api-resource';
 
 const PAGE_SIZE = 10;
 
@@ -168,7 +168,7 @@ export class ProjectUpdatesTab {
 
     // "Load more" grows the page; switching project resets it.
     readonly pageSize = linkedSignal({ source: this.projectCode, computation: () => PAGE_SIZE });
-    readonly updates = rxResource({
+    readonly updates = apiResource({
         params: () => ({ code: this.projectCode(), pageSize: this.pageSize(), refresh: this.refreshKey() }),
         stream: ({ params }) => this.progressService.listUpdates(params.code, 1, params.pageSize),
         defaultValue: { items: [], total: 0, page: 1, pageSize: PAGE_SIZE }

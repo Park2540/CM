@@ -4,6 +4,29 @@
  */
 
 export interface paths {
+    "/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * เข้าสู่ระบบด้วยอีเมลและรหัสผ่าน — ได้ access token (Bearer) สำหรับทุกคำขอ
+         * @description - อีเมลหรือรหัสผ่านไม่ถูกต้อง → 401 (ข้อความเดียวกัน ไม่บอกว่าผิดช่องไหน)
+         *     - รหัสผ่านถูกแต่ยังเข้าใช้ไม่ได้ → 403 โดย title บอกเหตุผล: คำขอสมัครรออนุมัติ, คำขอสมัครถูกปฏิเสธ (detail = เหตุผล), บัญชีถูกระงับ, ยังไม่ได้ตั้งรหัสผ่านจากคำเชิญ
+         *     - ผิดติดกัน 5 ครั้งต่ออีเมล → 429 ล็อก 15 นาที
+         *     - lastLoginAt ใน user คือเวลาเข้าสู่ระบบครั้งก่อนหน้า (ก่อนครั้งนี้)
+         */
+        post: operations["login"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/me": {
         parameters: {
             query?: never;
@@ -38,6 +61,85 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * สมัครสมาชิก (ไม่ต้องล็อกอิน) — ได้คำขอสถานะ pending เข้าระบบได้หลังแอดมินหรือเจ้าของบริษัทอนุมัติเท่านั้น
+         * @description หลังบ้านต้องปฏิเสธการเข้าสู่ระบบของผู้ที่คำขอยังไม่ได้รับอนุมัติ
+         *     อีเมลที่มีบัญชีอยู่แล้วหรือมีคำขอรออนุมัติอยู่ ตอบ 409
+         */
+        post: operations["register"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/registrations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** คำขอสมัครสมาชิก (ต้องมีสิทธิ์ user.manage) */
+        get: operations["listRegistrations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/registrations/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * อนุมัติคำขอและสร้างบัญชี (สถานะ active) — เฉพาะบทบาทแอดมินหรือเจ้าของบริษัท (403)
+         * @description ผูกกับบุคลากรในทะเบียน (ยังไม่มีบัญชี) และกำหนดบทบาท/สิทธิ์ตามกฎเดียวกับ POST /user-accounts คำขอที่ไม่ใช่ pending ตอบ 409
+         */
+        post: operations["approveRegistration"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/registrations/{id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** ปฏิเสธคำขอ (ต้องระบุเหตุผล) — เฉพาะบทบาทแอดมินหรือเจ้าของบริษัท (403) */
+        post: operations["rejectRegistration"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/users": {
         parameters: {
             query?: never;
@@ -66,6 +168,100 @@ export interface paths {
         get: operations["listRoles"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/user-accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** บัญชีผู้ใช้ของบุคลากร (ต้องมีสิทธิ์ user.manage) */
+        get: operations["listUserAccounts"];
+        put?: never;
+        /** สร้างบัญชีให้บุคลากรและส่งคำเชิญตั้งรหัสผ่านทางอีเมล (สถานะเริ่มต้น invited) */
+        post: operations["createUserAccount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/user-accounts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** แก้บทบาท โครงการ และสิทธิ์รายคน — แก้บทบาทหรือถอน user.manage ของตัวเองไม่ได้ (409) */
+        put: operations["updateUserAccount"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/user-accounts/{id}/suspend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** ระงับบัญชี (ออกจากระบบทุกอุปกรณ์ทันที) — ระงับตัวเองหรือเจ้าของบริษัทคนสุดท้ายไม่ได้ (409) */
+        post: operations["suspendUserAccount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/user-accounts/{id}/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** เปิดใช้บัญชีที่ระงับไว้ (กลับเป็น active หรือ invited ถ้ายังไม่เคยตั้งรหัสผ่าน) */
+        post: operations["activateUserAccount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/user-accounts/{id}/reset-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** ส่งลิงก์ตั้งรหัสผ่านใหม่ทางอีเมล (บัญชี invited = ส่งคำเชิญซ้ำ) — บัญชีที่ระงับอยู่ทำไม่ได้ (409) */
+        post: operations["resetUserPassword"];
         delete?: never;
         options?: never;
         head?: never;
@@ -333,6 +529,73 @@ export interface paths {
         put?: never;
         /** อัปโหลดไฟล์ (รูปหน้างาน) แล้วนำ id ไปอ้างอิงในบันทึก */
         post: operations["uploadFile"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{code}/change-orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+            };
+            cookie?: never;
+        };
+        /** งานเพิ่ม-ลดของโครงการ (ล่าสุดก่อน) */
+        get: operations["listChangeOrders"];
+        put?: never;
+        /**
+         * ขอเพิ่ม-ลดงาน (ต้องมีสิทธิ์ project.manage) — สร้างคำขออนุมัติประเภท change-order ในศูนย์อนุมัติ
+         * @description อนุมัติ/ไม่อนุมัติผ่าน POST /approvals/{approvalId}/approve|reject เมื่ออนุมัติ หลังบ้าน:
+         *     - บวกยอดสุทธิเข้า changeOrderTotal ของโครงการ และเพิ่มงวดงานของงานเพิ่ม-ลด
+         *     - เลื่อนกำหนดส่งมอบตาม scheduleImpactDays
+         *     - เพิ่ม newTask เข้าไทม์ไลน์ (ท้ายขั้นตอนที่ระบุ ก่อนหมุดหมาย)
+         *     งานที่ลูกค้าขอ (source = customer) อนุมัติไม่ได้จนกว่าลูกค้าจะยืนยัน (409)
+         */
+        post: operations["createChangeOrder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{code}/change-orders/{id}/customer-confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** บันทึกว่าลูกค้ายืนยันรายการและราคาแล้ว (คำขอที่ยังรออนุมัติ) */
+        post: operations["confirmChangeOrderByCustomer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{code}/change-orders/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** ยกเลิกคำขอที่ยังรออนุมัติ (คำขออนุมัติที่ผูกไว้ถูกปิดด้วย) */
+        post: operations["cancelChangeOrder"];
         delete?: never;
         options?: never;
         head?: never;
@@ -863,9 +1126,10 @@ export interface components {
          *     - approval.any: อนุมัติได้ทุกยอด
          *     - project.create: เปิดโครงการใหม่
          *     - project.manage: จัดการโครงการ เช่น บันทึกสัญญาและเริ่มแผนงาน
+         *     - user.manage: จัดการบัญชีผู้ใช้ บทบาท และสิทธิ์ของบุคลากร
          * @enum {string}
          */
-        Permission: "progress.update" | "personnel.sensitive" | "finance.company" | "approval.any" | "project.create" | "project.manage";
+        Permission: "progress.update" | "personnel.sensitive" | "finance.company" | "approval.any" | "project.create" | "project.manage" | "user.manage";
         CurrentUser: {
             id: string;
             name: string;
@@ -904,9 +1168,116 @@ export interface components {
                 label: string;
                 access: string;
                 restriction: string;
+                /** @description สิทธิ์ตั้งต้นของบทบาท (ปรับรายคนได้ที่บัญชีผู้ใช้) */
+                permissions: components["schemas"]["Permission"][];
                 suggested?: boolean;
                 optional?: boolean;
             }[];
+        };
+        LoginInput: {
+            email: string;
+            password: string;
+            /**
+             * @description จดจำการเข้าสู่ระบบ (token อายุ 30 วัน แทน 8 ชั่วโมง)
+             * @default false
+             */
+            remember: boolean;
+        };
+        LoginResult: {
+            /** @description ส่งใน header Authorization: Bearer <token> */
+            accessToken: string;
+            /** Format: date-time */
+            expiresAt: string;
+            user: components["schemas"]["CurrentUser"];
+        };
+        /** @enum {string} */
+        RegistrationStatus: "pending" | "approved" | "rejected";
+        RegistrationInput: {
+            fullName: string;
+            /** Format: email */
+            email: string;
+            /** @description ตัวเลข 9-10 หลัก ขึ้นต้นด้วย 0 */
+            phone: string;
+            /** @description รหัสบุคลากร (ถ้ามี) ช่วยให้ผู้อนุมัติจับคู่กับทะเบียนบุคลากรได้ */
+            employeeCode?: string;
+            /** @description ตำแหน่งงานที่แจ้งมา */
+            position?: string;
+            /** @description ข้อความถึงผู้อนุมัติ เช่น ทำงานโครงการไหน */
+            note?: string;
+            /** @description ใช้ได้หลังได้รับอนุมัติ (หลังบ้านเก็บแบบ hash เท่านั้น) */
+            password: string;
+        };
+        Registration: {
+            id: string;
+            fullName: string;
+            email: string;
+            phone: string;
+            employeeCode?: string;
+            position?: string;
+            note?: string;
+            status: components["schemas"]["RegistrationStatus"];
+            /** Format: date-time */
+            submittedAt: string;
+            /** @description บุคลากรที่หลังบ้านจับคู่ให้ (จากรหัสบุคลากร อีเมล หรือชื่อ) และยังไม่มีบัญชี */
+            suggestedPersonnelId?: string;
+            /** Format: date-time */
+            decidedAt?: string;
+            decidedBy?: components["schemas"]["UserRef"];
+            rejectReason?: string;
+            /** @description บัญชีที่สร้างเมื่ออนุมัติ */
+            accountId?: string;
+        };
+        /**
+         * @description - invited: ส่งคำเชิญแล้ว ยังไม่ได้ตั้งรหัสผ่าน
+         *     - active: ใช้งานได้
+         *     - suspended: ระงับการเข้าสู่ระบบ (เก็บประวัติไว้)
+         * @enum {string}
+         */
+        UserAccountStatus: "invited" | "active" | "suspended";
+        /**
+         * @description สิทธิ์ที่ใช้จริง = สิทธิ์ตั้งต้นของบทบาท + grantedPermissions − revokedPermissions
+         *     บทบาทกลุ่มทีมประจำโครงการ (project) ต้องระบุ projectCodes อย่างน้อย 1 โครงการ; กลุ่มทีมภายใน (internal) เห็นทุกโครงการ ให้ส่ง projectCodes ว่าง
+         */
+        UserAccountInput: {
+            /**
+             * Format: email
+             * @description อีเมลที่ใช้เข้าสู่ระบบ (ซ้ำกับบัญชีอื่นไม่ได้ 409)
+             */
+            email: string;
+            roleId: components["schemas"]["RoleId"];
+            projectCodes: string[];
+            /** @description สิทธิ์ที่ให้เพิ่มจากบทบาท */
+            grantedPermissions: components["schemas"]["Permission"][];
+            /** @description สิทธิ์ของบทบาทที่ถอนออกสำหรับคนนี้ */
+            revokedPermissions: components["schemas"]["Permission"][];
+        };
+        UserAccountCreateInput: components["schemas"]["UserAccountInput"] & {
+            /** @description บุคลากรที่ยังไม่มีบัญชี (1 คน 1 บัญชี ซ้ำได้ 409) */
+            personnelId: string;
+        };
+        UserAccount: components["schemas"]["UserAccountInput"] & {
+            id: string;
+            personnelId: string;
+            /** @description ชื่อจากทะเบียนบุคลากร */
+            name: string;
+            employeeCode?: string;
+            position?: string;
+            department?: string;
+            /** @description เบอร์โทรจากทะเบียนบุคลากร */
+            phone?: string;
+            roleLabel: string;
+            status: components["schemas"]["UserAccountStatus"];
+            /** @description สิทธิ์ที่ใช้จริง (หลังบ้านคำนวณ) */
+            permissions: components["schemas"]["Permission"][];
+            /** Format: date-time */
+            createdAt: string;
+            /**
+             * Format: date-time
+             * @description ส่งคำเชิญหรือลิงก์ตั้งรหัสผ่านล่าสุด
+             */
+            invitedAt?: string;
+            /** Format: date-time */
+            lastLoginAt?: string;
         };
         ApprovalSettings: {
             /** @description วงเงินที่ผู้จัดการโครงการอนุมัติได้ต่อรายการ (บาท) */
@@ -1017,6 +1388,77 @@ export interface components {
              * @description วันสิ้นสุดการรับประกันผลงาน (หลังบ้านคำนวณจากวันส่งมอบ + ระยะประกัน)
              */
             warrantyUntil?: string | null;
+            /** @description ยอดสุทธิของงานเพิ่ม-ลดที่อนุมัติแล้ว (บวก = เพิ่ม ลบ = ลด) */
+            changeOrderTotal?: number;
+            /** @description มูลค่าสัญญาปัจจุบัน = value + changeOrderTotal (null จนกว่าจะบันทึกสัญญา) */
+            revisedValue?: number | null;
+        };
+        /**
+         * @description - customer: ลูกค้าขอเพิ่ม/เปลี่ยนงานนอกสัญญา (ต้องให้ลูกค้ายืนยันก่อนอนุมัติ)
+         *     - site: ปรับแก้ระหว่างก่อสร้างตามสภาพหน้างาน
+         *     - design: แก้แบบ/เปลี่ยนวัสดุตามผู้ออกแบบ
+         * @enum {string}
+         */
+        ChangeOrderSource: "customer" | "site" | "design";
+        /**
+         * @description pending = รออนุมัติ, approved = อนุมัติแล้ว (ปรับมูลค่า/ไทม์ไลน์แล้ว), rejected = ไม่อนุมัติ, cancelled = ผู้ขอยกเลิก
+         * @enum {string}
+         */
+        ChangeOrderStatus: "pending" | "approved" | "rejected" | "cancelled";
+        ChangeOrderItem: {
+            name: string;
+            /**
+             * @description add = งานเพิ่ม (บวกมูลค่า), deduct = งานลด (หักมูลค่า)
+             * @enum {string}
+             */
+            kind: "add" | "deduct";
+            quantity: number;
+            unit: string;
+            unitPrice: number;
+        };
+        ChangeOrderInput: {
+            title: string;
+            source: components["schemas"]["ChangeOrderSource"];
+            /** @description เหตุผล/รายละเอียดที่ขอเปลี่ยน */
+            reason: string;
+            items: components["schemas"]["ChangeOrderItem"][];
+            /** @description เลื่อนกำหนดส่งมอบ (วัน) เมื่ออนุมัติ — ลบ = เร็วขึ้น */
+            scheduleImpactDays: number;
+            /** @description เพิ่มงานเข้าไทม์ไลน์เมื่ออนุมัติ (ติดตามความคืบหน้าได้เหมือนงานอื่น) */
+            newTask?: {
+                phaseCode: string;
+                name: string;
+                durationDays: number;
+            };
+            /** @description ลูกค้ายืนยันรายการและราคาแล้ว (เช่น ลงนามใบเสนอราคางานเพิ่ม) */
+            customerConfirmed: boolean;
+        };
+        ChangeOrder: components["schemas"]["ChangeOrderInput"] & {
+            /** @example CO-CR690002-01 */
+            id: string;
+            projectCode: string;
+            status: components["schemas"]["ChangeOrderStatus"];
+            addTotal: number;
+            deductTotal: number;
+            /** @description ยอดสุทธิ = addTotal − deductTotal */
+            total: number;
+            requestedBy: components["schemas"]["UserRef"];
+            /** Format: date-time */
+            requestedAt: string;
+            /** @description คำขออนุมัติในศูนย์อนุมัติ (อนุมัติ/ไม่อนุมัติผ่าน /approvals/{approvalId}) */
+            approvalId: string;
+            /** Format: date-time */
+            customerConfirmedAt?: string;
+            /** Format: date-time */
+            decidedAt?: string;
+            decidedBy?: components["schemas"]["UserRef"];
+            decisionNote?: string;
+            /** @description รหัสงานที่เพิ่มเข้าไทม์ไลน์เมื่ออนุมัติ */
+            appliedTaskCode?: string;
+            /** Format: date */
+            deliveryDateBefore?: string;
+            /** Format: date */
+            deliveryDateAfter?: string;
         };
         /** @description single = รหัสตัวเลือก, multiple = รายการรหัส, boolean = true/false */
         ConstructionOptionValue: string | boolean | string[];
@@ -1271,6 +1713,8 @@ export interface components {
             dueDate: string;
             /** Format: date */
             paidDate?: string | null;
+            /** @description งวดของงานเพิ่ม-ลด (ไม่อยู่ในงวดตามสัญญาเดิม) */
+            changeOrderId?: string;
         };
         SitePhoto: {
             id: string;
@@ -1596,6 +2040,8 @@ export interface components {
             approvalLevel: components["schemas"]["ApprovalLevel"];
             items: components["schemas"]["ApprovalItem"][];
             history: components["schemas"]["ApprovalStep"][];
+            /** @description คำขอนี้มาจากงานเพิ่ม-ลดของโครงการ (อนุมัติแล้วหลังบ้านปรับมูลค่า/ไทม์ไลน์ให้) */
+            changeOrderId?: string;
         };
         ApprovalPage: components["schemas"]["PageMeta"] & {
             items: components["schemas"]["Approval"][];
@@ -1788,6 +2234,42 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    login: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginInput"];
+            };
+        };
+        responses: {
+            /** @description เข้าสู่ระบบแล้ว */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoginResult"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["ValidationError"];
+            /** @description พยายามเข้าสู่ระบบผิดหลายครั้ง */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     getCurrentUser: {
         parameters: {
             query?: never;
@@ -1825,6 +2307,125 @@ export interface operations {
                 };
                 content?: never;
             };
+        };
+    };
+    register: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegistrationInput"];
+            };
+        };
+        responses: {
+            /** @description รับคำขอแล้ว รออนุมัติ */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        /** @constant */
+                        status: "pending";
+                        /** Format: date-time */
+                        submittedAt: string;
+                    };
+                };
+            };
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationError"];
+        };
+    };
+    listRegistrations: {
+        parameters: {
+            query?: {
+                status?: components["schemas"]["RegistrationStatus"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK (ใหม่สุดก่อน) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Registration"][];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    approveRegistration: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserAccountInput"] & {
+                    personnelId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description อนุมัติแล้ว */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserAccount"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationError"];
+        };
+    };
+    rejectRegistration: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description ปฏิเสธแล้ว */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Registration"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationError"];
         };
     };
     listUsers: {
@@ -1866,6 +2467,173 @@ export interface operations {
                     "application/json": components["schemas"]["RoleCatalog"];
                 };
             };
+        };
+    };
+    listUserAccounts: {
+        parameters: {
+            query?: {
+                /** @description ค้นหาชื่อ รหัสบุคลากร อีเมล */
+                q?: string;
+                roleId?: components["schemas"]["RoleId"];
+                status?: components["schemas"]["UserAccountStatus"];
+                /** @description บัญชีของบุคลากรคนนี้ (มีได้ไม่เกิน 1) */
+                personnelId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserAccount"][];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    createUserAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserAccountCreateInput"];
+            };
+        };
+        responses: {
+            /** @description สร้างแล้ว */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserAccount"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationError"];
+        };
+    };
+    updateUserAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserAccountInput"];
+            };
+        };
+        responses: {
+            /** @description บันทึกแล้ว */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserAccount"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationError"];
+        };
+    };
+    suspendUserAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** @description เหตุผล (บันทึกใน Audit Log) */
+                    reason?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description ระงับแล้ว */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserAccount"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    activateUserAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description เปิดใช้แล้ว */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserAccount"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    resetUserPassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ส่งแล้ว (invitedAt เปลี่ยนเป็นเวลาล่าสุด) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserAccount"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
     getApprovalSettings: {
@@ -2302,6 +3070,117 @@ export interface operations {
             };
             413: components["responses"]["ValidationError"];
             422: components["responses"]["ValidationError"];
+        };
+    };
+    listChangeOrders: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeOrder"][];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    createChangeOrder: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangeOrderInput"];
+            };
+        };
+        responses: {
+            /** @description ส่งขออนุมัติแล้ว */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeOrder"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationError"];
+        };
+    };
+    confirmChangeOrderByCustomer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description บันทึกแล้ว */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeOrder"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    cancelChangeOrder: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    reason?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description ยกเลิกแล้ว */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeOrder"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
     listProjectInstallments: {

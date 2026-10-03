@@ -1,7 +1,7 @@
 import { NgClass } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, computed, inject, linkedSignal, signal } from '@angular/core';
-import { rxResource, toObservable, toSignal } from '@angular/core/rxjs-interop';
+import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { MessageService } from 'primeng/api';
 import { ButtonModule } from 'primeng/button';
@@ -16,6 +16,7 @@ import { ConstructionOptionGroup, ConstructionOptionValue, CustomTask, ProjectSe
 import { InputTextModule } from 'primeng/inputtext';
 import { ProjectService, isContracted } from '@/app/pages/service/project.service';
 import { ThaiDatePipe } from './thai-date.pipe';
+import { apiResource } from '@/app/api/api-resource';
 
 /**
  * ตั้งค่างานก่อสร้าง (หลังบันทึกสัญญา): เลือกว่าบ้านหลังนี้มีอะไรบ้าง เช่น จำนวนชั้น ประเภทฐานราก ระบบพิเศษ
@@ -666,15 +667,15 @@ export class ProjectSetup {
 
     readonly code = toSignal(this.route.paramMap.pipe(map((params) => params.get('code') ?? '')), { initialValue: '' });
 
-    readonly projectResource = rxResource({ params: () => this.code() || undefined, stream: ({ params: code }) => this.projectService.get(code) });
+    readonly projectResource = apiResource({ params: () => this.code() || undefined, stream: ({ params: code }) => this.projectService.get(code) });
     readonly project = computed(() => {
         const project = this.projectResource.value();
         return isContracted(project) ? project : null;
     });
     readonly loadError = computed(() => problemMessage(this.projectResource.error(), 'ไม่พบโครงการ'));
 
-    readonly optionsResource = rxResource({ stream: () => this.setupService.options(), defaultValue: [] });
-    readonly setupResource = rxResource({ params: () => (this.project() ? this.code() : undefined), stream: ({ params: code }) => this.setupService.get(code) });
+    readonly optionsResource = apiResource({ stream: () => this.setupService.options(), defaultValue: [] });
+    readonly setupResource = apiResource({ params: () => (this.project() ? this.code() : undefined), stream: ({ params: code }) => this.setupService.get(code) });
     readonly setup = computed(() => this.setupResource.value());
 
     readonly canManage = computed(() => this.auth.can('project.manage'));
@@ -742,7 +743,7 @@ export class ProjectSetup {
     });
 
     private readonly debouncedDraft = toSignal(toObservable(this.draft).pipe(debounceTime(250)));
-    readonly previewResource = rxResource({
+    readonly previewResource = apiResource({
         params: () => {
             const input = this.debouncedDraft();
             return this.setup() && input && Object.keys(input.options).length ? { code: this.code(), input } : undefined;

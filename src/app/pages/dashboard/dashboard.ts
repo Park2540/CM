@@ -4,7 +4,7 @@ import { Router, RouterLink } from '@angular/router';
 import { ButtonModule } from 'primeng/button';
 import { ChartModule } from 'primeng/chart';
 import { LayoutService } from '@/app/layout/service/layout.service';
-import { rxResource } from '@angular/core/rxjs-interop';
+import { AuthService } from '@/app/pages/service/auth.service';
 import { ApprovalService, APPROVAL_TYPE_LABEL } from '@/app/pages/service/approval.service';
 import { AuditLogService } from '@/app/pages/service/audit-log.service';
 import { CompanyFinanceService, ProjectHealth } from '@/app/pages/service/company-finance.service';
@@ -13,6 +13,7 @@ import { PROJECT_STATUS_LABEL, ProjectGroup, ProjectService, ProjectStatus, getP
 import { TagModule } from 'primeng/tag';
 import { ThaiDatePipe } from '@/app/pages/projects/thai-date.pipe';
 import { problemMessage } from '@/app/api/api';
+import { apiResource } from '@/app/api/api-resource';
 
 /** สีชุดข้อมูลกราฟ (ผ่านการตรวจ CVD ทั้งโหมดสว่างและมืด) */
 const CHART_COLORS = {
@@ -42,7 +43,7 @@ export function formatBaht(value: number, compact = false): string {
         <div class="flex flex-wrap justify-between items-end gap-3 mb-6">
             <div>
                 <h1 class="text-2xl font-bold m-0">ภาพรวมบริษัท</h1>
-                <p class="text-muted-color mt-1 mb-0">ข้อมูล ณ {{ today | thaiDate }} · ทุกโครงการ</p>
+                <p class="text-muted-color mt-1 mb-0">ข้อมูล ณ {{ today | thaiDate }} · {{ canViewFinance() ? 'ทุกโครงการ' : 'ตัวเลขการเงินแสดงเฉพาะผู้มีสิทธิ์การเงินระดับบริษัท' }}</p>
             </div>
             <span class="flex items-center gap-2 text-sm rounded-lg px-3 py-2 bg-blue-50 text-blue-800 dark:bg-blue-500/10 dark:text-blue-200" role="note"> <i class="pi pi-info-circle"></i>ตัวเลขเป็นข้อมูลตัวอย่าง ยังไม่ได้เชื่อมต่อระบบบัญชี </span>
         </div>
@@ -144,44 +145,54 @@ export function formatBaht(value: number, compact = false): string {
 
         <div class="grid grid-cols-12 gap-6 mb-6">
             <!-- กระแสเงินสด -->
-            <section class="card m-0 col-span-12 xl:col-span-8" aria-labelledby="cashflow-heading">
-                <div class="flex flex-wrap justify-between items-start gap-3 mb-4">
-                    <div>
-                        <h2 id="cashflow-heading" class="text-lg font-semibold m-0">เงินรับ-เงินจ่าย รายเดือน</h2>
-                        <p class="text-sm text-muted-color mt-1 mb-0">6 เดือนล่าสุด · รับ {{ cashTotals().cashIn | number: '1.0-0' }} บาท · จ่าย {{ cashTotals().cashOut | number: '1.0-0' }} บาท</p>
+            @if (canViewFinance()) {
+                <section class="card m-0 col-span-12 xl:col-span-8" aria-labelledby="cashflow-heading">
+                    <div class="flex flex-wrap justify-between items-start gap-3 mb-4">
+                        <div>
+                            <h2 id="cashflow-heading" class="text-lg font-semibold m-0">เงินรับ-เงินจ่าย รายเดือน</h2>
+                            <p class="text-sm text-muted-color mt-1 mb-0">6 เดือนล่าสุด · รับ {{ cashTotals().cashIn | number: '1.0-0' }} บาท · จ่าย {{ cashTotals().cashOut | number: '1.0-0' }} บาท</p>
+                        </div>
+                        <button
+                            pButton
+                            type="button"
+                            [text]="true"
+                            size="small"
+                            [icon]="showCashTable() ? 'pi pi-chart-bar' : 'pi pi-table'"
+                            [label]="showCashTable() ? 'ดูเป็นกราฟ' : 'ดูเป็นตาราง'"
+                            (click)="showCashTable.set(!showCashTable())"
+                        ></button>
                     </div>
-                    <button pButton type="button" [text]="true" size="small" [icon]="showCashTable() ? 'pi pi-chart-bar' : 'pi pi-table'" [label]="showCashTable() ? 'ดูเป็นกราฟ' : 'ดูเป็นตาราง'" (click)="showCashTable.set(!showCashTable())"></button>
-                </div>
-                @if (showCashTable()) {
-                    <table class="w-full text-sm border-collapse">
-                        <thead>
-                            <tr class="border-b border-surface text-muted-color text-left">
-                                <th class="py-2 font-semibold">เดือน</th>
-                                <th class="py-2 font-semibold text-right">เงินรับ (บาท)</th>
-                                <th class="py-2 font-semibold text-right">เงินจ่าย (บาท)</th>
-                                <th class="py-2 font-semibold text-right">สุทธิ (บาท)</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @for (month of cashFlow(); track month.key) {
-                                <tr class="border-b border-surface last:border-b-0">
-                                    <td class="py-2">{{ month.label }}</td>
-                                    <td class="py-2 text-right tabular-nums">{{ month.cashIn | number: '1.0-0' }}</td>
-                                    <td class="py-2 text-right tabular-nums">{{ month.cashOut | number: '1.0-0' }}</td>
-                                    <td class="py-2 text-right tabular-nums">{{ month.cashIn - month.cashOut | number: '1.0-0' }}</td>
+                    @if (showCashTable()) {
+                        <table class="w-full text-sm border-collapse">
+                            <thead>
+                                <tr class="border-b border-surface text-muted-color text-left">
+                                    <th class="py-2 font-semibold">เดือน</th>
+                                    <th class="py-2 font-semibold text-right">เงินรับ (บาท)</th>
+                                    <th class="py-2 font-semibold text-right">เงินจ่าย (บาท)</th>
+                                    <th class="py-2 font-semibold text-right">สุทธิ (บาท)</th>
                                 </tr>
-                            }
-                        </tbody>
-                    </table>
-                } @else {
-                    <div class="h-80">
-                        <p-chart type="bar" [data]="chartData()" [options]="chartOptions()" height="100%" [ariaLabel]="'กราฟเงินรับและเงินจ่ายรายเดือน 6 เดือนล่าสุด'" />
-                    </div>
-                }
-            </section>
+                            </thead>
+                            <tbody>
+                                @for (month of cashFlow(); track month.key) {
+                                    <tr class="border-b border-surface last:border-b-0">
+                                        <td class="py-2">{{ month.label }}</td>
+                                        <td class="py-2 text-right tabular-nums">{{ month.cashIn | number: '1.0-0' }}</td>
+                                        <td class="py-2 text-right tabular-nums">{{ month.cashOut | number: '1.0-0' }}</td>
+                                        <td class="py-2 text-right tabular-nums">{{ month.cashIn - month.cashOut | number: '1.0-0' }}</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    } @else {
+                        <div class="h-80">
+                            <p-chart type="bar" [data]="chartData()" [options]="chartOptions()" height="100%" [ariaLabel]="'กราฟเงินรับและเงินจ่ายรายเดือน 6 เดือนล่าสุด'" />
+                        </div>
+                    }
+                </section>
+            }
 
             <!-- รออนุมัติ -->
-            <section class="card m-0 col-span-12 xl:col-span-4 flex flex-col" aria-labelledby="approval-heading">
+            <section class="card m-0 col-span-12 flex flex-col" [ngClass]="canViewFinance() ? 'xl:col-span-4' : ''" aria-labelledby="approval-heading">
                 <div class="flex justify-between items-center gap-3 mb-4">
                     <h2 id="approval-heading" class="text-lg font-semibold m-0">รออนุมัติ</h2>
                     <span class="px-2 py-1 rounded-full text-xs font-semibold bg-orange-500 text-white">{{ pendingCount() }} รายการ</span>
@@ -211,81 +222,83 @@ export function formatBaht(value: number, compact = false): string {
         </div>
 
         <!-- กำไร-ขาดทุนรายโครงการ -->
-        <section class="card mb-6" aria-labelledby="pl-heading">
-            <div class="flex flex-wrap justify-between items-center gap-3 mb-4">
-                <h2 id="pl-heading" class="text-lg font-semibold m-0">กำไร-ขาดทุนรายโครงการ</h2>
-                <span class="text-sm text-muted-color">หน่วย: บาท · รายได้รับรู้ตามความคืบหน้า</span>
-            </div>
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm border-collapse" style="min-width: 64rem">
-                    <thead>
-                        <tr class="border-b border-surface text-muted-color text-left">
-                            <th class="py-3 pr-3 font-semibold">โครงการ</th>
-                            <th class="py-3 pr-3 font-semibold text-right">มูลค่าสัญญา</th>
-                            <th class="py-3 pr-3 font-semibold text-right">ความคืบหน้า</th>
-                            <th class="py-3 pr-3 font-semibold text-right">รายได้รับรู้</th>
-                            <th class="py-3 pr-3 font-semibold text-right">ต้นทุนจริง</th>
-                            <th class="py-3 pr-3 font-semibold text-right">กำไรขั้นต้น</th>
-                            <th class="py-3 pr-3 font-semibold text-right">อัตรากำไร</th>
-                            <th class="py-3 pr-3 font-semibold text-right">คาดการณ์กำไรเมื่อจบ</th>
-                            <th class="py-3 font-semibold">สถานะ</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @for (row of financeRows(); track row.projectCode) {
-                            <tr
-                                class="border-b border-surface cursor-pointer hover:bg-emphasis"
-                                tabindex="0"
-                                role="link"
-                                [attr.aria-label]="'เปิดโครงการ ' + row.projectCode"
-                                (click)="openProject(row.projectCode)"
-                                (keydown.enter)="openProject(row.projectCode)"
-                            >
-                                <td class="py-3 pr-3">
-                                    <div class="font-semibold">{{ row.projectCode }}</div>
-                                    <div class="text-xs text-muted-color">{{ row.customerName }}</div>
-                                </td>
-                                <td class="py-3 pr-3 text-right tabular-nums">{{ row.contractValue | number: '1.0-0' }}</td>
-                                <td class="py-3 pr-3 text-right tabular-nums">
-                                    {{ row.progress }}%
-                                    @if (row.progress < 100) {
-                                        <div class="text-xs text-muted-color">แผน {{ row.plannedProgress }}%</div>
-                                    }
-                                </td>
-                                <td class="py-3 pr-3 text-right tabular-nums">{{ row.earnedRevenue | number: '1.0-0' }}</td>
-                                <td class="py-3 pr-3 text-right tabular-nums">{{ row.actualCost | number: '1.0-0' }}</td>
-                                <td class="py-3 pr-3 text-right tabular-nums font-semibold">{{ row.grossProfit | number: '1.0-0' }}</td>
-                                <td class="py-3 pr-3 text-right tabular-nums">{{ row.margin | number: '1.1-1' }}%</td>
-                                <td class="py-3 pr-3 text-right tabular-nums">{{ row.forecastProfit | number: '1.0-0' }}</td>
-                                <td class="py-3">
-                                    <span class="inline-flex items-center gap-2 whitespace-nowrap">
-                                        <i class="pi" [ngClass]="health[row.health].icon" [style.color]="health[row.health].color" aria-hidden="true"></i>
-                                        {{ health[row.health].label }}
-                                    </span>
-                                </td>
+        @if (canViewFinance()) {
+            <section class="card mb-6" aria-labelledby="pl-heading">
+                <div class="flex flex-wrap justify-between items-center gap-3 mb-4">
+                    <h2 id="pl-heading" class="text-lg font-semibold m-0">กำไร-ขาดทุนรายโครงการ</h2>
+                    <span class="text-sm text-muted-color">หน่วย: บาท · รายได้รับรู้ตามความคืบหน้า</span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm border-collapse" style="min-width: 64rem">
+                        <thead>
+                            <tr class="border-b border-surface text-muted-color text-left">
+                                <th class="py-3 pr-3 font-semibold">โครงการ</th>
+                                <th class="py-3 pr-3 font-semibold text-right">มูลค่าสัญญา</th>
+                                <th class="py-3 pr-3 font-semibold text-right">ความคืบหน้า</th>
+                                <th class="py-3 pr-3 font-semibold text-right">รายได้รับรู้</th>
+                                <th class="py-3 pr-3 font-semibold text-right">ต้นทุนจริง</th>
+                                <th class="py-3 pr-3 font-semibold text-right">กำไรขั้นต้น</th>
+                                <th class="py-3 pr-3 font-semibold text-right">อัตรากำไร</th>
+                                <th class="py-3 pr-3 font-semibold text-right">คาดการณ์กำไรเมื่อจบ</th>
+                                <th class="py-3 font-semibold">สถานะ</th>
                             </tr>
-                        } @empty {
-                            <tr>
-                                <td colspan="9" class="py-8 text-center text-muted-color">{{ summaryResource.isLoading() ? 'กำลังโหลด...' : 'ไม่มีข้อมูล' }}</td>
+                        </thead>
+                        <tbody>
+                            @for (row of financeRows(); track row.projectCode) {
+                                <tr
+                                    class="border-b border-surface cursor-pointer hover:bg-emphasis"
+                                    tabindex="0"
+                                    role="link"
+                                    [attr.aria-label]="'เปิดโครงการ ' + row.projectCode"
+                                    (click)="openProject(row.projectCode)"
+                                    (keydown.enter)="openProject(row.projectCode)"
+                                >
+                                    <td class="py-3 pr-3">
+                                        <div class="font-semibold">{{ row.projectCode }}</div>
+                                        <div class="text-xs text-muted-color">{{ row.customerName }}</div>
+                                    </td>
+                                    <td class="py-3 pr-3 text-right tabular-nums">{{ row.contractValue | number: '1.0-0' }}</td>
+                                    <td class="py-3 pr-3 text-right tabular-nums">
+                                        {{ row.progress }}%
+                                        @if (row.progress < 100) {
+                                            <div class="text-xs text-muted-color">แผน {{ row.plannedProgress }}%</div>
+                                        }
+                                    </td>
+                                    <td class="py-3 pr-3 text-right tabular-nums">{{ row.earnedRevenue | number: '1.0-0' }}</td>
+                                    <td class="py-3 pr-3 text-right tabular-nums">{{ row.actualCost | number: '1.0-0' }}</td>
+                                    <td class="py-3 pr-3 text-right tabular-nums font-semibold">{{ row.grossProfit | number: '1.0-0' }}</td>
+                                    <td class="py-3 pr-3 text-right tabular-nums">{{ row.margin | number: '1.1-1' }}%</td>
+                                    <td class="py-3 pr-3 text-right tabular-nums">{{ row.forecastProfit | number: '1.0-0' }}</td>
+                                    <td class="py-3">
+                                        <span class="inline-flex items-center gap-2 whitespace-nowrap">
+                                            <i class="pi" [ngClass]="health[row.health].icon" [style.color]="health[row.health].color" aria-hidden="true"></i>
+                                            {{ health[row.health].label }}
+                                        </span>
+                                    </td>
+                                </tr>
+                            } @empty {
+                                <tr>
+                                    <td colspan="9" class="py-8 text-center text-muted-color">{{ summaryResource.isLoading() ? 'กำลังโหลด...' : 'ไม่มีข้อมูล' }}</td>
+                                </tr>
+                            }
+                        </tbody>
+                        <tfoot>
+                            <tr class="font-semibold">
+                                <td class="py-3 pr-3">รวมทุกโครงการ</td>
+                                <td class="py-3 pr-3 text-right tabular-nums">{{ totals()?.contractValue | number: '1.0-0' }}</td>
+                                <td></td>
+                                <td class="py-3 pr-3 text-right tabular-nums">{{ totals()?.earnedRevenue | number: '1.0-0' }}</td>
+                                <td class="py-3 pr-3 text-right tabular-nums">{{ totals()?.actualCost | number: '1.0-0' }}</td>
+                                <td class="py-3 pr-3 text-right tabular-nums">{{ totals()?.grossProfit | number: '1.0-0' }}</td>
+                                <td class="py-3 pr-3 text-right tabular-nums">{{ totals()?.margin | number: '1.1-1' }}%</td>
+                                <td class="py-3 pr-3 text-right tabular-nums">{{ totals()?.forecastProfit | number: '1.0-0' }}</td>
+                                <td></td>
                             </tr>
-                        }
-                    </tbody>
-                    <tfoot>
-                        <tr class="font-semibold">
-                            <td class="py-3 pr-3">รวมทุกโครงการ</td>
-                            <td class="py-3 pr-3 text-right tabular-nums">{{ totals()?.contractValue | number: '1.0-0' }}</td>
-                            <td></td>
-                            <td class="py-3 pr-3 text-right tabular-nums">{{ totals()?.earnedRevenue | number: '1.0-0' }}</td>
-                            <td class="py-3 pr-3 text-right tabular-nums">{{ totals()?.actualCost | number: '1.0-0' }}</td>
-                            <td class="py-3 pr-3 text-right tabular-nums">{{ totals()?.grossProfit | number: '1.0-0' }}</td>
-                            <td class="py-3 pr-3 text-right tabular-nums">{{ totals()?.margin | number: '1.1-1' }}%</td>
-                            <td class="py-3 pr-3 text-right tabular-nums">{{ totals()?.forecastProfit | number: '1.0-0' }}</td>
-                            <td></td>
-                        </tr>
-                    </tfoot>
-                </table>
-            </div>
-        </section>
+                        </tfoot>
+                    </table>
+                </div>
+            </section>
+        }
 
         <!-- กิจกรรมล่าสุด -->
         <section class="card" aria-labelledby="activity-heading">
@@ -317,19 +330,23 @@ export class Dashboard {
     private readonly auditLog = inject(AuditLogService);
     private readonly finance = inject(CompanyFinanceService);
     private readonly projects = inject(ProjectService);
+    private readonly auth = inject(AuthService);
+
+    /** ตัวเลขการเงินระดับบริษัท (กำไร-ขาดทุน กระแสเงินสด) เฉพาะผู้มีสิทธิ์ finance.company */
+    readonly canViewFinance = computed(() => this.auth.can('finance.company'));
 
     readonly today = todayAsDate();
     readonly health = HEALTH_DISPLAY;
     readonly typeLabel = APPROVAL_TYPE_LABEL;
     readonly showCashTable = signal(false);
 
-    readonly summaryResource = rxResource({ stream: () => this.finance.summary() });
-    readonly cashFlowResource = rxResource({ stream: () => this.finance.cashFlow(6), defaultValue: [] });
-    readonly totals = computed(() => this.summaryResource.value()?.totals);
-    readonly financeRows = computed(() => this.summaryResource.value()?.projects ?? []);
-    readonly cashFlow = this.cashFlowResource.value;
+    readonly summaryResource = apiResource({ params: () => this.canViewFinance() || undefined, stream: () => this.finance.summary() });
+    readonly cashFlowResource = apiResource({ params: () => this.canViewFinance() || undefined, stream: () => this.finance.cashFlow(6), defaultValue: [] });
+    readonly totals = computed(() => (this.summaryResource.hasValue() ? this.summaryResource.value().totals : undefined));
+    readonly financeRows = computed(() => (this.summaryResource.hasValue() ? this.summaryResource.value().projects : []));
+    readonly cashFlow = computed(() => (this.cashFlowResource.hasValue() ? this.cashFlowResource.value() : []));
 
-    readonly portfolioResource = rxResource({ stream: () => this.projects.portfolio() });
+    readonly portfolioResource = apiResource({ stream: () => this.projects.portfolio() });
     readonly portfolio = computed(() => (this.portfolioResource.hasValue() ? this.portfolioResource.value() : undefined));
     readonly warranties = computed(() => (this.portfolio()?.warranties ?? []).slice(0, 5));
     readonly statusLabel = PROJECT_STATUS_LABEL;
@@ -371,21 +388,22 @@ export class Dashboard {
     });
     readonly pendingCount = computed(() => this.approvals.summary()?.pending ?? 0);
     // Both lists reload whenever the approval summary changes (i.e. after any decision).
-    private readonly topPendingResource = rxResource({
+    private readonly topPendingResource = apiResource({
         params: () => this.approvals.summary(),
         stream: () => this.approvals.list({ status: 'pending', sort: 'priority', pageSize: 5 })
     });
-    readonly topPending = computed(() => this.topPendingResource.value()?.items ?? []);
-    private readonly activityResource = rxResource({
+    readonly topPending = computed(() => (this.topPendingResource.hasValue() ? this.topPendingResource.value().items : []));
+    private readonly activityResource = apiResource({
         params: () => this.approvals.summary(),
         stream: () => this.auditLog.list({ pageSize: 6 })
     });
-    readonly recentActivity = computed(() => this.activityResource.value()?.items ?? []);
+    readonly recentActivity = computed(() => (this.activityResource.hasValue() ? this.activityResource.value().items : []));
 
     readonly kpis = computed(() => {
         const totals = this.totals();
         const summary = this.approvals.summary();
         const loading = 'กำลังโหลด...';
+        const finance = this.canViewFinance();
         return [
             { label: 'มูลค่างานในมือ', icon: 'pi-briefcase', value: totals ? formatBaht(totals.backlog, true) : '–', hint: totals ? `${totals.activeProjects} โครงการกำลังดำเนินการ` : loading, link: '/projects' },
             { label: 'รายได้รับรู้สะสม', icon: 'pi-chart-line', value: totals ? formatBaht(totals.earnedRevenue, true) : '–', hint: totals ? `จากมูลค่าสัญญารวม ${formatBaht(totals.contractValue, true)}` : loading },
@@ -398,7 +416,7 @@ export class Dashboard {
                 hint: summary ? `รวม ${formatBaht(summary.pendingAmount, true)}` : 'กำลังโหลด...',
                 link: '/approvals'
             }
-        ];
+        ].filter((tile) => finance || tile.label === 'รออนุมัติ');
     });
 
     readonly cashTotals = computed(() => this.cashFlow().reduce((sum, month) => ({ cashIn: sum.cashIn + month.cashIn, cashOut: sum.cashOut + month.cashOut }), { cashIn: 0, cashOut: 0 }));

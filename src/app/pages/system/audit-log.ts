@@ -1,5 +1,5 @@
 import { Component, computed, inject, linkedSignal, signal } from '@angular/core';
-import { rxResource, toObservable, toSignal } from '@angular/core/rxjs-interop';
+import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { debounceTime } from 'rxjs';
 import { ButtonModule } from 'primeng/button';
@@ -12,6 +12,7 @@ import { problemMessage } from '@/app/api/api';
 import { ThaiDatePipe } from '@/app/pages/projects/thai-date.pipe';
 import { AUDIT_MODULE_LABEL, AuditEntry, AuditLogService, AuditModule } from '@/app/pages/service/audit-log.service';
 import { UserService } from '@/app/pages/service/user.service';
+import { apiResource } from '@/app/api/api-resource';
 
 const PAGE_SIZE = 15;
 
@@ -120,7 +121,7 @@ export class AuditLog {
     private readonly filters = computed(() => ({ module: this.moduleFilter(), userId: this.userFilter(), q: this.debouncedQuery() }));
     readonly page = linkedSignal({ source: this.filters, computation: () => 1 });
 
-    readonly logs = rxResource({
+    readonly logs = apiResource({
         params: () => ({ ...this.filters(), page: this.page(), pageSize: PAGE_SIZE }),
         stream: ({ params }) => this.auditLog.list(params),
         defaultValue: { items: [], total: 0, page: 1, pageSize: PAGE_SIZE }

@@ -1,10 +1,10 @@
 import { Component, HostListener, computed, inject, input, linkedSignal, signal } from '@angular/core';
-import { rxResource } from '@angular/core/rxjs-interop';
 import { ButtonModule } from 'primeng/button';
 import { DialogModule } from 'primeng/dialog';
 import { problemMessage } from '@/app/api/api';
 import { ProjectRecordsService, SitePhoto } from '@/app/pages/service/project-records.service';
 import { ThaiDatePipe } from '../thai-date.pipe';
+import { apiResource } from '@/app/api/api-resource';
 
 const PAGE_SIZE = 36;
 
@@ -122,7 +122,7 @@ export class ProjectPhotosTab {
     readonly pageSize = linkedSignal({ source: () => [this.projectCode(), this.phaseFilter()], computation: () => PAGE_SIZE });
     readonly selected = signal<SitePhoto | null>(null);
 
-    readonly photos = rxResource({
+    readonly photos = apiResource({
         params: () => ({ code: this.projectCode(), phaseCode: this.phaseFilter() === 'all' ? null : this.phaseFilter(), pageSize: this.pageSize(), refresh: this.refreshKey() }),
         stream: ({ params }) => this.records.photos(params.code, { phaseCode: params.phaseCode, pageSize: params.pageSize }),
         defaultValue: { items: [], total: 0, phases: [] }

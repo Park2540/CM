@@ -6,3 +6,4 @@ public
 *.md
 *.json
 src/app/api/schema.ts
+backend/src/api/schema.ts

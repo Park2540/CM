@@ -1,6 +1,6 @@
 import { DecimalPipe, NgClass } from '@angular/common';
 import { Component, Injector, afterNextRender, computed, inject, linkedSignal, signal, viewChild } from '@angular/core';
-import { rxResource, toSignal } from '@angular/core/rxjs-interop';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { map } from 'rxjs/operators';
 import { MessageService } from 'primeng/api';
@@ -27,8 +27,11 @@ import { ProjectPhotosTab } from './components/project-photos-tab';
 import { ProjectPlanTab } from './components/project-plan-tab';
 import { ProjectStepsOverview } from './components/project-steps-overview';
 import { ProjectTimelineTab } from './components/project-timeline-tab';
+import { ProjectChangeOrdersTab } from './components/project-change-orders-tab';
+import { ChangeOrderService } from '@/app/pages/service/change-order.service';
 import { PROJECT_TABS, ProjectTab } from './components/project-ui';
 import { ThaiDatePipe } from './thai-date.pipe';
+import { apiResource } from '@/app/api/api-resource';
 
 const RING_RADIUS = 52;
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
@@ -54,6 +57,7 @@ const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
         ProjectPaymentsTab,
         ProjectPhotosTab,
         ProjectPlanTab,
+        ProjectChangeOrdersTab,
         ProjectStepsOverview,
         ProjectTimelineTab,
         RecentPhotosCard,
@@ -72,11 +76,6 @@ const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
         </a>
 
         @if (planned(); as project) {
-            <div class="flex items-center gap-2 text-sm rounded-lg px-4 py-2 mb-4 bg-blue-50 text-blue-800 dark:bg-blue-500/10 dark:text-blue-200" role="note">
-                <i class="pi pi-info-circle"></i>
-                <span>หน้านี้แสดงด้วยข้อมูลตัวอย่าง ยังไม่ได้เชื่อมต่อระบบหลังบ้าน</span>
-            </div>
-
             <!-- ข้อมูลโครงการ -->
             <section class="card flex flex-col lg:flex-row lg:items-center gap-6 mb-0 rounded-b-none">
                 <div class="flex-1 min-w-0">
@@ -108,7 +107,10 @@ const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
                         </div>
                         <div>
                             <dt class="text-sm text-muted-color">มูลค่าสัญญา</dt>
-                            <dd class="m-0 mt-1 font-semibold">฿{{ project.value | number: '1.0-0' }}</dd>
+                            <dd class="m-0 mt-1 font-semibold">฿{{ project.revisedValue ?? project.value | number: '1.0-0' }}</dd>
+                            @if (project.changeOrderTotal) {
+                                <dd class="m-0 text-xs text-muted-color">สัญญาเดิม ฿{{ project.value | number: '1.0-0' }} · งานเพิ่ม-ลด {{ project.changeOrderTotal > 0 ? '+' : '−' }}฿{{ abs(project.changeOrderTotal) | number: '1.0-0' }}</dd>
+                            }
                         </div>
                         <div>
                             <dt class="text-sm text-muted-color">ผู้รับผิดชอบโครงการ</dt>
@@ -174,6 +176,9 @@ const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
                             @if (tab.value === 'payments' && dueCount()) {
                                 <span class="w-5 h-5 rounded-full bg-orange-500 text-white text-xs flex items-center justify-center" [attr.aria-label]="dueCount() + ' งวดรอชำระ'">{{ dueCount() }}</span>
                             }
+                            @if (tab.value === 'changes' && pendingChangeCount()) {
+                                <span class="w-5 h-5 rounded-full bg-orange-500 text-white text-xs flex items-center justify-center" [attr.aria-label]="pendingChangeCount() + ' รายการรออนุมัติ'">{{ pendingChangeCount() }}</span>
+                            }
                         </button>
                     }
                 </div>
@@ -187,7 +192,7 @@ const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
                             <div class="grid grid-cols-12 gap-6">
                                 <div class="col-span-12 xl:col-span-8 flex flex-col gap-6">
                                     <app-current-work-card [phases]="timeline.phases" (viewTimeline)="setTab('timeline')" />
-                                    <app-payment-summary-card [installments]="installments()" [contractValue]="project.value" (viewAll)="setTab('payments')" />
+                                    <app-payment-summary-card [installments]="installments()" [contractValue]="project.revisedValue ?? project.value" (viewAll)="setTab('payments')" />
                                     <app-recent-photos-card [photos]="recentPhotos().items" [total]="recentPhotos().total" [limit]="9" (open)="showPhoto($event)" (viewAll)="setTab('photos')" />
                                 </div>
                                 <aside class="col-span-12 xl:col-span-4 flex flex-col gap-6">
@@ -230,7 +235,18 @@ const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
                             <app-project-team-tab [projectCode]="project.code" [phases]="timeline.phases" [canManage]="canManage()" (changed)="onTeamChanged()" />
                         }
                         @case ('payments') {
-                            <app-project-payments-tab [installments]="installments()" [contractValue]="project.value" />
+                            <app-project-payments-tab [installments]="installments()" [contractValue]="project.revisedValue ?? project.value" />
+                        }
+                        @case ('changes') {
+                            <app-project-change-orders-tab
+                                [projectCode]="project.code"
+                                [orders]="changeOrders()"
+                                [contractValue]="project.value"
+                                [phases]="timeline.phases"
+                                [canManage]="canManage()"
+                                [canApprove]="canApproveChanges()"
+                                (changed)="onChangeOrdersChanged()"
+                            />
                         }
                         @case ('documents') {
                             <app-project-documents-tab [projectCode]="project.code" [refreshKey]="refreshKey()" />
@@ -398,6 +414,7 @@ export class ProjectManagement {
     private readonly messages = inject(MessageService);
     private readonly recordsService = inject(ProjectRecordsService);
     private readonly housePlanService = inject(HousePlanService);
+    private readonly changeOrderService = inject(ChangeOrderService);
     private readonly thaiDate = new ThaiDatePipe();
 
     readonly getProjectSeverity = getProjectSeverity;
@@ -416,7 +433,7 @@ export class ProjectManagement {
         return this.tabs.some((item) => item.value === tab) ? (tab as ProjectTab) : 'overview';
     });
 
-    readonly projectResource = rxResource({
+    readonly projectResource = apiResource({
         params: () => this.code() || undefined,
         stream: ({ params: code }) => this.projectService.get(code)
     });
@@ -450,7 +467,7 @@ export class ProjectManagement {
     });
     readonly statusLabel = PROJECT_STATUS_LABEL;
     /** ไทม์ไลน์จาก API — หลังบ้านคำนวณ % ใหม่ทุกครั้งที่มีการอัปเดตงาน */
-    readonly timelineResource = rxResource({
+    readonly timelineResource = apiResource({
         params: () => (this.planned() ? this.code() : undefined),
         stream: ({ params: code }) => this.progressService.getTimeline(code)
     });
@@ -466,18 +483,25 @@ export class ProjectManagement {
     readonly refreshKey = signal(0);
     // ข้อมูลประกอบของโครงการ โหลดใหม่เมื่อมีการอัปเดตงาน (refreshKey) เพราะสถานะงวดและภาพเปลี่ยนตาม
     private readonly projectParams = computed(() => (this.planned() ? { code: this.code(), refresh: this.refreshKey() } : undefined));
-    private readonly installmentsResource = rxResource({ params: this.projectParams, stream: ({ params }) => this.recordsService.installments(params.code), defaultValue: [] });
-    readonly teamResource = rxResource({ params: this.projectParams, stream: ({ params }) => this.recordsService.team(params.code), defaultValue: [] });
-    private readonly recentPhotosResource = rxResource({
+    private readonly installmentsResource = apiResource({ params: this.projectParams, stream: ({ params }) => this.recordsService.installments(params.code), defaultValue: [] });
+    readonly teamResource = apiResource({ params: this.projectParams, stream: ({ params }) => this.recordsService.team(params.code), defaultValue: [] });
+    private readonly recentPhotosResource = apiResource({
         params: this.projectParams,
         stream: ({ params }) => this.recordsService.photos(params.code, { pageSize: 9 }),
         defaultValue: { items: [], total: 0, phases: [] }
     });
     readonly installments = this.installmentsResource.value;
+    /** งานเพิ่ม-ลด (โหลดใหม่ตาม refreshKey เหมือนข้อมูลประกอบอื่น) */
+    private readonly changeOrdersResource = apiResource({ params: this.projectParams, stream: ({ params }) => this.changeOrderService.list(params.code), defaultValue: [] });
+    readonly changeOrders = this.changeOrdersResource.value;
+    readonly pendingChangeCount = computed(() => this.changeOrders().filter((order) => order.status === 'pending').length);
+    /** งานเพิ่ม-ลดต้องให้ผู้อนุมัติทุกยอดตัดสิน (หลังบ้านตรวจซ้ำ) */
+    readonly canApproveChanges = computed(() => this.auth.can('approval.any'));
+    readonly abs = Math.abs;
     readonly team = this.teamResource.value;
     readonly recentPhotos = this.recentPhotosResource.value;
 
-    readonly housePlanResource = rxResource({
+    readonly housePlanResource = apiResource({
         params: () => this.project()?.housePlanCode,
         stream: ({ params: code }) => this.housePlanService.get(code)
     });
@@ -523,6 +547,13 @@ export class ProjectManagement {
     }
 
     /** ทีมงานเปลี่ยน: โหลดรายชื่อติดต่อและผู้รับผิดชอบหลักของโครงการใหม่ */
+    /** งานเพิ่ม-ลดเปลี่ยน: มูลค่าสัญญา กำหนดส่งมอบ ไทม์ไลน์ และงวดเงินอาจเปลี่ยนตาม */
+    onChangeOrdersChanged() {
+        this.projectResource.reload();
+        this.timelineResource.reload();
+        this.refreshKey.update((key) => key + 1);
+    }
+
     onTeamChanged() {
         this.teamResource.reload();
         this.projectResource.reload();

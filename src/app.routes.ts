@@ -2,7 +2,9 @@ import { Routes } from '@angular/router';
 import { AppLayout } from './app/layout/component/app.layout';
 import { ApprovalCenter } from './app/pages/approvals/approval-center';
 import { AuditLog } from './app/pages/system/audit-log';
+import { authGuard } from './app/pages/service/auth.guard';
 import { Roles } from './app/pages/system/roles';
+import { Users } from './app/pages/system/users';
 import { Dashboard } from './app/pages/dashboard/dashboard';
 import { Notfound } from './app/pages/notfound/notfound';
 import { PersonnelDetail } from './app/pages/personnel/personnel-detail';
@@ -17,6 +19,7 @@ export const appRoutes: Routes = [
     {
         path: '',
         component: AppLayout,
+        canActivate: [authGuard],
         children: [
             { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
             { path: 'dashboard', component: Dashboard },
@@ -28,6 +31,7 @@ export const appRoutes: Routes = [
             { path: 'projects/:code', component: ProjectManagement },
             { path: 'projects/:code/setup', component: ProjectSetup },
             { path: 'approvals', component: ApprovalCenter },
+            { path: 'system/users', component: Users },
             { path: 'system/roles', component: Roles },
             { path: 'system/audit-log', component: AuditLog }
         ]

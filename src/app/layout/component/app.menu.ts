@@ -192,7 +192,7 @@ export class AppMenu {
             {
                 label: 'ระบบ',
                 items: [
-                    { label: 'ผู้ใช้งาน', icon: 'pi pi-fw pi-users' },
+                    { label: 'ผู้ใช้งาน', icon: 'pi pi-fw pi-users', routerLink: ['/system/users'] },
                     { label: 'บทบาทและสิทธิ์', icon: 'pi pi-fw pi-key', routerLink: ['/system/roles'] },
                     { label: 'ตั้งค่าโครงการ', icon: 'pi pi-fw pi-sliders-h' },
                     { label: 'ตั้งค่าระบบ', icon: 'pi pi-fw pi-cog' },

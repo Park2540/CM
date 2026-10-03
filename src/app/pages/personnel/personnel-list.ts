@@ -6,9 +6,9 @@ import { IconFieldModule } from 'primeng/iconfield';
 import { InputIconModule } from 'primeng/inputicon';
 import { InputTextModule } from 'primeng/inputtext';
 import { Table, TableModule } from 'primeng/table';
-import { rxResource } from '@angular/core/rxjs-interop';
 import { problemMessage } from '@/app/api/api';
 import { PersonnelRecord, PersonnelService } from '@/app/pages/service/personnel.service';
+import { apiResource } from '@/app/api/api-resource';
 
 @Component({
     selector: 'app-personnel-list',
@@ -111,8 +111,8 @@ export class PersonnelList {
     private readonly personnelService = inject(PersonnelService);
     private readonly router = inject(Router);
 
-    readonly records = rxResource({ stream: () => this.personnelService.list(), defaultValue: [] });
-    readonly expiringLicenses = rxResource({ stream: () => this.personnelService.licenseAlerts(90), defaultValue: [] });
+    readonly records = apiResource({ stream: () => this.personnelService.list(), defaultValue: [] });
+    readonly expiringLicenses = apiResource({ stream: () => this.personnelService.licenseAlerts(90), defaultValue: [] });
 
     errorMessage(error: unknown) {
         return problemMessage(error);

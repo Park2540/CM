@@ -1,7 +1,7 @@
 import { DecimalPipe, NgClass } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, computed, inject, linkedSignal, signal } from '@angular/core';
-import { rxResource, toObservable, toSignal } from '@angular/core/rxjs-interop';
+import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { debounceTime, map } from 'rxjs';
@@ -20,6 +20,7 @@ import { problemMessage } from '@/app/api/api';
 import { ThaiDatePipe } from '@/app/pages/projects/thai-date.pipe';
 import { APPROVAL_STATUS_LABEL, APPROVAL_STEP_LABEL, APPROVAL_TYPE_LABEL, ApprovalRequest, ApprovalService, ApprovalStatus, ApprovalType } from '@/app/pages/service/approval.service';
 import { ProjectService } from '@/app/pages/service/project.service';
+import { apiResource } from '@/app/api/api-resource';
 
 type StatusFilter = ApprovalStatus | 'all';
 
@@ -314,7 +315,7 @@ export class ApprovalCenter {
     // Back to the first page whenever a filter changes.
     readonly page = linkedSignal({ source: this.filters, computation: () => 1 });
 
-    readonly approvals = rxResource({
+    readonly approvals = apiResource({
         params: () => ({ ...this.filters(), page: this.page(), pageSize: PAGE_SIZE }),
         stream: ({ params }) => this.approvalService.list(params),
         defaultValue: { items: [], total: 0, page: 1, pageSize: PAGE_SIZE }

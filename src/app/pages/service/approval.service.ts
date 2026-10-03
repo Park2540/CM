@@ -1,7 +1,8 @@
 import { HttpClient } from '@angular/common/http';
-import { Injectable, inject, signal } from '@angular/core';
+import { Injectable, effect, inject, signal, untracked } from '@angular/core';
 import { Observable, map, tap } from 'rxjs';
 import { ApiPage, ApiSchemas, apiUrl, queryParams, toDate } from '@/app/api/api';
+import { AuthService } from './auth.service';
 
 export type ApprovalType = ApiSchemas['ApprovalType'];
 export type ApprovalStatus = ApiSchemas['ApprovalStatus'];
@@ -49,9 +50,20 @@ export class ApprovalService {
     private readonly settingsState = signal<ApprovalSettings | null>(null);
     readonly settings = this.settingsState.asReadonly();
 
+    private readonly auth = inject(AuthService);
+
     constructor() {
-        this.refreshSummary();
-        this.http.get<ApprovalSettings>(apiUrl('/settings/approval')).subscribe({ next: (settings) => this.settingsState.set(settings), error: () => {} });
+        // โหลดใหม่เมื่อเปลี่ยนผู้ใช้ (ตัวเลขและเกณฑ์ขึ้นกับสิทธิ์ของแต่ละคน)
+        effect(() => {
+            const userId = this.auth.currentUser()?.id;
+            untracked(() => {
+                this.summaryState.set(null);
+                this.settingsState.set(null);
+                if (!userId) return;
+                this.refreshSummary();
+                this.http.get<ApprovalSettings>(apiUrl('/settings/approval')).subscribe({ next: (settings) => this.settingsState.set(settings), error: () => {} });
+            });
+        });
     }
 
     refreshSummary() {

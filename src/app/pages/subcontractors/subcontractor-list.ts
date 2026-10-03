@@ -1,7 +1,7 @@
 import { NgClass } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, computed, inject, signal } from '@angular/core';
-import { rxResource, takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { MessageService } from 'primeng/api';
@@ -19,6 +19,7 @@ import { debounceTime } from 'rxjs';
 import { ApiProblem, problemMessage } from '@/app/api/api';
 import { AuthService } from '@/app/pages/service/auth.service';
 import { Subcontractor, SubcontractorInput, SubcontractorService, SubcontractorTrade, TRADES, TRADE_LABEL } from '@/app/pages/service/subcontractor.service';
+import { apiResource } from '@/app/api/api-resource';
 
 const blankForm = (): SubcontractorInput => ({ name: '', trades: [], contactName: '', phone: '', email: '', lineId: '', taxId: '', address: '', note: '', status: 'active' });
 
@@ -231,7 +232,7 @@ export class SubcontractorList {
     readonly trade = signal<SubcontractorTrade | null>(null);
     readonly status = signal<'active' | 'inactive' | null>(null);
     private readonly debouncedQuery = toSignal(toObservable(this.query).pipe(debounceTime(250)), { initialValue: '' });
-    readonly list = rxResource({
+    readonly list = apiResource({
         params: () => ({ q: this.debouncedQuery() || undefined, trade: this.trade(), status: this.status() }),
         stream: ({ params }) => this.service.list(params),
         defaultValue: []

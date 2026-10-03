@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectorRef, Component, inject } from '@angular/core';
+import { ChangeDetectorRef, Component, computed, inject } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -11,12 +11,13 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { problemMessage } from '@/app/api/api';
 import { AuthService } from '@/app/pages/service/auth.service';
 import { FileUploadService, UploadedFile } from '@/app/pages/service/file-upload.service';
+import { PersonnelAccountSection } from './personnel-account-section';
 import { LicenseAlert, PersonnelRecord, PersonnelService, blankPersonnel, isProfessionalLicenseValid } from '@/app/pages/service/personnel.service';
 
 @Component({
     selector: 'app-personnel-detail',
     standalone: true,
-    imports: [CommonModule, FormsModule, ButtonModule, InputTextModule, ProgressBarModule, RouterLink, TagModule],
+    imports: [CommonModule, FormsModule, ButtonModule, InputTextModule, PersonnelAccountSection, ProgressBarModule, RouterLink, TagModule],
     template: `
         @if (personnel; as person) {
             <div class="flex flex-wrap justify-between items-start gap-4 mb-5">
@@ -69,6 +70,9 @@ import { LicenseAlert, PersonnelRecord, PersonnelService, blankPersonnel, isProf
                 <a href="#documents" class="text-primary">เอกสารแนบ</a>
                 <a href="#history" class="text-primary">ประวัติในระบบ</a>
                 <a href="#safety" class="text-primary">ความปลอดภัย</a>
+                @if (canManageUsers()) {
+                    <a href="#account" class="text-primary">บัญชีผู้ใช้</a>
+                }
             </nav>
 
             <section id="general" class="border-b border-surface py-5">
@@ -299,6 +303,10 @@ import { LicenseAlert, PersonnelRecord, PersonnelService, blankPersonnel, isProf
                     <p class="text-color-secondary mt-4"><i class="pi pi-lock mr-2"></i>ข้อมูลประเมินผลงานจำกัดสิทธิ์สำหรับผู้บริหาร</p>
                 }
             </section>
+
+            @if (canManageUsers() && !isNew) {
+                <app-personnel-account-section [personnel]="{ id: person.id, fullName: person.fullName, email: person.email }" />
+            }
         } @else if (loading) {
             <div class="card text-center text-muted-color py-12"><i class="pi pi-spin pi-spinner mr-2"></i>กำลังโหลดข้อมูลบุคลากร...</div>
         } @else if (loadError) {
@@ -320,6 +328,8 @@ export class PersonnelDetail {
     private readonly personnelService = inject(PersonnelService);
     private readonly files = inject(FileUploadService);
     private readonly auth = inject(AuthService);
+    /** ส่วนบัญชีผู้ใช้และสิทธิ์ แสดงเฉพาะผู้มีสิทธิ์จัดการผู้ใช้ */
+    readonly canManageUsers = computed(() => this.auth.can('user.manage'));
     private readonly cdr = inject(ChangeDetectorRef);
 
     isNew = false;

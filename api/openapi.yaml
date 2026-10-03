@@ -21,6 +21,8 @@ security:
 tags:
     - name: auth
       description: ผู้ใช้และสิทธิ์
+    - name: users
+      description: บัญชีผู้ใช้ของบุคลากร บทบาท และสิทธิ์รายคน
     - name: settings
     - name: projects
     - name: personnel
@@ -31,6 +33,37 @@ tags:
     - name: dashboard
 
 paths:
+    /auth/login:
+        post:
+            tags: [auth]
+            summary: เข้าสู่ระบบด้วยอีเมลและรหัสผ่าน — ได้ access token (Bearer) สำหรับทุกคำขอ
+            description: |
+                - อีเมลหรือรหัสผ่านไม่ถูกต้อง → 401 (ข้อความเดียวกัน ไม่บอกว่าผิดช่องไหน)
+                - รหัสผ่านถูกแต่ยังเข้าใช้ไม่ได้ → 403 โดย title บอกเหตุผล: คำขอสมัครรออนุมัติ, คำขอสมัครถูกปฏิเสธ (detail = เหตุผล), บัญชีถูกระงับ, ยังไม่ได้ตั้งรหัสผ่านจากคำเชิญ
+                - ผิดติดกัน 5 ครั้งต่ออีเมล → 429 ล็อก 15 นาที
+                - lastLoginAt ใน user คือเวลาเข้าสู่ระบบครั้งก่อนหน้า (ก่อนครั้งนี้)
+            operationId: login
+            security: []
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema: { $ref: '#/components/schemas/LoginInput' }
+            responses:
+                '200':
+                    description: เข้าสู่ระบบแล้ว
+                    content:
+                        application/json:
+                            schema: { $ref: '#/components/schemas/LoginResult' }
+                '401': { $ref: '#/components/responses/Unauthorized' }
+                '403': { $ref: '#/components/responses/Forbidden' }
+                '422': { $ref: '#/components/responses/ValidationError' }
+                '429':
+                    description: พยายามเข้าสู่ระบบผิดหลายครั้ง
+                    content:
+                        application/problem+json:
+                            schema: { $ref: '#/components/schemas/Problem' }
+
     /auth/me:
         get:
             tags: [auth]
@@ -52,6 +85,109 @@ paths:
             responses:
                 '204':
                     description: ออกจากระบบแล้ว
+
+    /auth/register:
+        post:
+            tags: [auth]
+            summary: สมัครสมาชิก (ไม่ต้องล็อกอิน) — ได้คำขอสถานะ pending เข้าระบบได้หลังแอดมินหรือเจ้าของบริษัทอนุมัติเท่านั้น
+            description: |
+                หลังบ้านต้องปฏิเสธการเข้าสู่ระบบของผู้ที่คำขอยังไม่ได้รับอนุมัติ
+                อีเมลที่มีบัญชีอยู่แล้วหรือมีคำขอรออนุมัติอยู่ ตอบ 409
+            operationId: register
+            security: []
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema: { $ref: '#/components/schemas/RegistrationInput' }
+            responses:
+                '202':
+                    description: รับคำขอแล้ว รออนุมัติ
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                required: [id, status, submittedAt]
+                                properties:
+                                    id: { type: string }
+                                    status: { type: string, const: pending }
+                                    submittedAt: { type: string, format: date-time }
+                '409': { $ref: '#/components/responses/Conflict' }
+                '422': { $ref: '#/components/responses/ValidationError' }
+
+    /registrations:
+        get:
+            tags: [users]
+            summary: คำขอสมัครสมาชิก (ต้องมีสิทธิ์ user.manage)
+            operationId: listRegistrations
+            parameters:
+                - { name: status, in: query, schema: { $ref: '#/components/schemas/RegistrationStatus' } }
+            responses:
+                '200':
+                    description: OK (ใหม่สุดก่อน)
+                    content:
+                        application/json:
+                            schema:
+                                type: array
+                                items: { $ref: '#/components/schemas/Registration' }
+                '403': { $ref: '#/components/responses/Forbidden' }
+
+    /registrations/{id}/approve:
+        parameters:
+            - { name: id, in: path, required: true, schema: { type: string } }
+        post:
+            tags: [users]
+            summary: อนุมัติคำขอและสร้างบัญชี (สถานะ active) — เฉพาะบทบาทแอดมินหรือเจ้าของบริษัท (403)
+            description: ผูกกับบุคลากรในทะเบียน (ยังไม่มีบัญชี) และกำหนดบทบาท/สิทธิ์ตามกฎเดียวกับ POST /user-accounts คำขอที่ไม่ใช่ pending ตอบ 409
+            operationId: approveRegistration
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            allOf:
+                                - $ref: '#/components/schemas/UserAccountInput'
+                                - type: object
+                                  required: [personnelId]
+                                  properties:
+                                      personnelId: { type: string }
+            responses:
+                '200':
+                    description: อนุมัติแล้ว
+                    content:
+                        application/json:
+                            schema: { $ref: '#/components/schemas/UserAccount' }
+                '403': { $ref: '#/components/responses/Forbidden' }
+                '404': { $ref: '#/components/responses/NotFound' }
+                '409': { $ref: '#/components/responses/Conflict' }
+                '422': { $ref: '#/components/responses/ValidationError' }
+
+    /registrations/{id}/reject:
+        parameters:
+            - { name: id, in: path, required: true, schema: { type: string } }
+        post:
+            tags: [users]
+            summary: ปฏิเสธคำขอ (ต้องระบุเหตุผล) — เฉพาะบทบาทแอดมินหรือเจ้าของบริษัท (403)
+            operationId: rejectRegistration
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required: [reason]
+                            properties:
+                                reason: { type: string, minLength: 1 }
+            responses:
+                '200':
+                    description: ปฏิเสธแล้ว
+                    content:
+                        application/json:
+                            schema: { $ref: '#/components/schemas/Registration' }
+                '403': { $ref: '#/components/responses/Forbidden' }
+                '404': { $ref: '#/components/responses/NotFound' }
+                '409': { $ref: '#/components/responses/Conflict' }
+                '422': { $ref: '#/components/responses/ValidationError' }
 
     /users:
         get:
@@ -79,6 +215,125 @@ paths:
                     content:
                         application/json:
                             schema: { $ref: '#/components/schemas/RoleCatalog' }
+
+    /user-accounts:
+        get:
+            tags: [users]
+            summary: บัญชีผู้ใช้ของบุคลากร (ต้องมีสิทธิ์ user.manage)
+            operationId: listUserAccounts
+            parameters:
+                - { name: q, in: query, description: ค้นหาชื่อ รหัสบุคลากร อีเมล, schema: { type: string } }
+                - { name: roleId, in: query, schema: { $ref: '#/components/schemas/RoleId' } }
+                - { name: status, in: query, schema: { $ref: '#/components/schemas/UserAccountStatus' } }
+                - { name: personnelId, in: query, description: บัญชีของบุคลากรคนนี้ (มีได้ไม่เกิน 1), schema: { type: string } }
+            responses:
+                '200':
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                type: array
+                                items: { $ref: '#/components/schemas/UserAccount' }
+                '403': { $ref: '#/components/responses/Forbidden' }
+        post:
+            tags: [users]
+            summary: สร้างบัญชีให้บุคลากรและส่งคำเชิญตั้งรหัสผ่านทางอีเมล (สถานะเริ่มต้น invited)
+            operationId: createUserAccount
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema: { $ref: '#/components/schemas/UserAccountCreateInput' }
+            responses:
+                '201':
+                    description: สร้างแล้ว
+                    content:
+                        application/json:
+                            schema: { $ref: '#/components/schemas/UserAccount' }
+                '403': { $ref: '#/components/responses/Forbidden' }
+                '409': { $ref: '#/components/responses/Conflict' }
+                '422': { $ref: '#/components/responses/ValidationError' }
+
+    /user-accounts/{id}:
+        parameters:
+            - { name: id, in: path, required: true, schema: { type: string } }
+        put:
+            tags: [users]
+            summary: แก้บทบาท โครงการ และสิทธิ์รายคน — แก้บทบาทหรือถอน user.manage ของตัวเองไม่ได้ (409)
+            operationId: updateUserAccount
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema: { $ref: '#/components/schemas/UserAccountInput' }
+            responses:
+                '200':
+                    description: บันทึกแล้ว
+                    content:
+                        application/json:
+                            schema: { $ref: '#/components/schemas/UserAccount' }
+                '403': { $ref: '#/components/responses/Forbidden' }
+                '404': { $ref: '#/components/responses/NotFound' }
+                '409': { $ref: '#/components/responses/Conflict' }
+                '422': { $ref: '#/components/responses/ValidationError' }
+
+    /user-accounts/{id}/suspend:
+        parameters:
+            - { name: id, in: path, required: true, schema: { type: string } }
+        post:
+            tags: [users]
+            summary: ระงับบัญชี (ออกจากระบบทุกอุปกรณ์ทันที) — ระงับตัวเองหรือเจ้าของบริษัทคนสุดท้ายไม่ได้ (409)
+            operationId: suspendUserAccount
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            properties:
+                                reason: { type: string, description: เหตุผล (บันทึกใน Audit Log) }
+            responses:
+                '200':
+                    description: ระงับแล้ว
+                    content:
+                        application/json:
+                            schema: { $ref: '#/components/schemas/UserAccount' }
+                '403': { $ref: '#/components/responses/Forbidden' }
+                '404': { $ref: '#/components/responses/NotFound' }
+                '409': { $ref: '#/components/responses/Conflict' }
+
+    /user-accounts/{id}/activate:
+        parameters:
+            - { name: id, in: path, required: true, schema: { type: string } }
+        post:
+            tags: [users]
+            summary: เปิดใช้บัญชีที่ระงับไว้ (กลับเป็น active หรือ invited ถ้ายังไม่เคยตั้งรหัสผ่าน)
+            operationId: activateUserAccount
+            responses:
+                '200':
+                    description: เปิดใช้แล้ว
+                    content:
+                        application/json:
+                            schema: { $ref: '#/components/schemas/UserAccount' }
+                '403': { $ref: '#/components/responses/Forbidden' }
+                '404': { $ref: '#/components/responses/NotFound' }
+                '409': { $ref: '#/components/responses/Conflict' }
+
+    /user-accounts/{id}/reset-password:
+        parameters:
+            - { name: id, in: path, required: true, schema: { type: string } }
+        post:
+            tags: [users]
+            summary: ส่งลิงก์ตั้งรหัสผ่านใหม่ทางอีเมล (บัญชี invited = ส่งคำเชิญซ้ำ) — บัญชีที่ระงับอยู่ทำไม่ได้ (409)
+            operationId: resetUserPassword
+            responses:
+                '200':
+                    description: ส่งแล้ว (invitedAt เปลี่ยนเป็นเวลาล่าสุด)
+                    content:
+                        application/json:
+                            schema: { $ref: '#/components/schemas/UserAccount' }
+                '403': { $ref: '#/components/responses/Forbidden' }
+                '404': { $ref: '#/components/responses/NotFound' }
+                '409': { $ref: '#/components/responses/Conflict' }
 
     /settings/approval:
         get:
@@ -398,6 +653,91 @@ paths:
                             schema: { $ref: '#/components/schemas/UploadedFile' }
                 '413': { $ref: '#/components/responses/ValidationError' }
                 '422': { $ref: '#/components/responses/ValidationError' }
+
+    /projects/{code}/change-orders:
+        parameters:
+            - $ref: '#/components/parameters/ProjectCode'
+        get:
+            tags: [projects]
+            summary: งานเพิ่ม-ลดของโครงการ (ล่าสุดก่อน)
+            operationId: listChangeOrders
+            responses:
+                '200':
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                type: array
+                                items: { $ref: '#/components/schemas/ChangeOrder' }
+                '404': { $ref: '#/components/responses/NotFound' }
+                '409': { $ref: '#/components/responses/Conflict' }
+        post:
+            tags: [projects]
+            summary: ขอเพิ่ม-ลดงาน (ต้องมีสิทธิ์ project.manage) — สร้างคำขออนุมัติประเภท change-order ในศูนย์อนุมัติ
+            description: |
+                อนุมัติ/ไม่อนุมัติผ่าน POST /approvals/{approvalId}/approve|reject เมื่ออนุมัติ หลังบ้าน:
+                - บวกยอดสุทธิเข้า changeOrderTotal ของโครงการ และเพิ่มงวดงานของงานเพิ่ม-ลด
+                - เลื่อนกำหนดส่งมอบตาม scheduleImpactDays
+                - เพิ่ม newTask เข้าไทม์ไลน์ (ท้ายขั้นตอนที่ระบุ ก่อนหมุดหมาย)
+                งานที่ลูกค้าขอ (source = customer) อนุมัติไม่ได้จนกว่าลูกค้าจะยืนยัน (409)
+            operationId: createChangeOrder
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema: { $ref: '#/components/schemas/ChangeOrderInput' }
+            responses:
+                '201':
+                    description: ส่งขออนุมัติแล้ว
+                    content:
+                        application/json:
+                            schema: { $ref: '#/components/schemas/ChangeOrder' }
+                '403': { $ref: '#/components/responses/Forbidden' }
+                '409': { $ref: '#/components/responses/Conflict' }
+                '422': { $ref: '#/components/responses/ValidationError' }
+
+    /projects/{code}/change-orders/{id}/customer-confirm:
+        parameters:
+            - $ref: '#/components/parameters/ProjectCode'
+            - { name: id, in: path, required: true, schema: { type: string } }
+        post:
+            tags: [projects]
+            summary: บันทึกว่าลูกค้ายืนยันรายการและราคาแล้ว (คำขอที่ยังรออนุมัติ)
+            operationId: confirmChangeOrderByCustomer
+            responses:
+                '200':
+                    description: บันทึกแล้ว
+                    content:
+                        application/json:
+                            schema: { $ref: '#/components/schemas/ChangeOrder' }
+                '403': { $ref: '#/components/responses/Forbidden' }
+                '404': { $ref: '#/components/responses/NotFound' }
+                '409': { $ref: '#/components/responses/Conflict' }
+
+    /projects/{code}/change-orders/{id}/cancel:
+        parameters:
+            - $ref: '#/components/parameters/ProjectCode'
+            - { name: id, in: path, required: true, schema: { type: string } }
+        post:
+            tags: [projects]
+            summary: ยกเลิกคำขอที่ยังรออนุมัติ (คำขออนุมัติที่ผูกไว้ถูกปิดด้วย)
+            operationId: cancelChangeOrder
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            properties:
+                                reason: { type: string }
+            responses:
+                '200':
+                    description: ยกเลิกแล้ว
+                    content:
+                        application/json:
+                            schema: { $ref: '#/components/schemas/ChangeOrder' }
+                '403': { $ref: '#/components/responses/Forbidden' }
+                '404': { $ref: '#/components/responses/NotFound' }
+                '409': { $ref: '#/components/responses/Conflict' }
 
     /projects/{code}/installments:
         parameters:
@@ -1049,7 +1389,8 @@ components:
                 - approval.any: อนุมัติได้ทุกยอด
                 - project.create: เปิดโครงการใหม่
                 - project.manage: จัดการโครงการ เช่น บันทึกสัญญาและเริ่มแผนงาน
-            enum: [progress.update, personnel.sensitive, finance.company, approval.any, project.create, project.manage]
+                - user.manage: จัดการบัญชีผู้ใช้ บทบาท และสิทธิ์ของบุคลากร
+            enum: [progress.update, personnel.sensitive, finance.company, approval.any, project.create, project.manage, user.manage]
         CurrentUser:
             type: object
             required: [id, name, roleId, roleLabel, projectCodes, email, lastLoginAt, permissions]
@@ -1089,15 +1430,120 @@ components:
                     type: array
                     items:
                         type: object
-                        required: [id, group, label, access, restriction]
+                        required: [id, group, label, access, restriction, permissions]
                         properties:
                             id: { $ref: '#/components/schemas/RoleId' }
                             group: { type: string, enum: [internal, project, external] }
                             label: { type: string }
                             access: { type: string }
                             restriction: { type: string }
+                            permissions:
+                                type: array
+                                description: สิทธิ์ตั้งต้นของบทบาท (ปรับรายคนได้ที่บัญชีผู้ใช้)
+                                items: { $ref: '#/components/schemas/Permission' }
                             suggested: { type: boolean }
                             optional: { type: boolean }
+
+        LoginInput:
+            type: object
+            required: [email, password]
+            properties:
+                email: { type: string }
+                password: { type: string, writeOnly: true }
+                remember: { type: boolean, default: false, description: จดจำการเข้าสู่ระบบ (token อายุ 30 วัน แทน 8 ชั่วโมง) }
+        LoginResult:
+            type: object
+            required: [accessToken, expiresAt, user]
+            properties:
+                accessToken: { type: string, description: 'ส่งใน header Authorization: Bearer <token>' }
+                expiresAt: { type: string, format: date-time }
+                user: { $ref: '#/components/schemas/CurrentUser' }
+        RegistrationStatus:
+            type: string
+            enum: [pending, approved, rejected]
+        RegistrationInput:
+            type: object
+            required: [fullName, email, phone, password]
+            properties:
+                fullName: { type: string, minLength: 1 }
+                email: { type: string, format: email }
+                phone: { type: string, description: ตัวเลข 9-10 หลัก ขึ้นต้นด้วย 0 }
+                employeeCode: { type: string, description: รหัสบุคลากร (ถ้ามี) ช่วยให้ผู้อนุมัติจับคู่กับทะเบียนบุคลากรได้ }
+                position: { type: string, description: ตำแหน่งงานที่แจ้งมา }
+                note: { type: string, description: ข้อความถึงผู้อนุมัติ เช่น ทำงานโครงการไหน }
+                password: { type: string, minLength: 8, writeOnly: true, description: ใช้ได้หลังได้รับอนุมัติ (หลังบ้านเก็บแบบ hash เท่านั้น) }
+        Registration:
+            type: object
+            required: [id, fullName, email, phone, status, submittedAt]
+            properties:
+                id: { type: string }
+                fullName: { type: string }
+                email: { type: string }
+                phone: { type: string }
+                employeeCode: { type: string }
+                position: { type: string }
+                note: { type: string }
+                status: { $ref: '#/components/schemas/RegistrationStatus' }
+                submittedAt: { type: string, format: date-time }
+                suggestedPersonnelId: { type: string, description: บุคลากรที่หลังบ้านจับคู่ให้ (จากรหัสบุคลากร อีเมล หรือชื่อ) และยังไม่มีบัญชี }
+                decidedAt: { type: string, format: date-time }
+                decidedBy: { $ref: '#/components/schemas/UserRef' }
+                rejectReason: { type: string }
+                accountId: { type: string, description: บัญชีที่สร้างเมื่ออนุมัติ }
+        UserAccountStatus:
+            type: string
+            description: |
+                - invited: ส่งคำเชิญแล้ว ยังไม่ได้ตั้งรหัสผ่าน
+                - active: ใช้งานได้
+                - suspended: ระงับการเข้าสู่ระบบ (เก็บประวัติไว้)
+            enum: [invited, active, suspended]
+        UserAccountInput:
+            type: object
+            description: |
+                สิทธิ์ที่ใช้จริง = สิทธิ์ตั้งต้นของบทบาท + grantedPermissions − revokedPermissions
+                บทบาทกลุ่มทีมประจำโครงการ (project) ต้องระบุ projectCodes อย่างน้อย 1 โครงการ; กลุ่มทีมภายใน (internal) เห็นทุกโครงการ ให้ส่ง projectCodes ว่าง
+            required: [email, roleId, projectCodes, grantedPermissions, revokedPermissions]
+            properties:
+                email: { type: string, format: email, description: อีเมลที่ใช้เข้าสู่ระบบ (ซ้ำกับบัญชีอื่นไม่ได้ 409) }
+                roleId: { $ref: '#/components/schemas/RoleId' }
+                projectCodes: { type: array, items: { type: string } }
+                grantedPermissions:
+                    type: array
+                    description: สิทธิ์ที่ให้เพิ่มจากบทบาท
+                    items: { $ref: '#/components/schemas/Permission' }
+                revokedPermissions:
+                    type: array
+                    description: สิทธิ์ของบทบาทที่ถอนออกสำหรับคนนี้
+                    items: { $ref: '#/components/schemas/Permission' }
+        UserAccountCreateInput:
+            allOf:
+                - $ref: '#/components/schemas/UserAccountInput'
+                - type: object
+                  required: [personnelId]
+                  properties:
+                      personnelId: { type: string, description: บุคลากรที่ยังไม่มีบัญชี (1 คน 1 บัญชี ซ้ำได้ 409) }
+        UserAccount:
+            allOf:
+                - $ref: '#/components/schemas/UserAccountInput'
+                - type: object
+                  required: [id, personnelId, name, roleLabel, status, permissions, createdAt]
+                  properties:
+                      id: { type: string }
+                      personnelId: { type: string }
+                      name: { type: string, description: ชื่อจากทะเบียนบุคลากร }
+                      employeeCode: { type: string }
+                      position: { type: string }
+                      department: { type: string }
+                      phone: { type: string, description: เบอร์โทรจากทะเบียนบุคลากร }
+                      roleLabel: { type: string }
+                      status: { $ref: '#/components/schemas/UserAccountStatus' }
+                      permissions:
+                          type: array
+                          description: สิทธิ์ที่ใช้จริง (หลังบ้านคำนวณ)
+                          items: { $ref: '#/components/schemas/Permission' }
+                      createdAt: { type: string, format: date-time }
+                      invitedAt: { type: string, format: date-time, description: ส่งคำเชิญหรือลิงก์ตั้งรหัสผ่านล่าสุด }
+                      lastLoginAt: { type: string, format: date-time }
 
         ApprovalSettings:
             type: object
@@ -1169,6 +1615,72 @@ components:
                 setupConfiguredAt: { type: [string, 'null'], format: date-time, description: เวลาที่ตั้งค่างานก่อสร้าง (null = ยังไม่ตั้งค่า ยังไม่มีไทม์ไลน์) }
                 handedOverAt: { type: [string, 'null'], format: date, description: วันที่ส่งมอบงานจริง (null = ยังไม่ส่งมอบ) }
                 warrantyUntil: { type: [string, 'null'], format: date, description: วันสิ้นสุดการรับประกันผลงาน (หลังบ้านคำนวณจากวันส่งมอบ + ระยะประกัน) }
+                changeOrderTotal: { type: number, description: ยอดสุทธิของงานเพิ่ม-ลดที่อนุมัติแล้ว (บวก = เพิ่ม ลบ = ลด) }
+                revisedValue: { type: [number, 'null'], description: มูลค่าสัญญาปัจจุบัน = value + changeOrderTotal (null จนกว่าจะบันทึกสัญญา) }
+
+        ChangeOrderSource:
+            type: string
+            description: |
+                - customer: ลูกค้าขอเพิ่ม/เปลี่ยนงานนอกสัญญา (ต้องให้ลูกค้ายืนยันก่อนอนุมัติ)
+                - site: ปรับแก้ระหว่างก่อสร้างตามสภาพหน้างาน
+                - design: แก้แบบ/เปลี่ยนวัสดุตามผู้ออกแบบ
+            enum: [customer, site, design]
+        ChangeOrderStatus:
+            type: string
+            description: pending = รออนุมัติ, approved = อนุมัติแล้ว (ปรับมูลค่า/ไทม์ไลน์แล้ว), rejected = ไม่อนุมัติ, cancelled = ผู้ขอยกเลิก
+            enum: [pending, approved, rejected, cancelled]
+        ChangeOrderItem:
+            type: object
+            required: [name, kind, quantity, unit, unitPrice]
+            properties:
+                name: { type: string, minLength: 1 }
+                kind: { type: string, enum: [add, deduct], description: 'add = งานเพิ่ม (บวกมูลค่า), deduct = งานลด (หักมูลค่า)' }
+                quantity: { type: number, exclusiveMinimum: 0 }
+                unit: { type: string, minLength: 1 }
+                unitPrice: { type: number, minimum: 0 }
+        ChangeOrderInput:
+            type: object
+            required: [title, source, reason, items, scheduleImpactDays, customerConfirmed]
+            properties:
+                title: { type: string, minLength: 1 }
+                source: { $ref: '#/components/schemas/ChangeOrderSource' }
+                reason: { type: string, minLength: 1, description: เหตุผล/รายละเอียดที่ขอเปลี่ยน }
+                items:
+                    type: array
+                    minItems: 1
+                    items: { $ref: '#/components/schemas/ChangeOrderItem' }
+                scheduleImpactDays: { type: integer, minimum: -60, maximum: 365, description: เลื่อนกำหนดส่งมอบ (วัน) เมื่ออนุมัติ — ลบ = เร็วขึ้น }
+                newTask:
+                    type: object
+                    description: เพิ่มงานเข้าไทม์ไลน์เมื่ออนุมัติ (ติดตามความคืบหน้าได้เหมือนงานอื่น)
+                    required: [phaseCode, name, durationDays]
+                    properties:
+                        phaseCode: { type: string }
+                        name: { type: string, minLength: 1 }
+                        durationDays: { type: integer, minimum: 1, maximum: 120 }
+                customerConfirmed: { type: boolean, description: ลูกค้ายืนยันรายการและราคาแล้ว (เช่น ลงนามใบเสนอราคางานเพิ่ม) }
+        ChangeOrder:
+            allOf:
+                - $ref: '#/components/schemas/ChangeOrderInput'
+                - type: object
+                  required: [id, projectCode, status, addTotal, deductTotal, total, requestedBy, requestedAt, approvalId]
+                  properties:
+                      id: { type: string, examples: [CO-CR690002-01] }
+                      projectCode: { type: string }
+                      status: { $ref: '#/components/schemas/ChangeOrderStatus' }
+                      addTotal: { type: number }
+                      deductTotal: { type: number }
+                      total: { type: number, description: ยอดสุทธิ = addTotal − deductTotal }
+                      requestedBy: { $ref: '#/components/schemas/UserRef' }
+                      requestedAt: { type: string, format: date-time }
+                      approvalId: { type: string, description: 'คำขออนุมัติในศูนย์อนุมัติ (อนุมัติ/ไม่อนุมัติผ่าน /approvals/{approvalId})' }
+                      customerConfirmedAt: { type: string, format: date-time }
+                      decidedAt: { type: string, format: date-time }
+                      decidedBy: { $ref: '#/components/schemas/UserRef' }
+                      decisionNote: { type: string }
+                      appliedTaskCode: { type: string, description: รหัสงานที่เพิ่มเข้าไทม์ไลน์เมื่ออนุมัติ }
+                      deliveryDateBefore: { type: string, format: date }
+                      deliveryDateAfter: { type: string, format: date }
 
         ConstructionOptionValue:
             description: single = รหัสตัวเลือก, multiple = รายการรหัส, boolean = true/false
@@ -1485,6 +1997,7 @@ components:
                 status: { $ref: '#/components/schemas/InstallmentStatus' }
                 dueDate: { type: string, format: date }
                 paidDate: { type: [string, 'null'], format: date }
+                changeOrderId: { type: string, description: งวดของงานเพิ่ม-ลด (ไม่อยู่ในงวดตามสัญญาเดิม) }
 
         SitePhoto:
             type: object
@@ -1829,6 +2342,7 @@ components:
                 history:
                     type: array
                     items: { $ref: '#/components/schemas/ApprovalStep' }
+                changeOrderId: { type: string, description: คำขอนี้มาจากงานเพิ่ม-ลดของโครงการ (อนุมัติแล้วหลังบ้านปรับมูลค่า/ไทม์ไลน์ให้) }
         ApprovalPage:
             allOf:
                 - $ref: '#/components/schemas/PageMeta'

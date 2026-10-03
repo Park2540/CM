@@ -9,10 +9,11 @@ import { InputTextModule } from 'primeng/inputtext';
 import { ProgressBarModule } from 'primeng/progressbar';
 import { Table, TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
-import { rxResource, toSignal } from '@angular/core/rxjs-interop';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { map } from 'rxjs';
 import { problemMessage } from '@/app/api/api';
 import { PROJECT_GROUP_LABEL, PROJECT_STATUS_LABEL, Project, ProjectGroup, ProjectService, getProjectSeverity } from '@/app/pages/service/project.service';
+import { apiResource } from '@/app/api/api-resource';
 
 const GROUPS: ProjectGroup[] = ['in-hand', 'pending-contract', 'active', 'completed', 'warranty'];
 
@@ -140,7 +141,7 @@ export class ProjectList {
     /** กลุ่มที่เลือกอยู่ใน URL (?group=) ให้ลิงก์จาก Dashboard เปิดมาพร้อมตัวกรอง */
     readonly group = toSignal(this.route.queryParamMap.pipe(map((params) => ((GROUPS as string[]).includes(params.get('group') ?? '') ? (params.get('group') as ProjectGroup) : null))), { initialValue: null });
 
-    readonly projects = rxResource({ params: () => ({ group: this.group() }), stream: ({ params }) => this.projectService.list(params), defaultValue: [] });
+    readonly projects = apiResource({ params: () => ({ group: this.group() }), stream: ({ params }) => this.projectService.list(params), defaultValue: [] });
 
     setGroup(group: ProjectGroup | null) {
         this.router.navigate([], { relativeTo: this.route, queryParams: { group }, queryParamsHandling: 'merge', replaceUrl: true });

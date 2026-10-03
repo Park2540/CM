@@ -1,7 +1,6 @@
 import { DecimalPipe, NgClass } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, computed, inject, input, output, signal } from '@angular/core';
-import { rxResource } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { ConfirmationService, MessageService } from 'primeng/api';
@@ -23,6 +22,7 @@ import { TimelinePhase } from '@/app/pages/service/project-timeline.service';
 import { Subcontractor, SubcontractorService, TRADE_LABEL, TRADE_PHASES } from '@/app/pages/service/subcontractor.service';
 import { ThaiDatePipe } from '../thai-date.pipe';
 import { initials } from './project-ui';
+import { apiResource } from '@/app/api/api-resource';
 
 /** ขั้นตอนที่เป็นงานของบริษัทเอง (สำรวจ ออกแบบ ขออนุญาต) ไม่ต้องมีผู้รับเหมาช่วง */
 const IN_HOUSE_PHASES = ['01', '02', '03'];
@@ -401,7 +401,7 @@ export class ProjectTeamTab {
     readonly subStatusSeverity = SUB_STATUS_SEVERITY;
     readonly roleOptions = STAFF_ROLES.map((value) => ({ value, label: STAFF_ROLE_LABEL[value] }));
 
-    readonly assignments = rxResource({ params: () => this.projectCode(), stream: ({ params: code }) => this.teamService.assignments(code) });
+    readonly assignments = apiResource({ params: () => this.projectCode(), stream: ({ params: code }) => this.teamService.assignments(code) });
     readonly staff = computed(() => this.assignments.value()?.staff ?? []);
     readonly subs = computed(() => this.assignments.value()?.subcontractors ?? []);
     /** null เมื่อไม่มีสิทธิ์เห็นมูลค่าจ้าง (หลังบ้านไม่ส่ง contractValue) */
@@ -423,8 +423,8 @@ export class ProjectTeamTab {
 
     // ---------- ตัวเลือกในฟอร์ม (โหลดเมื่อเปิดฟอร์มครั้งแรก) ----------
     private readonly formsUsed = signal(false);
-    private readonly personnelResource = rxResource({ params: () => this.formsUsed() || undefined, stream: () => this.personnelService.list(), defaultValue: [] });
-    private readonly subcontractorResource = rxResource({ params: () => this.formsUsed() || undefined, stream: () => this.subcontractorService.list(), defaultValue: [] });
+    private readonly personnelResource = apiResource({ params: () => this.formsUsed() || undefined, stream: () => this.personnelService.list(), defaultValue: [] });
+    private readonly subcontractorResource = apiResource({ params: () => this.formsUsed() || undefined, stream: () => this.subcontractorService.list(), defaultValue: [] });
     readonly personnelOptions = computed(() => this.personnelResource.value().map((person) => ({ value: person.id, label: person.position ? `${person.fullName} · ${person.position}` : person.fullName })));
     readonly subcontractorOptions = computed(() => {
         const editingId = this.editingSub()?.subcontractor.id;
