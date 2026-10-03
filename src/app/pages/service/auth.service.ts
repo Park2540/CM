@@ -7,8 +7,6 @@ import { ApiSchemas, apiUrl, toDate } from '@/app/api/api';
 export type RoleId = ApiSchemas['RoleId'];
 export type Permission = ApiSchemas['Permission'];
 export type RoleCatalog = ApiSchemas['RoleCatalog'];
-export type RoleGroup = RoleCatalog['groups'][number];
-export type RoleDefinition = RoleCatalog['roles'][number];
 export type CurrentUser = Omit<ApiSchemas['CurrentUser'], 'lastLoginAt'> & { lastLoginAt: Date };
 
 /**
