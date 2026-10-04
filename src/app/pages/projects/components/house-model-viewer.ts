@@ -3,7 +3,7 @@ import { Component, DestroyRef, ElementRef, afterNextRender, computed, effect, i
 import type * as T from 'three';
 import type { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { HousePlan, PlanRoom, RoomKind } from '@/app/pages/service/house-plan.service';
-import { ModelFile, ModelFormat, VIEWABLE_MODEL_ACCEPT, modelFormatOf } from '@/app/pages/service/project-model.service';
+import { ModelElement, ModelFile, ModelFormat, VIEWABLE_MODEL_ACCEPT, modelFormatOf } from '@/app/pages/service/project-model.service';
 
 type Three = typeof import('three');
 type ModelView = 'exterior' | number;
@@ -23,6 +23,24 @@ interface IfcNode {
 const emptyFilters = (): Record<IfcDimension, Set<string>> => ({ discipline: new Set(), category: new Set(), storey: new Set(), system: new Set() });
 /** ค่าของกลุ่มในมิตินั้น (หมวดใส่งานนำหน้า เพราะชื่อหมวดซ้ำข้ามงานได้) */
 const ifcKey = (node: IfcNode, dimension: IfcDimension) => (dimension === 'category' ? `${node.discipline}|${node.category}` : node[dimension]);
+/** การวัดระยะ 1 เส้น (พิกัดฉาก หน่วยของไฟล์) */
+interface Measurement {
+    id: number;
+    a: T.Vector3;
+    b: T.Vector3;
+    distance: number;
+    horizontal: number;
+    vertical: number;
+}
+/** ข้อมูลที่แสดงในการ์ดเมื่อคลิกชิ้นงาน */
+interface PickedInfo {
+    title: string;
+    subtitle: string;
+    rows: Array<[string, string]>;
+    groups: Array<{ name: string; items: Array<[string, string]> }>;
+    loading: boolean;
+    element?: ModelElement;
+}
 /** ส่วนประกอบระดับหมวด (เช่น tag "รวมโครงสร้าง") และส่วนย่อย (tag) */
 interface PartGroup {
     id: string;
@@ -62,7 +80,15 @@ const isTextFormat = (format: ModelFormat) => format === 'dae' || format === 'ob
     imports: [DecimalPipe],
     template: `
         <div #container class="viewer relative w-full h-full overflow-hidden rounded-lg">
-            <canvas #canvas class="block w-full h-full outline-none" tabindex="0" aria-label="โมเดลบ้าน 3 มิติ ลากเพื่อหมุน เลื่อนลูกกลิ้งเพื่อซูม"></canvas>
+            <canvas
+                #canvas
+                class="block w-full h-full outline-none"
+                tabindex="0"
+                aria-label="โมเดลบ้าน 3 มิติ ลากเพื่อหมุน เลื่อนลูกกลิ้งเพื่อซูม คลิกที่ชิ้นงานเพื่อดูคุณสมบัติ"
+                (pointerdown)="onPointerDown($event)"
+                (pointerup)="onPointerUp($event)"
+                (keydown.escape)="onEscape()"
+            ></canvas>
 
             <div class="absolute top-3 left-3 right-28 flex flex-wrap gap-2">
                 @if (source() === 'sample') {
@@ -95,6 +121,9 @@ const isTextFormat = (format: ModelFormat) => format === 'dae' || format === 'ob
                 <button type="button" class="tool tool-icon" aria-label="เปิดไฟล์ 3 มิติจากเครื่องเพื่อดู (ไม่บันทึก)" title="เปิดไฟล์ 3D จากเครื่องเพื่อดู (.glb .gltf .dae .fbx .obj) — ไม่บันทึกเข้าระบบ" (click)="fileInput.click()">
                     <i class="pi pi-folder-open"></i>
                 </button>
+                @if (source() !== 'none') {
+                    <button type="button" class="tool" [class.tool-active]="measuring()" [attr.aria-pressed]="measuring()" title="วัดระยะ: คลิก 2 จุดบนโมเดล" (click)="toggleMeasure()"><i class="pi pi-arrows-h mr-1"></i>วัดระยะ</button>
+                }
                 <button type="button" class="tool tool-icon" aria-label="รีเซ็ตมุมมอง" title="รีเซ็ตมุมมอง" (click)="resetView()"><i class="pi pi-refresh"></i></button>
                 <button type="button" class="tool tool-icon" [attr.aria-label]="fullscreen() ? 'ออกจากเต็มจอ' : 'เต็มจอ'" [title]="fullscreen() ? 'ออกจากเต็มจอ' : 'เต็มจอ'" (click)="toggleFullscreen()">
                     <i class="pi" [class.pi-window-maximize]="!fullscreen()" [class.pi-window-minimize]="fullscreen()"></i>
@@ -203,7 +232,96 @@ const isTextFormat = (format: ModelFormat) => format === 'dae' || format === 'ob
                 </section>
             }
 
-            <div class="absolute bottom-3 left-3 text-xs px-2 py-1 rounded bg-surface-0/85 dark:bg-surface-900/85 text-muted-color pointer-events-none">ลากเพื่อหมุน · ลูกกลิ้งเพื่อซูม · คลิกขวาลากเพื่อเลื่อน</div>
+            <!-- ป้ายระยะบนเส้นวัด (ตำแหน่งคำนวณจากกล้องทุกครั้งที่วาดใหม่) -->
+            @for (label of measureLabels(); track label.id) {
+                @if (label.visible) {
+                    <div class="measure-label" [style.left.px]="label.x" [style.top.px]="label.y">{{ label.text }}</div>
+                }
+            }
+
+            @if (measuring()) {
+                <section class="measure-panel" aria-label="เครื่องมือวัดระยะ">
+                    <div class="flex items-center justify-between gap-2">
+                        <span class="font-semibold text-sm"><i class="pi pi-arrows-h mr-1"></i>วัดระยะ</span>
+                        <button type="button" class="bg-transparent border-0 p-1 cursor-pointer text-muted-color" aria-label="ปิดเครื่องมือวัดระยะ" (click)="toggleMeasure()"><i class="pi pi-times"></i></button>
+                    </div>
+                    <p class="text-xs text-muted-color m-0 mt-1" role="status">
+                        {{ pendingPoint() ? 'คลิกจุดที่ 2 (Esc = ยกเลิกจุดแรก)' : 'คลิกจุดที่ 1 บนโมเดล — ใกล้มุมจะยึดเข้ามุมให้' }}
+                    </p>
+                    @if (modelSize(); as size) {
+                        <div class="text-xs mt-2">
+                            ขนาดโมเดล (กว้าง × ลึก × สูง)
+                            <div class="font-semibold">{{ formatLength(size[0]) }} × {{ formatLength(size[1]) }} × {{ formatLength(size[2]) }}</div>
+                        </div>
+                    }
+                    <label class="flex items-center gap-2 text-xs mt-2">
+                        หน่วยของไฟล์
+                        <select class="unit-select" [value]="unitFactor()" (change)="setUnit(+$any($event.target).value)" title="ไฟล์ที่ระบบแปลงจาก .skp / .ifc และไฟล์ glTF เป็นเมตรอยู่แล้ว ปรับเฉพาะไฟล์ OBJ / FBX ที่ใช้หน่วยอื่น">
+                            @for (unit of units; track unit.value) {
+                                <option [value]="unit.value" [selected]="unit.value === unitFactor()">{{ unit.label }}</option>
+                            }
+                        </select>
+                    </label>
+                    @if (measurementRows().length) {
+                        <ol class="list-none p-0 m-0 mt-2 flex flex-col gap-1 max-h-40 overflow-y-auto">
+                            @for (row of measurementRows(); track row.id; let i = $index) {
+                                <li class="measure-row">
+                                    <span class="measure-index">{{ i + 1 }}</span>
+                                    <span class="flex-1 min-w-0">
+                                        <span class="block font-semibold">{{ row.distance }}</span>
+                                        <span class="block text-[0.7rem] text-muted-color">ราบ {{ row.horizontal }} · ดิ่ง {{ row.vertical }}</span>
+                                    </span>
+                                    <button type="button" class="part-solo measure-delete" [attr.aria-label]="'ลบการวัดที่ ' + (i + 1)" (click)="removeMeasurement(row.id)"><i class="pi pi-trash text-[0.65rem]"></i></button>
+                                </li>
+                            }
+                        </ol>
+                        <button type="button" class="link-button text-xs mt-2" (click)="clearMeasurements()">ล้างการวัดทั้งหมด</button>
+                    }
+                </section>
+            }
+
+            @if (selection(); as selected) {
+                <section class="info-card" aria-live="polite" aria-label="ข้อมูลชิ้นงานที่เลือก">
+                    <div class="flex items-start justify-between gap-2">
+                        <div class="min-w-0">
+                            <div class="text-xs text-muted-color">{{ selected.subtitle }}</div>
+                            <div class="font-semibold truncate" [title]="selected.title">{{ selected.title }}</div>
+                        </div>
+                        <button type="button" class="bg-transparent border-0 p-1 cursor-pointer text-muted-color shrink-0" aria-label="ปิดข้อมูลชิ้นงาน" (click)="clearSelection()"><i class="pi pi-times"></i></button>
+                    </div>
+                    @if (selected.loading) {
+                        <div class="text-xs text-muted-color mt-2"><i class="pi pi-spin pi-spinner mr-1"></i>กำลังโหลดข้อมูลชิ้นงาน...</div>
+                    }
+                    <dl class="info-list">
+                        @for (row of selected.rows; track $index) {
+                            <dt>{{ row[0] }}</dt>
+                            <dd>{{ row[1] }}</dd>
+                        }
+                    </dl>
+                    @for (group of selected.groups; track group.name) {
+                        <details class="mt-2">
+                            <summary class="text-xs font-semibold cursor-pointer">{{ group.name }} ({{ group.items.length }})</summary>
+                            <dl class="info-list">
+                                @for (item of group.items; track $index) {
+                                    <dt>{{ item[0] }}</dt>
+                                    <dd>{{ item[1] }}</dd>
+                                }
+                            </dl>
+                        </details>
+                    }
+                    @if (selected.element && ifcMode()) {
+                        <div class="flex flex-wrap gap-2 mt-2 text-xs">
+                            <button type="button" class="link-button" (click)="soloIn('category', selected.element.discipline + '|' + selected.element.category)">ดูเฉพาะหมวดนี้</button>
+                            <button type="button" class="link-button" (click)="soloIn('storey', selected.element.storey)">ดูเฉพาะชั้นนี้</button>
+                            @if (selected.element.system) {
+                                <button type="button" class="link-button" (click)="soloSystemOf(selected.element)">ดูเฉพาะระบบนี้</button>
+                            }
+                        </div>
+                    }
+                </section>
+            }
+
+            <div class="absolute bottom-3 left-3 text-xs px-2 py-1 rounded bg-surface-0/85 dark:bg-surface-900/85 text-muted-color pointer-events-none">ลากเพื่อหมุน · ลูกกลิ้งเพื่อซูม · คลิกขวาลากเพื่อเลื่อน · คลิกชิ้นงานเพื่อดูข้อมูล</div>
 
             @if (loading()) {
                 <div class="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-surface-0/70 dark:bg-surface-900/70">
@@ -310,6 +428,91 @@ const isTextFormat = (format: ModelFormat) => format === 'dae' || format === 'ob
         .part-solo:focus-visible {
             opacity: 1;
         }
+        .measure-label {
+            position: absolute;
+            transform: translate(-50%, -50%);
+            padding: 0.1rem 0.45rem;
+            border-radius: 999px;
+            background: #e11d48;
+            color: #fff;
+            font-size: 0.75rem;
+            font-weight: 600;
+            white-space: nowrap;
+            pointer-events: none;
+            box-shadow: 0 1px 3px rgb(15 23 42 / 30%);
+        }
+        .measure-panel {
+            position: absolute;
+            left: 0.75rem;
+            top: 3.5rem;
+            width: min(15rem, calc(100% - 1.5rem));
+            padding: 0.75rem;
+            border-radius: var(--p-content-border-radius);
+            border: 1px solid var(--p-content-border-color);
+            background: color-mix(in srgb, var(--p-content-background) 96%, transparent);
+            color: var(--p-text-color);
+            box-shadow: 0 4px 16px rgb(15 23 42 / 15%);
+            font-size: 0.85rem;
+        }
+        .unit-select {
+            padding: 0.15rem 0.35rem;
+            border: 1px solid var(--p-content-border-color);
+            border-radius: 0.375rem;
+            background: var(--p-content-background);
+            color: var(--p-text-color);
+            font: inherit;
+        }
+        .measure-row {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.8rem;
+        }
+        .measure-index {
+            width: 1.15rem;
+            height: 1.15rem;
+            flex-shrink: 0;
+            border-radius: 999px;
+            background: #e11d48;
+            color: #fff;
+            font-size: 0.65rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .measure-row:hover .measure-delete,
+        .measure-delete:focus-visible {
+            opacity: 1;
+        }
+        .info-card {
+            position: absolute;
+            left: 0.75rem;
+            bottom: 2.75rem;
+            width: min(20rem, calc(100% - 1.5rem));
+            max-height: calc(100% - 6.5rem);
+            overflow-y: auto;
+            padding: 0.75rem;
+            border-radius: var(--p-content-border-radius);
+            border: 1px solid var(--p-content-border-color);
+            background: color-mix(in srgb, var(--p-content-background) 96%, transparent);
+            color: var(--p-text-color);
+            box-shadow: 0 4px 16px rgb(15 23 42 / 15%);
+            font-size: 0.85rem;
+        }
+        .info-list {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 0.15rem 0.6rem;
+            margin: 0.5rem 0 0;
+            font-size: 0.78rem;
+        }
+        .info-list dt {
+            color: var(--p-text-muted-color);
+        }
+        .info-list dd {
+            margin: 0;
+            word-break: break-word;
+        }
         .dim-tabs {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
@@ -407,6 +610,311 @@ export class HouseModelViewer {
     private destroyed = false;
     /** กันผลการโหลดครั้งเก่ามาทับครั้งใหม่ (เช่น สลับเวอร์ชันเร็ว ๆ) */
     private loadToken = 0;
+
+    // ---------- คลิกเลือกชิ้นงาน ----------
+    readonly selection = signal<PickedInfo | null>(null);
+    private pointerStart: { x: number; y: number } | null = null;
+    private highlight?: T.Mesh;
+    /** ข้อมูลชิ้นงานของไฟล์ที่เปิดอยู่ (โหลดครั้งแรกที่คลิก) */
+    private elementsLoad?: Promise<ModelElement[]>;
+    private elementsUrl?: string;
+
+    onPointerDown(event: PointerEvent) {
+        this.pointerStart = event.button === 0 ? { x: event.clientX, y: event.clientY } : null;
+    }
+
+    /** คลิก (ไม่ได้ลากหมุน) = เลือกชิ้นงาน หรือวางจุดวัดระยะ */
+    onPointerUp(event: PointerEvent) {
+        const start = this.pointerStart;
+        this.pointerStart = null;
+        if (!start || Math.hypot(event.clientX - start.x, event.clientY - start.y) > 4) return;
+        if (this.measuring()) this.addMeasurePoint(event);
+        else void this.pick(event);
+    }
+
+    onEscape() {
+        if (this.pendingPoint()) this.cancelPendingPoint();
+        else this.clearSelection();
+    }
+
+    // ---------- วัดระยะ ----------
+    readonly measuring = signal(false);
+    readonly pendingPoint = signal(false);
+    readonly measurements = signal<Measurement[]>([]);
+    readonly measureLabels = signal<Array<{ id: number; x: number; y: number; text: string; visible: boolean }>>([]);
+    /** ขนาดกรอบโมเดล (กว้าง × ลึก × สูง) ในหน่วยของไฟล์ */
+    readonly modelSize = signal<[number, number, number] | null>(null);
+    /** หน่วยของไฟล์ → เมตร (ไฟล์ที่แปลงจาก .skp / .ifc และ glTF เป็นเมตร) */
+    readonly unitFactor = signal(1);
+    readonly units = [
+        { value: 1, label: 'เมตร' },
+        { value: 0.01, label: 'เซนติเมตร' },
+        { value: 0.001, label: 'มิลลิเมตร' },
+        { value: 0.0254, label: 'นิ้ว' },
+        { value: 0.3048, label: 'ฟุต' }
+    ];
+    readonly measurementRows = computed(() =>
+        this.measurements().map((m) => ({ id: m.id, distance: this.formatLength(m.distance), horizontal: this.formatLength(m.horizontal), vertical: this.formatLength(m.vertical) }))
+    );
+    private measureGroup?: T.Group;
+    private pendingStart?: T.Vector3;
+    private pendingMarker?: T.Mesh;
+    private markerRadius = 0.05;
+    private nextMeasureId = 1;
+    private measureObjects = new Map<number, T.Object3D[]>();
+
+    /** ระยะในหน่วยของไฟล์ → ข้อความเป็นเมตร (สั้นกว่า 1 ม. แสดงเป็น ซม. / มม.) */
+    formatLength(value: number) {
+        const meters = value * this.unitFactor();
+        if (meters >= 1) return `${meters.toFixed(2)} ม.`;
+        if (meters >= 0.01) return `${(meters * 100).toFixed(1)} ซม.`;
+        return `${Math.round(meters * 1000)} มม.`;
+    }
+
+    toggleMeasure() {
+        const on = !this.measuring();
+        this.measuring.set(on);
+        this.cancelPendingPoint();
+        if (on) this.clearSelection();
+    }
+
+    setUnit(factor: number) {
+        this.unitFactor.set(factor);
+        this.updateMeasureLabels();
+    }
+
+    removeMeasurement(id: number) {
+        for (const object of this.measureObjects.get(id) ?? []) {
+            this.measureGroup?.remove(object);
+            disposeObject(object);
+        }
+        this.measureObjects.delete(id);
+        this.measurements.update((list) => list.filter((m) => m.id !== id));
+        this.updateMeasureLabels();
+        this.requestRender();
+    }
+
+    clearMeasurements() {
+        for (const id of [...this.measureObjects.keys()]) this.removeMeasurement(id);
+        this.cancelPendingPoint();
+    }
+
+    private cancelPendingPoint() {
+        if (this.pendingMarker) {
+            this.measureGroup?.remove(this.pendingMarker);
+            disposeObject(this.pendingMarker);
+        }
+        this.pendingMarker = undefined;
+        this.pendingStart = undefined;
+        this.pendingPoint.set(false);
+        this.requestRender();
+    }
+
+    private addMeasurePoint(event: PointerEvent) {
+        const hit = this.raycast(event);
+        if (!hit || !this.measureGroup) return;
+        const point = this.snapToVertex(hit, event);
+        if (!this.pendingStart) {
+            this.pendingStart = point;
+            this.pendingMarker = this.measureMarker(point);
+            this.measureGroup.add(this.pendingMarker);
+            this.pendingPoint.set(true);
+            this.requestRender();
+            return;
+        }
+        const three = this.three!;
+        const start = this.pendingStart;
+        const id = this.nextMeasureId++;
+        const line = new three.Line(new three.BufferGeometry().setFromPoints([start, point]), new three.LineBasicMaterial({ color: 0xe11d48, depthTest: false, transparent: true }));
+        line.renderOrder = 20;
+        const end = this.measureMarker(point);
+        this.measureGroup.add(line, end);
+        this.measureObjects.set(id, [this.pendingMarker!, line, end]);
+        this.pendingMarker = undefined;
+        this.pendingStart = undefined;
+        this.pendingPoint.set(false);
+        // แกนตั้งของฉากคือ Y
+        const delta = point.clone().sub(start);
+        this.measurements.update((list) => [...list, { id, a: start, b: point, distance: delta.length(), horizontal: Math.hypot(delta.x, delta.z), vertical: Math.abs(delta.y) }]);
+        this.updateMeasureLabels();
+        this.requestRender();
+    }
+
+    private measureMarker(point: T.Vector3): T.Mesh {
+        const three = this.three!;
+        const marker = new three.Mesh(new three.SphereGeometry(this.markerRadius, 16, 12), new three.MeshBasicMaterial({ color: 0xe11d48, depthTest: false, transparent: true }));
+        marker.position.copy(point);
+        marker.renderOrder = 21;
+        return marker;
+    }
+
+    /** ยึดเข้ามุมของสามเหลี่ยมที่คลิกถ้าอยู่ใกล้ (ไม่เกิน 12 พิกเซลบนจอ) ให้วัดจากมุมชิ้นงานได้แม่น */
+    private snapToVertex(hit: T.Intersection, event: PointerEvent): T.Vector3 {
+        const three = this.three!;
+        const mesh = hit.object as T.Mesh;
+        const position = mesh.geometry.getAttribute('position');
+        if (!hit.face || !position) return hit.point.clone();
+        const rect = this.canvas().nativeElement.getBoundingClientRect();
+        let best: T.Vector3 | null = null;
+        let bestDistance = 12;
+        for (const index of [hit.face.a, hit.face.b, hit.face.c]) {
+            const vertex = new three.Vector3().fromBufferAttribute(position, index).applyMatrix4(mesh.matrixWorld);
+            const screen = vertex.clone().project(this.camera!);
+            const distance = Math.hypot(((screen.x + 1) / 2) * rect.width - (event.clientX - rect.left), ((1 - screen.y) / 2) * rect.height - (event.clientY - rect.top));
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                best = vertex;
+            }
+        }
+        return best ?? hit.point.clone();
+    }
+
+    /** ตำแหน่งป้ายระยะบนจอ (จุดกึ่งกลางเส้นวัด) */
+    private updateMeasureLabels() {
+        const camera = this.camera;
+        const element = this.container().nativeElement;
+        if (!camera || !this.three) return;
+        const width = element.clientWidth;
+        const height = element.clientHeight;
+        this.measureLabels.set(
+            this.measurements().map((m) => {
+                const mid = m.a.clone().add(m.b).multiplyScalar(0.5).project(camera);
+                return { id: m.id, x: ((mid.x + 1) / 2) * width, y: ((1 - mid.y) / 2) * height, text: this.formatLength(m.distance), visible: mid.z < 1 && Math.abs(mid.x) <= 1.1 && Math.abs(mid.y) <= 1.1 };
+            })
+        );
+    }
+
+    /** จุดแรกที่ลำแสงจากตำแหน่งเมาส์ชนโมเดล (เฉพาะส่วนที่มองเห็นอยู่) */
+    private raycast(event: PointerEvent): T.Intersection | undefined {
+        const three = this.three;
+        if (!three || !this.model3d || !this.camera) return undefined;
+        const rect = this.canvas().nativeElement.getBoundingClientRect();
+        const pointer = new three.Vector2(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1);
+        const raycaster = new three.Raycaster();
+        raycaster.setFromCamera(pointer, this.camera);
+        const meshes: T.Object3D[] = [];
+        this.model3d.traverseVisible((child) => {
+            if ((child as T.Mesh).isMesh) meshes.push(child);
+        });
+        return raycaster.intersectObjects(meshes, false).find((item) => item.face);
+    }
+
+    clearSelection() {
+        this.selection.set(null);
+        this.removeHighlight();
+        this.requestRender();
+    }
+
+    /** ดูเฉพาะค่าเดียวในมิติที่กำหนด (จากการ์ดข้อมูลชิ้นงาน) */
+    soloIn(dimension: IfcDimension, key: string) {
+        this.ifcDimension.set(dimension);
+        this.soloValue(key);
+        this.partsOpen.set(true);
+    }
+
+    /** ระบบในตัวกรองเป็นชื่อแบบรวมเลขวงจร (ตัดเลขท้าย) */
+    soloSystemOf(element: ModelElement) {
+        this.soloIn('system', element.system.replace(/\s+\d+$/, ''));
+    }
+
+    private async pick(event: PointerEvent) {
+        if (!this.three || !this.model3d || this.source() === 'sample') return;
+        // เฉพาะ mesh ที่มองเห็นอยู่ (ส่วนที่ปิดในแผงส่วนประกอบคลิกไม่โดน)
+        const hit = this.raycast(event);
+        this.removeHighlight();
+        if (!hit) {
+            this.selection.set(null);
+            this.requestRender();
+            return;
+        }
+        const mesh = hit.object as T.Mesh;
+        const attribute = mesh.geometry.getAttribute('_element') as T.BufferAttribute | undefined;
+        if (!attribute) {
+            // ไฟล์ที่ไม่มีข้อมูลรายชิ้น: บอกส่วนประกอบที่คลิก (tag / ชื่อ object)
+            let node: T.Object3D | null = mesh;
+            while (node && !node.userData['name'] && !node.name) node = node.parent;
+            const name = String(node?.userData['name'] ?? node?.name ?? 'ไม่มีชื่อ');
+            const parentName = node?.parent?.userData['name'];
+            this.highlightMesh(mesh, null, 0);
+            this.selection.set({ title: name, subtitle: parentName ? `ส่วนประกอบ · ${parentName}` : 'ส่วนประกอบ', rows: [], groups: [], loading: false });
+            return;
+        }
+        const index = Math.round(attribute.getX(hit.face!.a));
+        this.highlightMesh(mesh, attribute, index);
+        this.selection.set({ title: 'ชิ้นงาน', subtitle: '', rows: [], groups: [], loading: true });
+        try {
+            const element = (await this.loadElements())[index];
+            if (!element) throw new Error('missing');
+            const groups = new Map<string, Array<[string, string]>>();
+            for (const [group, name, value] of element.properties) groups.set(group, [...(groups.get(group) ?? []), [name, value]]);
+            this.selection.set({
+                title: element.name || element.category,
+                subtitle: `${element.discipline} · ${element.category}`,
+                element,
+                loading: false,
+                rows: [
+                    ['ประเภท', element.type || '-'],
+                    ['ชั้น', element.storey],
+                    ...(element.system ? ([['ระบบ', element.system]] as Array<[string, string]>) : []),
+                    ['IFC', element.ifcClass],
+                    ['GUID', element.guid]
+                ],
+                groups: [...groups].map(([name, items]) => ({ name, items }))
+            });
+        } catch {
+            this.selection.set({ title: 'ชิ้นงาน', subtitle: '', rows: [['ข้อมูล', 'โหลดข้อมูลชิ้นงานไม่สำเร็จ']], groups: [], loading: false });
+        }
+    }
+
+    private loadElements(): Promise<ModelElement[]> {
+        const url = this.model()?.elementsUrl;
+        if (!url) return Promise.resolve([]);
+        if (!this.elementsLoad || this.elementsUrl !== url) {
+            this.elementsUrl = url;
+            this.elementsLoad = fetch(url)
+                .then((response) => (response.ok ? response.json() : Promise.reject(new Error(`HTTP ${response.status}`))))
+                .then((data: { elements: ModelElement[] }) => data.elements);
+            this.elementsLoad.catch(() => (this.elementsLoad = undefined));
+        }
+        return this.elementsLoad;
+    }
+
+    /** ไฮไลต์สามเหลี่ยมของชิ้นงานที่เลือก (attribute = null: ทั้ง mesh) */
+    private highlightMesh(mesh: T.Mesh, attribute: T.BufferAttribute | null, element: number) {
+        const three = this.three!;
+        const geometry = mesh.geometry;
+        const position = geometry.getAttribute('position');
+        const index = geometry.index;
+        const triangleCount = (index ? index.count : position.count) / 3;
+        const vertex = (i: number) => (index ? index.getX(i) : i);
+        const points: number[] = [];
+        const p = new three.Vector3();
+        mesh.updateWorldMatrix(true, false);
+        for (let t = 0; t < triangleCount; t++) {
+            const a = vertex(t * 3);
+            if (attribute && Math.round(attribute.getX(a)) !== element) continue;
+            for (let k = 0; k < 3; k++) {
+                p.fromBufferAttribute(position, vertex(t * 3 + k)).applyMatrix4(mesh.matrixWorld);
+                points.push(p.x, p.y, p.z);
+            }
+        }
+        const highlightGeometry = new three.BufferGeometry();
+        highlightGeometry.setAttribute('position', new three.Float32BufferAttribute(points, 3));
+        this.highlight = new three.Mesh(
+            highlightGeometry,
+            new three.MeshBasicMaterial({ color: 0xff8a00, transparent: true, opacity: 0.65, side: three.DoubleSide, depthTest: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })
+        );
+        this.highlight.renderOrder = 10;
+        this.scene!.add(this.highlight);
+        this.requestRender();
+    }
+
+    private removeHighlight() {
+        if (!this.highlight) return;
+        this.scene?.remove(this.highlight);
+        disposeObject(this.highlight);
+        this.highlight = undefined;
+    }
     private readonly onFullscreenChange = () => {
         this.fullscreen.set(document.fullscreenElement === this.container().nativeElement);
     };
@@ -452,6 +960,9 @@ export class HouseModelViewer {
             this.ground.rotation.x = -Math.PI / 2;
             this.ground.receiveShadow = true;
             this.scene.add(this.ground);
+            // เส้นและหมุดวัดระยะ (ไม่ถูกลบตอนเปลี่ยนโมเดล ใช้ clearMeasurements แทน)
+            this.measureGroup = new three.Group();
+            this.scene.add(this.measureGroup);
 
             this.controls = new OrbitControls(this.camera, canvas);
             this.controls.enableDamping = true;
@@ -826,6 +1337,11 @@ export class HouseModelViewer {
         object.updateMatrixWorld(true);
         const box = new three.Box3().setFromObject(object);
         const sphere = box.getBoundingSphere(new three.Sphere());
+        const size = box.getSize(new three.Vector3());
+        // กว้าง (X) × ลึก (Z) × สูง (Y — แกนตั้งของฉาก)
+        this.modelSize.set([size.x, size.z, size.y]);
+        // ขนาดหมุดวัดตามขนาดโมเดล (เห็นชัดทั้งบ้านหลังเล็กและอาคารใหญ่)
+        this.markerRadius = Math.max(sphere.radius * 0.006, 1e-4);
         const camera = this.camera!;
         const distance = (sphere.radius / Math.sin(three.MathUtils.degToRad(camera.fov / 2))) * 1.05;
         this.ground!.position.y = box.min.y;
@@ -933,6 +1449,7 @@ export class HouseModelViewer {
             // update() returns true while damping is still moving the camera.
             const moving = this.controls?.update() ?? false;
             this.renderer?.render(this.scene!, this.camera!);
+            if (this.measurements().length) this.updateMeasureLabels();
             if (moving) this.requestRender();
         });
     }
@@ -949,6 +1466,9 @@ export class HouseModelViewer {
     }
 
     private clearModel() {
+        this.selection.set(null);
+        this.removeHighlight();
+        this.clearMeasurements();
         if (!this.model3d) return;
         this.scene?.remove(this.model3d);
         disposeObject(this.model3d);

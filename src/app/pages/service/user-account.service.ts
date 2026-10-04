@@ -23,7 +23,8 @@ export const PERMISSION_INFO: Record<Permission, { label: string; description: s
     'finance.company': { label: 'การเงินระดับบริษัท', description: 'ดู Dashboard กำไร-ขาดทุนและกระแสเงินสด' },
     'personnel.sensitive': { label: 'ข้อมูลอ่อนไหวของบุคลากร', description: 'ดู/แก้ค่าตอบแทน บัญชีธนาคาร ผลประเมิน' },
     'user.manage': { label: 'จัดการผู้ใช้และสิทธิ์', description: 'สร้างบัญชี กำหนดบทบาท สิทธิ์ และระงับผู้ใช้' },
-    'payment.record': { label: 'บันทึกรับชำระเงิน', description: 'บันทึกและยกเลิกการรับชำระเงินงวดงานจากลูกค้า พร้อมหลักฐาน' }
+    'payment.record': { label: 'บันทึกรับชำระเงิน', description: 'บันทึกและยกเลิกการรับชำระเงินงวดงานจากลูกค้า พร้อมหลักฐาน' },
+    'procurement.manage': { label: 'จัดซื้อและเช่าอุปกรณ์', description: 'ออกใบสั่งซื้อ รับของเข้าหน้างาน รับ/คืนอุปกรณ์ที่เช่าหรือยืม' }
 };
 export const PERMISSIONS = Object.keys(PERMISSION_INFO) as Permission[];
 

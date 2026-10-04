@@ -50,19 +50,19 @@ export interface ConversionSummary {
 }
 
 /** แปลงทีละไฟล์ (ไฟล์ใหญ่ใช้หน่วยความจำมาก) — .skp ต้องมี SketchUp บนเครื่อง ส่วน .ifc ใช้ web-ifc ได้ทุกเครื่อง */
-export function convertModel(kind: ConvertKind, input: string, output: string): Promise<ConversionSummary> {
-    const job = queue.then(() => runWorker(kind, input, output));
+export function convertModel(kind: ConvertKind, input: string, output: string, elementsOutput?: string): Promise<ConversionSummary> {
+    const job = queue.then(() => runWorker(kind, input, output, elementsOutput));
     queue = job.catch(() => undefined);
     return job;
 }
 
-function runWorker(kind: ConvertKind, input: string, output: string): Promise<ConversionSummary> {
+function runWorker(kind: ConvertKind, input: string, output: string, elementsOutput?: string): Promise<ConversionSummary> {
     const apiDir = kind === 'skp' ? sketchupApiDir() : '';
     if (kind === 'skp' && !apiDir) return Promise.reject(new ConversionError('เซิร์ฟเวอร์ไม่มี SketchUp สำหรับแปลงไฟล์'));
     // ตอนพัฒนารันผ่าน tsx (ไฟล์ .ts) — worker ใช้ execArgv เดียวกับ process หลักจึงโหลด .ts ได้
     const script = new URL(import.meta.url.endsWith('.ts') ? './skp-worker.ts' : './skp-worker.js', import.meta.url);
     return new Promise((resolve, reject) => {
-        const worker = new Worker(script, { workerData: { kind, apiDir, input, output }, resourceLimits: { maxOldGenerationSizeMb: 8192 } });
+        const worker = new Worker(script, { workerData: { kind, apiDir, input, output, elementsOutput }, resourceLimits: { maxOldGenerationSizeMb: 8192 } });
         let settled = false;
         worker.once('message', (message: { ok: true; result: ConversionSummary } | { ok: false; message: string; code?: number }) => {
             settled = true;

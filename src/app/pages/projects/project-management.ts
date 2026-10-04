@@ -28,6 +28,7 @@ import { ProjectPlanTab } from './components/project-plan-tab';
 import { ProjectStepsOverview } from './components/project-steps-overview';
 import { ProjectTimelineTab } from './components/project-timeline-tab';
 import { ProjectChangeOrdersTab } from './components/project-change-orders-tab';
+import { ProjectProcurementTab } from './components/project-procurement-tab';
 import { ChangeOrderService } from '@/app/pages/service/change-order.service';
 import { ProjectModel } from '@/app/pages/service/project-model.service';
 import { PROJECT_TABS, ProjectTab } from './components/project-ui';
@@ -59,6 +60,7 @@ const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
         ProjectPhotosTab,
         ProjectPlanTab,
         ProjectChangeOrdersTab,
+        ProjectProcurementTab,
         ProjectStepsOverview,
         ProjectTimelineTab,
         RecentPhotosCard,
@@ -262,6 +264,9 @@ const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
                                 (changed)="onChangeOrdersChanged()"
                             />
                         }
+                        @case ('procurement') {
+                            <app-project-procurement-tab [projectCode]="project.code" [phases]="timeline.phases" (notify)="messages.add({ severity: 'success', summary: $event })" />
+                        }
                         @case ('documents') {
                             <app-project-documents-tab [projectCode]="project.code" [refreshKey]="refreshKey()" />
                         }
@@ -426,7 +431,7 @@ export class ProjectManagement {
     private readonly projectService = inject(ProjectService);
     private readonly progressService = inject(ProjectProgressService);
     private readonly auth = inject(AuthService);
-    private readonly messages = inject(MessageService);
+    protected readonly messages = inject(MessageService);
     private readonly recordsService = inject(ProjectRecordsService);
     private readonly housePlanService = inject(HousePlanService);
     private readonly changeOrderService = inject(ChangeOrderService);

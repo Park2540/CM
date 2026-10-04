@@ -178,7 +178,7 @@ const STATUS_PILL: Record<ApprovalStatus, string> = {
                     <span class="px-2 py-1 rounded-full text-xs font-semibold" [ngClass]="statusPill[item.status]">{{ statusLabel[item.status] }}</span>
                 </div>
                 <h2 class="text-xl font-semibold mt-3 mb-1">{{ item.title }}</h2>
-                <a [routerLink]="['/projects', item.projectCode]" class="text-primary">โครงการ {{ item.projectCode }}</a>
+                <a [routerLink]="['/projects', item.projectCode]" [queryParams]="projectTab(item)" class="text-primary">โครงการ {{ item.projectCode }}{{ projectTab(item) ? ' · ' + (item.type === 'change-order' ? 'ดูงานเพิ่ม-ลด' : 'ดูจัดซื้อ/เช่า') : '' }}</a>
 
                 <dl class="grid grid-cols-2 gap-4 my-5">
                     <div>
@@ -276,6 +276,13 @@ export class ApprovalCenter {
 
     readonly pageSize = PAGE_SIZE;
     readonly typeLabel = APPROVAL_TYPE_LABEL;
+
+    /** เปิดแท็บที่เกี่ยวข้องในหน้าโครงการ */
+    projectTab(item: ApprovalRequest): { tab: string } | null {
+        if (item.changeOrderId) return { tab: 'changes' };
+        if (item.purchaseId || item.rentalId) return { tab: 'procurement' };
+        return null;
+    }
     readonly statusLabel = APPROVAL_STATUS_LABEL;
     readonly stepLabel = APPROVAL_STEP_LABEL;
     readonly statusPill = STATUS_PILL;

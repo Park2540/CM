@@ -3,5 +3,6 @@ export * from './approvals.js';
 export * from './auth.js';
 export * from './files.js';
 export * from './projects.js';
+export * from './procurement.js';
 export * from './records.js';
 export * from './team.js';

@@ -93,7 +93,7 @@ erDiagram
 
     project_models {
         string _id PK,FK "= projects.code"
-        array value "ProjectModel[]: id, version, title, sourceApp (sketchup|revit|other), format (glb|gltf|dae|fbx|obj), file, sourceFile (.skp/.rvt), upAxis, note, uploadedBy, uploadedAt, deletedAt, deletedBy"
+        array value "ProjectModel[]: id, version, title, sourceApp (sketchup|revit|other), format (glb|gltf|dae|fbx|obj), file, sourceFile (.skp/.rvt/.ifc), elements (ข้อมูลชิ้นงาน IFC), conversion, upAxis, note, uploadedBy, uploadedAt, deletedAt, deletedBy"
     }
 
     installment_payments {
@@ -101,11 +101,55 @@ erDiagram
         array value "PaymentRecord[]: id, key (no:n | co:changeOrderId), installmentNo, paidDate, amount, withholdingTax, method, reference, note, evidence (UploadedFile[]), recordedBy, recordedAt, cancelledAt, cancelledBy, cancelReason"
     }
 
+    purchase_requests {
+        string _id PK "= id = approvalId เช่น PR-6910-0001"
+        string projectCode FK
+        string approvalId FK
+        string title
+        date neededDate
+        string phaseCode "ขั้นตอนในไทม์ไลน์ (ไม่บังคับ)"
+        string supplier "ร้านที่เสนอ"
+        array items "ProcurementItem[]: name, quantity, unit, unitPrice"
+        number amount
+        string status "pending | approved | rejected | ordered | partial | received | cancelled"
+        object order "supplier, poNumber, orderDate, expectedDate, orderedBy"
+        array received "จำนวนที่รับแล้วต่อรายการ"
+        array receipts "PurchaseReceipt[]: date, quantities, note, files (UploadedFile[]), receivedBy"
+        object requestedBy "UserRef"
+        string cancelReason
+    }
+
+    rentals {
+        string _id PK "RT-yymm-nnnn (เช่า) | BR-yymm-nnnn (ยืม)"
+        string projectCode FK
+        string approvalId FK "เฉพาะเช่า"
+        string source "rent | borrow"
+        string equipment
+        number quantity
+        string unit
+        date startDate
+        date endDate
+        string vendor
+        number rate
+        string rateUnit "day | month"
+        string status "pending | approved | rejected | in-use | returned | cancelled"
+        date deliveredAt
+        date returnedAt
+        string returnCondition "good | damaged | lost"
+        array extensions "from, to, note, by (UserRef), at"
+        object deliveredBy "UserRef"
+        string deliveryNote
+        object returnedBy "UserRef"
+        object requestedBy "UserRef"
+    }
+
     approvals {
         string _id PK "= id"
         string type "pr | po | subcontract | change-order | petty-cash | rental"
         string projectCode FK
         string changeOrderId FK "เฉพาะ type = change-order"
+        string purchaseId FK "เฉพาะ type = pr"
+        string rentalId FK "เฉพาะ type = rental"
         string title
         string reason
         number amount
@@ -226,6 +270,11 @@ erDiagram
     projects ||--o{ change_orders : "งานเพิ่ม-ลด"
     projects ||--o{ approvals : "คำขออนุมัติ"
     change_orders |o--|| approvals : "approvalId / changeOrderId"
+    projects ||--o{ purchase_requests : "จัดซื้อวัสดุ"
+    projects ||--o{ rentals : "เช่า/ยืมอุปกรณ์"
+    purchase_requests |o--|| approvals : "approvalId / purchaseId"
+    rentals |o--o| approvals : "approvalId / rentalId (เฉพาะเช่า)"
+    purchase_requests }o--o{ uploads : "receipts.files"
     personnel ||--o{ project_staff : "personnelId"
     subcontractors ||--o{ project_subcontractors : "subcontractorId"
     personnel ||--o| user_accounts : "personnelId"
@@ -250,6 +299,8 @@ erDiagram
 | | `installment_payments` | map | รหัสโครงการ (รายการรับชำระพร้อมหลักฐาน รวมรายการที่ยกเลิก) |
 | | `project_models` | map | รหัสโครงการ (แบบ 3 มิติทุกเวอร์ชัน รวมเวอร์ชันที่ลบแล้ว) |
 | | `project_houses` | map | รหัสโครงการ (ข้อมูลแบบบ้านที่ผู้ตั้งค่ากรอก ภาพแปลนรายชั้น ทัศนียภาพ 4 มุม) |
+| | `purchase_requests` | array | รหัสใบขอซื้อ (= รหัสคำขออนุมัติ) |
+| | `rentals` | array | รหัสเช่า/ยืม |
 | การอนุมัติ | `approvals` | array | รหัสคำขอ |
 | | `approval_settings` | object | `singleton` |
 | บุคลากร | `personnel`, `subcontractors` | array | id |

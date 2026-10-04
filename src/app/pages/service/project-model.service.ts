@@ -19,6 +19,22 @@ export interface ModelFile {
     name: string;
     format: ModelFormat;
     upAxis: UpAxis;
+    /** ข้อมูลชิ้นงาน (ไฟล์ที่แปลงจาก IFC) สำหรับคลิกดูคุณสมบัติ */
+    elementsUrl?: string;
+}
+
+/** ข้อมูลชิ้นงาน 1 ชิ้นจากไฟล์ที่แปลงจาก IFC (ลำดับตรงกับ attribute _ELEMENT ของจุดในโมเดล) */
+export interface ModelElement {
+    id: number;
+    guid: string;
+    ifcClass: string;
+    discipline: string;
+    category: string;
+    name: string;
+    type: string;
+    storey: string;
+    system: string;
+    properties: Array<[string, string, string]>;
 }
 
 export const VIEWABLE_MODEL_FORMATS: ModelFormat[] = ['glb', 'gltf', 'dae', 'fbx', 'obj'];
@@ -65,7 +81,8 @@ export function modelFormatOf(fileName: string): ModelFormat | null {
 }
 
 /** null = เวอร์ชันนี้มีเฉพาะไฟล์ต้นฉบับ (.skp / .rvt) ยังแสดงเป็น 3 มิติไม่ได้ */
-export const toModelFile = (model: ProjectModel): ModelFile | null => (model.file && model.format ? { url: model.file.url, name: model.file.name, format: model.format, upAxis: model.upAxis } : null);
+export const toModelFile = (model: ProjectModel): ModelFile | null =>
+    model.file && model.format ? { url: model.file.url, name: model.file.name, format: model.format, upAxis: model.upAxis, ...(model.elements ? { elementsUrl: model.elements.url } : {}) } : null;
 
 /** แบบบ้าน 3 มิติของโครงการ (/projects/{code}/models) */
 @Injectable({ providedIn: 'root' })

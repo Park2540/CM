@@ -621,6 +621,192 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/projects/{code}/purchases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+            };
+            cookie?: never;
+        };
+        /** ใบขอซื้อวัสดุของโครงการ (ล่าสุดก่อน) */
+        get: operations["listPurchases"];
+        put?: never;
+        /**
+         * ขอซื้อวัสดุ (สิทธิ์ progress.update / project.manage / procurement.manage) — ส่งเข้าศูนย์อนุมัติเป็นใบขอซื้อ (pr)
+         * @description โครงการต้องบันทึกสัญญาแล้ว (ไม่เช่นนั้น 409) · phaseCode ต้องมีในไทม์ไลน์ของโครงการ
+         */
+        post: operations["createPurchase"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{code}/purchases/{id}/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** บันทึกการสั่งซื้อ (ใบขอซื้อต้องอนุมัติแล้ว) — สิทธิ์ procurement.manage */
+        post: operations["orderPurchase"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{code}/purchases/{id}/receive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** รับของ (ทยอยรับได้หลายครั้ง) — สิทธิ์ procurement.manage */
+        post: operations["receivePurchase"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{code}/purchases/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** ยกเลิกใบขอซื้อ (ก่อนรับของ) — ผู้ขอ หรือสิทธิ์ procurement.manage / project.manage */
+        post: operations["cancelPurchase"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{code}/rentals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+            };
+            cookie?: never;
+        };
+        /** การเช่า/ยืมอุปกรณ์ของโครงการ (ล่าสุดก่อน) */
+        get: operations["listRentals"];
+        put?: never;
+        /**
+         * ขอเช่า (ส่งเข้าศูนย์อนุมัติ) หรือขอยืมอุปกรณ์จากคลังบริษัท (ไม่ต้องอนุมัติ)
+         * @description โครงการต้องบันทึกสัญญาแล้ว (ไม่เช่นนั้น 409) · phaseCode ต้องมีในไทม์ไลน์ของโครงการ
+         */
+        post: operations["createRental"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{code}/rentals/{id}/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** รับอุปกรณ์เข้าหน้างาน (เริ่มคิดค่าเช่า) — สิทธิ์ procurement.manage */
+        post: operations["startRental"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{code}/rentals/{id}/extend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** ขยายกำหนดคืน — สิทธิ์ procurement.manage */
+        post: operations["extendRental"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{code}/rentals/{id}/return": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** คืนอุปกรณ์ (หยุดคิดค่าเช่า) — สิทธิ์ procurement.manage */
+        post: operations["returnRental"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{code}/rentals/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** ยกเลิกการเช่า/ยืม (ก่อนรับเข้าหน้างาน) — ผู้ขอ หรือสิทธิ์ procurement.manage / project.manage */
+        post: operations["cancelRental"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/projects/{code}/models": {
         parameters: {
             query?: never;
@@ -1257,9 +1443,10 @@ export interface components {
          *     - project.manage: จัดการโครงการ เช่น บันทึกสัญญาและเริ่มแผนงาน
          *     - user.manage: จัดการบัญชีผู้ใช้ บทบาท และสิทธิ์ของบุคลากร
          *     - payment.record: บันทึก/ยกเลิกการรับชำระเงินงวดงานของลูกค้า
+         *     - procurement.manage: จัดซื้อและเช่า: ออกใบสั่งซื้อ รับของ รับ/คืนอุปกรณ์ที่เช่า/ยืม
          * @enum {string}
          */
-        Permission: "progress.update" | "personnel.sensitive" | "finance.company" | "approval.any" | "project.create" | "project.manage" | "user.manage" | "payment.record";
+        Permission: "progress.update" | "personnel.sensitive" | "finance.company" | "approval.any" | "project.create" | "project.manage" | "user.manage" | "payment.record" | "procurement.manage";
         CurrentUser: {
             id: string;
             name: string;
@@ -1591,6 +1778,214 @@ export interface components {
             deliveryDateBefore?: string;
             /** Format: date */
             deliveryDateAfter?: string;
+        };
+        ProcurementItem: {
+            name: string;
+            quantity: number;
+            unit: string;
+            /** @description ราคาต่อหน่วยโดยประมาณ (บาท) */
+            unitPrice: number;
+        };
+        /**
+         * @description pending = รออนุมัติ, approved = อนุมัติแล้ว รอสั่งซื้อ, rejected = ไม่อนุมัติ,
+         *     ordered = สั่งซื้อแล้ว รอรับของ, partial = รับของบางส่วน, received = รับครบ, cancelled = ยกเลิก
+         * @enum {string}
+         */
+        PurchaseStatus: "pending" | "approved" | "rejected" | "ordered" | "partial" | "received" | "cancelled";
+        PurchaseRequestInput: {
+            title: string;
+            items: components["schemas"]["ProcurementItem"][];
+            /**
+             * Format: date
+             * @description วันที่ต้องการใช้ที่หน้างาน
+             */
+            neededDate: string;
+            /** @description ขั้นตอนในไทม์ไลน์ที่ใช้วัสดุนี้ (ถ้ามี) */
+            phaseCode?: string;
+            /** @description ร้านค้าที่เสนอ (ถ้ามี) */
+            supplier?: string;
+            note?: string;
+        };
+        PurchaseOrderInput: {
+            supplier: string;
+            /** @description ไม่ระบุ = ระบบออกเลขให้ (PO-<ปีเดือน>-<ลำดับ>) */
+            poNumber?: string;
+            /** Format: date */
+            orderDate: string;
+            /**
+             * Format: date
+             * @description วันที่ร้านจะส่งของ
+             */
+            expectedDate?: string;
+        };
+        PurchaseReceiveInput: {
+            /**
+             * Format: date
+             * @description วันที่รับของ (ไม่เกินวันนี้)
+             */
+            date: string;
+            /** @description จำนวนที่รับครั้งนี้ เรียงตาม items (0 = ไม่ได้รับ) รวมกับที่รับแล้วต้องไม่เกินจำนวนที่ขอ */
+            quantities: number[];
+            note?: string;
+            /** @description ใบส่งของ / รูปถ่ายของที่รับ (id จาก POST /uploads) */
+            fileIds?: string[];
+        };
+        PurchaseReceipt: {
+            /** Format: date */
+            date: string;
+            quantities: number[];
+            note?: string;
+            files: components["schemas"]["UploadedFile"][];
+            receivedBy: components["schemas"]["UserRef"];
+            /** Format: date-time */
+            recordedAt: string;
+        };
+        PurchaseRequest: components["schemas"]["PurchaseRequestInput"] & {
+            /**
+             * @description เลขใบขอซื้อ (เลขเดียวกับคำขอในศูนย์อนุมัติ)
+             * @example PR-6910-0037
+             */
+            id: string;
+            projectCode: string;
+            status: components["schemas"]["PurchaseStatus"];
+            /** @description ยอดรวมโดยประมาณ */
+            amount: number;
+            approvalId: string;
+            requestedBy: components["schemas"]["UserRef"];
+            /** Format: date-time */
+            requestedAt: string;
+            /** Format: date-time */
+            decidedAt?: string;
+            decisionNote?: string;
+            order?: {
+                supplier: string;
+                poNumber: string;
+                /** Format: date */
+                orderDate: string;
+                /** Format: date */
+                expectedDate?: string;
+                orderedBy: components["schemas"]["UserRef"];
+            };
+            /** @description จำนวนที่รับแล้วสะสม เรียงตาม items */
+            received: number[];
+            receipts: components["schemas"]["PurchaseReceipt"][];
+            cancelReason?: string;
+        };
+        /**
+         * @description rent = เช่าจากภายนอก (ต้องอนุมัติ), borrow = ยืมจากคลังบริษัท (ไม่ต้องอนุมัติ)
+         * @enum {string}
+         */
+        RentalSource: "rent" | "borrow";
+        /**
+         * @description pending = รออนุมัติ, approved = พร้อมรับเข้าหน้างาน, rejected = ไม่อนุมัติ, in-use = ใช้งานอยู่ที่หน้างาน, returned = คืนแล้ว, cancelled = ยกเลิก
+         * @enum {string}
+         */
+        RentalStatus: "pending" | "approved" | "rejected" | "in-use" | "returned" | "cancelled";
+        RentalInput: {
+            source: components["schemas"]["RentalSource"];
+            /** @example นั่งร้านเหล็ก */
+            equipment: string;
+            quantity: number;
+            /** @example ชุด */
+            unit: string;
+            /**
+             * Format: date
+             * @description วันเริ่มใช้งาน (ตามแผน)
+             */
+            startDate: string;
+            /**
+             * Format: date
+             * @description กำหนดคืน
+             */
+            endDate: string;
+            /** @description ร้านให้เช่า (จำเป็นเมื่อเช่า) / คลังหรือรหัสครุภัณฑ์ (ยืม) */
+            vendor?: string;
+            /** @description ค่าเช่าต่อหน่วยต่อ rateUnit (จำเป็นและต้องมากกว่า 0 เมื่อเช่า ยืมไม่ใช้) */
+            rate?: number;
+            /**
+             * @description จำเป็นเมื่อเช่า
+             * @enum {string}
+             */
+            rateUnit?: "day" | "month";
+            phaseCode?: string;
+            note?: string;
+        };
+        Rental: components["schemas"]["RentalInput"] & {
+            /**
+             * @example RT-6910-0003
+             * @example BR-6910-0001
+             */
+            id: string;
+            projectCode: string;
+            status: components["schemas"]["RentalStatus"];
+            /** @description ค่าเช่าตามแผน (เริ่ม → กำหนดคืน) ยืม = 0 */
+            estimatedCost: number;
+            /** @description ค่าเช่าจริงถึงวันนี้/วันคืน (คิดตามวันที่รับเข้าหน้างานจริง) */
+            cost: number;
+            /** @description ใช้งานอยู่และเลยกำหนดคืนแล้ว */
+            overdue: boolean;
+            /** @description เฉพาะการเช่า */
+            approvalId?: string;
+            requestedBy: components["schemas"]["UserRef"];
+            /** Format: date-time */
+            requestedAt: string;
+            /** Format: date-time */
+            decidedAt?: string;
+            decisionNote?: string;
+            /**
+             * Format: date
+             * @description วันที่รับเข้าหน้างานจริง
+             */
+            deliveredAt?: string;
+            deliveredBy?: components["schemas"]["UserRef"];
+            deliveryNote?: string;
+            /** Format: date */
+            returnedAt?: string;
+            returnedBy?: components["schemas"]["UserRef"];
+            /** @enum {string} */
+            returnCondition?: "good" | "damaged" | "lost";
+            returnNote?: string;
+            extensions?: {
+                /** Format: date */
+                from: string;
+                /** Format: date */
+                to: string;
+                note?: string;
+                by?: components["schemas"]["UserRef"];
+                /** Format: date-time */
+                at: string;
+            }[];
+            cancelReason?: string;
+        };
+        RentalStartInput: {
+            /**
+             * Format: date
+             * @description วันที่รับเข้าหน้างาน (ไม่ก่อนวันที่ขอ และไม่เกินวันนี้)
+             */
+            date: string;
+            note?: string;
+        };
+        RentalReturnInput: {
+            /**
+             * Format: date
+             * @description วันที่คืน (ไม่ก่อนวันที่รับเข้าหน้างาน และไม่เกินวันนี้)
+             */
+            date: string;
+            /** @enum {string} */
+            condition: "good" | "damaged" | "lost";
+            /** @description จำเป็นเมื่อชำรุดหรือสูญหาย */
+            note?: string;
+        };
+        RentalExtendInput: {
+            /**
+             * Format: date
+             * @description กำหนดคืนใหม่ (หลังกำหนดเดิม)
+             */
+            endDate: string;
+            note?: string;
+        };
+        CancelInput: {
+            reason: string;
         };
         /** @description single = รหัสตัวเลือก, multiple = รายการรหัส, boolean = true/false */
         ConstructionOptionValue: string | boolean | string[];
@@ -2166,6 +2561,8 @@ export interface components {
             file?: components["schemas"]["UploadedFile"];
             sourceFile?: components["schemas"]["UploadedFile"];
             conversion?: components["schemas"]["ModelConversion"];
+            /** @description ข้อมูลชิ้นงาน (JSON) ของไฟล์ที่แปลงจาก IFC — ลำดับในอาร์เรย์ elements ตรงกับค่า attribute _ELEMENT ของจุดใน .glb ใช้แสดงคุณสมบัติเมื่อคลิกชิ้นงาน */
+            elements?: components["schemas"]["UploadedFile"];
             /** @enum {string} */
             upAxis: "y" | "z";
             note?: string;
@@ -2358,6 +2755,10 @@ export interface components {
             history: components["schemas"]["ApprovalStep"][];
             /** @description คำขอนี้มาจากงานเพิ่ม-ลดของโครงการ (อนุมัติแล้วหลังบ้านปรับมูลค่า/ไทม์ไลน์ให้) */
             changeOrderId?: string;
+            /** @description คำขอนี้มาจากใบขอซื้อของโครงการ (อนุมัติแล้วสั่งซื้อได้ที่แท็บจัดซื้อ/เช่า) */
+            purchaseId?: string;
+            /** @description คำขอนี้มาจากการเช่าอุปกรณ์ของโครงการ */
+            rentalId?: string;
         };
         ApprovalPage: components["schemas"]["PageMeta"] & {
             items: components["schemas"]["Approval"][];
@@ -3552,6 +3953,329 @@ export interface operations {
                 };
             };
             404: components["responses"]["NotFound"];
+        };
+    };
+    listPurchases: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseRequest"][];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    createPurchase: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PurchaseRequestInput"];
+            };
+        };
+        responses: {
+            /** @description บันทึกแล้ว */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseRequest"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationError"];
+        };
+    };
+    orderPurchase: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PurchaseOrderInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseRequest"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationError"];
+        };
+    };
+    receivePurchase: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PurchaseReceiveInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseRequest"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationError"];
+        };
+    };
+    cancelPurchase: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CancelInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseRequest"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationError"];
+        };
+    };
+    listRentals: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rental"][];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    createRental: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RentalInput"];
+            };
+        };
+        responses: {
+            /** @description บันทึกแล้ว */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rental"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationError"];
+        };
+    };
+    startRental: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RentalStartInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rental"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationError"];
+        };
+    };
+    extendRental: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RentalExtendInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rental"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationError"];
+        };
+    };
+    returnRental: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RentalReturnInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rental"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationError"];
+        };
+    };
+    cancelRental: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CancelInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rental"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationError"];
         };
     };
     listProjectModels: {

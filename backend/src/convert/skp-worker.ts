@@ -5,11 +5,12 @@ import { gzipSync } from 'node:zlib';
 import { convertIfcToGlb } from './ifc-to-glb.js';
 import { convertSkpToGlb } from './skp-to-glb.js';
 
-const { kind, apiDir, input, output } = workerData as { kind: 'skp' | 'ifc'; apiDir: string; input: string; output: string };
+const { kind, apiDir, input, output, elementsOutput } = workerData as { kind: 'skp' | 'ifc'; apiDir: string; input: string; output: string; elementsOutput?: string };
 try {
-    const result = kind === 'ifc' ? await convertIfcToGlb(input, output) : convertSkpToGlb(apiDir, input, output);
+    const result = kind === 'ifc' ? await convertIfcToGlb(input, output, elementsOutput) : convertSkpToGlb(apiDir, input, output);
     // ไฟล์บีบอัดคู่กัน: /files/:id ส่งตัวนี้ให้เบราว์เซอร์ที่รับ gzip (ลดขนาดดาวน์โหลดราว 3-4 เท่า)
     writeFileSync(`${output}.gz`, gzipSync(readFileSync(output), { level: 6 }));
+    if (elementsOutput) writeFileSync(`${elementsOutput}.gz`, gzipSync(readFileSync(elementsOutput), { level: 6 }));
     parentPort!.postMessage({ ok: true, result });
 } catch (error) {
     parentPort!.postMessage({ ok: false, message: error instanceof Error ? error.message : String(error), code: (error as { code?: number }).code });

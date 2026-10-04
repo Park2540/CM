@@ -3,6 +3,7 @@ import type { ApiSchemas } from '../api/api.js';
 import { approvalLevel, approvalSettings, approvals } from '../domain/approvals.js';
 import { recordAudit } from '../domain/audit-logs.js';
 import { applyDecision, blockApproval } from '../domain/change-orders.js';
+import { applyProcurementDecision } from '../domain/procurement.js';
 import { CURRENT_USER } from '../domain/users.js';
 import { matchesQuery, paginate } from '../domain/utils.js';
 import { body, fail, query } from '../http/respond.js';
@@ -43,6 +44,8 @@ function decide(approval: Approval, status: 'approved' | 'rejected', note?: stri
     });
     // งานเพิ่ม-ลด: ปรับมูลค่าสัญญา กำหนดส่งมอบ และไทม์ไลน์ของโครงการ
     applyDecision(approval, status, note);
+    // ใบขอซื้อ / คำขอเช่า: เปลี่ยนสถานะรายการในแท็บจัดซื้อ/เช่าของโครงการ
+    applyProcurementDecision(approval, status, note);
 }
 
 const findApproval = (id: string) => approvals.find((item) => item.id === id);

@@ -8,6 +8,7 @@ import { approvalRouter } from './routes/approvals.js';
 import { authRouter, userRouter } from './routes/auth.js';
 import { fileRouter, uploadRouter } from './routes/files.js';
 import { projectRouter } from './routes/projects.js';
+import { procurementRouter } from './routes/procurement.js';
 import { recordsRouter } from './routes/records.js';
 import { teamRouter } from './routes/team.js';
 
@@ -46,7 +47,7 @@ export function createApp() {
     // ไม่ต้องล็อกอิน: เข้าสู่ระบบ สมัครสมาชิก และไฟล์ (ใช้ใน <img>/ลิงก์ดาวน์โหลด)
     api.use(authRouter, fileRouter);
     api.use(requireAuth);
-    api.use(userRouter, projectRouter, teamRouter, approvalRouter, recordsRouter, uploadRouter);
+    api.use(userRouter, projectRouter, procurementRouter, teamRouter, approvalRouter, recordsRouter, uploadRouter);
 
     app.use('/api', api);
     app.use(notFoundHandler);

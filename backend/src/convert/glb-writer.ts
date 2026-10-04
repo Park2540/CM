@@ -12,6 +12,11 @@ export class Grow {
         this.data = new Type(1024);
     }
 
+    push1(a: number) {
+        this.reserve(1);
+        this.data[this.length++] = a;
+    }
+
     push3(a: number, b: number, c: number) {
         this.reserve(3);
         this.data[this.length++] = a;
@@ -50,6 +55,8 @@ export interface GlbPart {
     normals: Grow;
     indices: Grow;
     vertexCount: number;
+    /** ลำดับชิ้นงานของแต่ละจุด (เขียนเป็น attribute _ELEMENT ให้ตัวดูรู้ว่าคลิกโดนชิ้นไหน) */
+    elementIds?: Grow;
 }
 
 export interface GlbNode {
@@ -143,7 +150,10 @@ export function writeGlb(root: GlbNode, generator: string): Buffer {
                 // int8 normalized เว้นไบต์ที่ 4 ไว้ให้แต่ละจุดชิดขอบ 4 ไบต์ตามข้อกำหนด glTF
                 const normal = json.accessors.push({ bufferView: addView(part.normals.view(), 34962, 4), componentType: 5120, normalized: true, count: vertexCount, type: 'VEC3' }) - 1;
                 const index = json.accessors.push({ bufferView: addView(part.indices.view(), 34963), componentType: 5125, count: part.indices.length, type: 'SCALAR' }) - 1;
-                return { attributes: { POSITION: position, NORMAL: normal }, indices: index, material: materialOf(part) };
+                const attributes: Record<string, number> = { POSITION: position, NORMAL: normal };
+                // attribute ของแอปต้องขึ้นต้นด้วย _ และห้ามเป็น unsigned int ตามข้อกำหนด glTF จึงใช้ float (แม่นถึง 16 ล้านชิ้น)
+                if (part.elementIds) attributes['_ELEMENT'] = json.accessors.push({ bufferView: addView(part.elementIds.view(), 34962), componentType: 5126, count: vertexCount, type: 'SCALAR' }) - 1;
+                return { attributes, indices: index, material: materialOf(part) };
             });
         return primitives.length ? json.meshes.push({ primitives }) - 1 : undefined;
     };

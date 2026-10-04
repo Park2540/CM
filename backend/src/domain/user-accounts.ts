@@ -24,7 +24,8 @@ const PERMISSION_LABEL: Record<Permission, string> = {
     'project.create': 'เปิดโครงการ',
     'project.manage': 'จัดการโครงการ',
     'user.manage': 'จัดการผู้ใช้และสิทธิ์',
-    'payment.record': 'บันทึกรับชำระเงินงวดงาน'
+    'payment.record': 'บันทึกรับชำระเงินงวดงาน',
+    'procurement.manage': 'จัดซื้อและเช่าอุปกรณ์'
 };
 const PERMISSIONS = Object.keys(PERMISSION_LABEL) as Permission[];
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

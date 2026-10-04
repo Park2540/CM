@@ -8,7 +8,7 @@
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { GlbNode, GlbPart, newPart, pushNormal, writeGlb } from './glb-writer.js';
+import { GlbNode, GlbPart, Grow, newPart, pushNormal, writeGlb } from './glb-writer.js';
 
 type WebIfcModule = typeof import('web-ifc');
 const WebIFC = createRequire(import.meta.url)('web-ifc') as WebIfcModule;
@@ -129,7 +129,26 @@ const IDENTITY: Mat = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
 /** แกน Z-up ของ IFC → Y-up (เหมือนที่ web-ifc ใช้) */
 const NORMALIZE_IFC: Mat = [1, 0, 0, 0, 0, 0, -1, 0, 0, 1, 0, 0, 0, 0, 0, 1];
 
-export async function convertIfcToGlb(input: string, output: string): Promise<IfcConvertResult> {
+/** ข้อมูลชิ้นงาน 1 ชิ้นในไฟล์ข้อมูล (ลำดับในอาร์เรย์ = ค่า _ELEMENT ของจุดใน .glb) */
+export interface IfcElementInfo {
+    id: number;
+    guid: string;
+    ifcClass: string;
+    discipline: string;
+    category: string;
+    name: string;
+    type: string;
+    storey: string;
+    system: string;
+    /** [กลุ่ม, ชื่อ, ค่า] */
+    properties: Array<[string, string, string]>;
+}
+
+const MAX_PROPERTIES = 30;
+const MAX_VALUE_LENGTH = 120;
+
+/** elementsOutput = ไฟล์ JSON ข้อมูลชิ้นงาน (โหลดเมื่อผู้ใช้คลิกชิ้นงานในตัวดู) */
+export async function convertIfcToGlb(input: string, output: string, elementsOutput?: string): Promise<IfcConvertResult> {
     const api = new WebIFC.IfcAPI();
     await api.Init();
     api.SetLogLevel(WebIFC.LogLevel.LOG_LEVEL_OFF);
@@ -191,13 +210,102 @@ export async function convertIfcToGlb(input: string, output: string): Promise<If
 
         // ---------- ระบบ (IfcSystem / IfcDistributionSystem / IfcBuildingSystem) ----------
         const systemDirect = new Map<number, string>();
+        /** ชื่อระบบเต็ม (เช่น "Mechanical Supply Air 18") สำหรับแสดงในข้อมูลชิ้นงาน */
+        const systemFull = new Map<number, string>();
         for (const id of ids(WebIFC.IFCRELASSIGNSTOGROUP)) {
             const rel = line(id);
             if (!/SYSTEM/.test(typeName(rel.RelatingGroup.value))) continue;
+            const full = text(line(rel.RelatingGroup.value).Name);
             // Revit ตั้งชื่อระบบเป็นเลขรายวงจร เช่น "Mechanical Supply Air 18" → รวมเป็นประเภทระบบ "Mechanical Supply Air"
-            const name = text(line(rel.RelatingGroup.value).Name).replace(/\s+\d+$/, '') || 'ระบบไม่มีชื่อ';
-            for (const object of rel.RelatedObjects ?? []) if (!systemDirect.has(object.value)) systemDirect.set(object.value, name);
+            const name = full.replace(/\s+\d+$/, '') || 'ระบบไม่มีชื่อ';
+            for (const object of rel.RelatedObjects ?? []) {
+                if (!systemDirect.has(object.value)) systemDirect.set(object.value, name);
+                if (!systemFull.has(object.value) && full) systemFull.set(object.value, full);
+            }
         }
+        const systemFullOf = (id: number): string => {
+            let current: number | undefined = id;
+            for (let depth = 0; current !== undefined && depth < 10; depth++) {
+                const full = systemFull.get(current);
+                if (full) return full;
+                current = parent.get(current);
+            }
+            return '';
+        };
+
+        // ---------- คุณสมบัติ (property set / quantity) ของชิ้นงาน ----------
+        const definitions = new Map<number, number[]>();
+        for (const id of ids(WebIFC.IFCRELDEFINESBYPROPERTIES)) {
+            const rel = line(id);
+            for (const object of rel.RelatedObjects ?? []) {
+                const list = definitions.get(object.value) ?? [];
+                list.push(rel.RelatingPropertyDefinition.value);
+                definitions.set(object.value, list);
+            }
+        }
+        const valueText = (value: unknown): string => {
+            if (value === null || value === undefined) return '';
+            if (typeof value === 'object' && 'value' in (value as object)) return valueText((value as { value: unknown }).value);
+            if (value === true || value === 'T') return 'ใช่';
+            if (value === false || value === 'F') return 'ไม่ใช่';
+            if (typeof value === 'number') return Number.isInteger(value) ? String(value) : String(+value.toFixed(4));
+            return String(value);
+        };
+        const setCache = new Map<number, Array<[string, string, string]>>();
+        const propertySet = (setId: number): Array<[string, string, string]> => {
+            const cached = setCache.get(setId);
+            if (cached) return cached;
+            const set = line(setId);
+            const setName = text(set.Name) || 'คุณสมบัติ';
+            const result: Array<[string, string, string]> = [];
+            for (const ref of [...(set.HasProperties ?? []), ...(set.Quantities ?? [])]) {
+                const property = line(ref.value);
+                const value = valueText(property.NominalValue ?? property.LengthValue ?? property.AreaValue ?? property.VolumeValue ?? property.CountValue ?? property.WeightValue);
+                if (value) result.push([setName, text(property.Name), value.slice(0, MAX_VALUE_LENGTH)]);
+            }
+            setCache.set(setId, result);
+            return result;
+        };
+        const elementInfo = (id: number, info: { discipline: Discipline; category: string; system: string }): IfcElementInfo => {
+            const element = line(id);
+            const properties: Array<[string, string, string]> = [];
+            if (typeName(id) === 'IFCREINFORCINGBAR') {
+                const diameter = Number(element.NominalDiameter?.value);
+                const length = Number(element.BarLength?.value);
+                if (diameter > 0) properties.push(['เหล็กเสริม', 'ขนาด', `Ø${lengthToMm(diameter)} มม.`]);
+                if (length > 0) properties.push(['เหล็กเสริม', 'ความยาว', `${(length * lengthScale).toFixed(2)} ม.`]);
+                if (element.BarSurface?.value) properties.push(['เหล็กเสริม', 'ผิวเหล็ก', element.BarSurface.value === 'TEXTURED' ? 'ข้ออ้อย' : 'ผิวเรียบ']);
+            }
+            for (const setId of definitions.get(id) ?? []) {
+                for (const property of propertySet(setId)) {
+                    if (properties.length >= MAX_PROPERTIES) break;
+                    properties.push(property);
+                }
+            }
+            return {
+                id,
+                guid: text(element.GlobalId),
+                ifcClass: String(api.GetNameFromTypeCode(api.GetLineType(model, id))),
+                discipline: info.discipline,
+                category: info.category,
+                name: text(element.Name),
+                type: text(element.ObjectType),
+                storey: storeyOf(id),
+                system: systemFullOf(id),
+                properties
+            };
+        };
+        /** expressID → ลำดับในไฟล์ข้อมูลชิ้นงาน */
+        const elementIndex = new Map<number, number>();
+        const elementList: IfcElementInfo[] = [];
+        const indexOf = (id: number, info: { discipline: Discipline; category: string; system: string }) => {
+            let index = elementIndex.get(id);
+            if (index === undefined) {
+                index = elementList.push(elementInfo(id, info)) - 1;
+                elementIndex.set(id, index);
+            }
+            return index;
+        };
         const systemOf = (id: number): string => {
             let current: number | undefined = id;
             for (let depth = 0; current !== undefined && depth < 10; depth++) {
@@ -248,7 +356,11 @@ export async function convertIfcToGlb(input: string, output: string): Promise<If
         const partOf = (group: Group, color: [number, number, number], alpha: number): GlbPart => {
             const key = `${color.join(',')},${alpha.toFixed(2)}`;
             let part = group.parts.get(key);
-            if (!part) group.parts.set(key, (part = newPart(key, color, alpha)));
+            if (!part) {
+                part = newPart(key, color, alpha);
+                part.elementIds = new Grow(Float32Array);
+                group.parts.set(key, part);
+            }
             return part;
         };
 
@@ -266,6 +378,7 @@ export async function convertIfcToGlb(input: string, output: string): Promise<If
                 if (!info || !placed.size()) return;
                 produced.add(id);
                 const group = groupOf(id, info);
+                const element = indexOf(id, info);
                 for (let i = 0; i < placed.size(); i++) {
                     const pg = placed.get(i);
                     const geometry = api.GetGeometry(model, pg.geometryExpressID);
@@ -282,6 +395,7 @@ export async function convertIfcToGlb(input: string, output: string): Promise<If
                         const ny = m[1]! * vertices[v + 3]! + m[5]! * vertices[v + 4]! + m[9]! * vertices[v + 5]!;
                         const nz = m[2]! * vertices[v + 3]! + m[6]! * vertices[v + 4]! + m[10]! * vertices[v + 5]!;
                         pushNormal(part, nx, ny, nz);
+                        part.elementIds!.push1(element);
                     }
                     const flip = det3(m) < 0;
                     for (let t = 0; t < indices.length; t += 3) {
@@ -319,7 +433,7 @@ export async function convertIfcToGlb(input: string, output: string): Promise<If
                         const path = points.map(([x, y, z]) => apply(world, x, y, z));
                         const radius = Number(solid.Radius?.value ?? 0) * lengthScale * Math.cbrt(Math.abs(det3(matrix)) || 1);
                         if (!(radius > 0)) continue;
-                        triangles += tube(partOf(groupOf(id, info), REBAR_COLOR, 1), path, radius);
+                        triangles += tube(partOf(groupOf(id, info), REBAR_COLOR, 1), path, radius, indexOf(id, info));
                         made = true;
                     }
                 }
@@ -459,6 +573,7 @@ export async function convertIfcToGlb(input: string, output: string): Promise<If
         const elements = nodes.reduce((sum, node) => sum + Number(node.extras!['elements']), 0);
         const glb = writeGlb({ name: 'model', extras: { source: 'ifc', storeys: [...new Set([...storeyOrder, NO_STOREY])] }, children: nodes }, 'cm-planning ifc-to-glb');
         writeFileSync(output, glb);
+        if (elementsOutput) writeFileSync(elementsOutput, JSON.stringify({ version: 1, elements: elementList }));
         return { triangles, elements, groups: nodes.length, rebars, bytes: glb.length };
     } finally {
         api.CloseModel(model);
@@ -504,7 +619,7 @@ function arcThrough(a: [number, number, number], b: [number, number, number], c:
 }
 
 /** ท่อกลมตามแนวจุด (พิกัดโลก เมตร) → เพิ่มลง part คืนจำนวนสามเหลี่ยม */
-function tube(part: GlbPart, path: Array<[number, number, number]>, radius: number): number {
+function tube(part: GlbPart, path: Array<[number, number, number]>, radius: number, element: number): number {
     const points = path.filter((p, i) => i === 0 || Math.hypot(p[0] - path[i - 1]![0], p[1] - path[i - 1]![1], p[2] - path[i - 1]![2]) > 1e-6);
     if (points.length < 2) return 0;
     // ทิศของแต่ละจุด (เฉลี่ยมุมหักเพื่อไม่ให้ท่อบีบ)
@@ -528,6 +643,7 @@ function tube(part: GlbPart, path: Array<[number, number, number]>, radius: numb
             const p = points[i]!;
             part.positions.push3(p[0] + dir[0]! * radius, p[1] + dir[1]! * radius, p[2] + dir[2]! * radius);
             pushNormal(part, dir[0]!, dir[1]!, dir[2]!);
+            part.elementIds?.push1(element);
         }
     }
     for (let i = 0; i < points.length - 1; i++)

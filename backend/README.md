@@ -61,6 +61,7 @@ npm run api:types            # สร้าง src/api/schema.ts ใหม่จ
 | โครงการ | `projects`, `project_setups`, `project_timelines`, `progress_updates`, `project_staff`, `project_subcontractors`, `change_orders` |
 | การรับชำระเงิน | `installment_payments` |
 | แบบบ้าน | `project_models` (แบบ 3 มิติ), `project_houses` (รายละเอียด ภาพแปลน ทัศนียภาพ) |
+| จัดซื้อ/เช่า | `purchase_requests` (ขอซื้อ → อนุมัติ → สั่งซื้อ → รับของ), `rentals` (เช่าต้องอนุมัติ ยืมคลังบริษัทไม่ต้อง) |
 | การอนุมัติ | `approvals`, `approval_settings` |
 | อื่น ๆ | `audit_logs`, `uploads` |
 
@@ -71,6 +72,7 @@ npm run api:types            # สร้าง src/api/schema.ts ใหม่จ
 - **การรับชำระของข้อมูลเดิม:** โครงการที่มีอยู่ก่อนมีการบันทึกรับชำระ ระบบสร้างรายการรับชำระตัวอย่าง (บันทึกโดย "ระบบ" ไม่มีหลักฐาน) ให้ครั้งเดียวตามสถานะเดิม
 - **ไฟล์ที่อัปโหลดเปิดได้โดยไม่ต้องแนบ token:** เพราะต้องใช้ใน `<img>` แต่รหัสไฟล์เป็น UUID สุ่มที่เดาไม่ได้ ถ้าต้องการปลอดภัยขึ้นควรเปลี่ยนเป็น signed URL ที่หมดอายุได้
 - **แปลง .skp เป็น 3 มิติต้องรันบน Windows ที่ติดตั้ง SketchUp:** `src/convert/` เรียก `SketchUpAPI.dll` ผ่าน koffi ใน worker thread แล้วเขียน .glb (พร้อม .glb.gz สำหรับส่งแบบ gzip) เปิดได้เฉพาะไฟล์ที่บันทึกจาก SketchUp รุ่นเดียวกันหรือเก่ากว่า ยังไม่ใส่ภาพ texture (ใช้สีเฉลี่ยของวัสดุ) — ถ้าเซิร์ฟเวอร์ไม่มี SketchUp สถานะจะเป็น `unavailable` และผู้ใช้ต้องส่งออก .glb เอง ใช้งานจริงควรดาวน์โหลด SketchUp C API SDK จาก Trimble แล้วตั้ง `SKETCHUP_API_DIR` ไปที่ SDK แทนการใช้ DLL ของโปรแกรม SketchUp ที่ติดตั้ง
+- **แปลง IFC (Revit / BIM) ใช้ web-ifc ทำงานได้ทุกเครื่อง:** `src/convert/ifc-to-glb.ts` แยกกลุ่มตาม งาน × หมวด × ชั้น × ระบบ ให้ตัวดูเปิด/ปิดได้ สร้างรูปทรงเหล็กเสริม (IfcSweptDiskSolid) เองเพราะ web-ifc ยังสร้างไม่ได้ และเขียนข้อมูลชิ้นงาน (property set) เป็นไฟล์ JSON แยก (`ProjectModel.elements`) ใช้แสดงเมื่อคลิกชิ้นงาน — Revit ควรส่งออก IFC4 Reference View และเปิด "Export Revit property sets" ไฟล์ .rvt ยังแปลงตรงไม่ได้
 - **ยังไม่ส่งอีเมลจริง:** ทั้งคำเชิญและลิงก์ตั้งรหัสผ่าน ตอนนี้แค่บันทึกใน Audit Log
 
 ## เพิ่มหรือแก้ endpoint

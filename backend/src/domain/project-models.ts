@@ -1,6 +1,6 @@
 /** แบบบ้าน 3 มิติของโครงการ (SketchUp / Revit ส่งออกเป็นรูปแบบที่เบราว์เซอร์แสดงได้ พร้อมไฟล์ต้นฉบับ) เก็บทุกเวอร์ชัน */
 import { randomUUID } from 'node:crypto';
-import { rmSync, statSync } from 'node:fs';
+import { existsSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { persistMap, saveState } from '../db/state.js';
 import type { ApiSchemas } from '../api/api.js';
@@ -62,18 +62,21 @@ export function queueConversion(code: string, id: string) {
         return;
     }
     // แปลงได้ซ้ำเฉพาะเวอร์ชันที่ไฟล์แสดงผลมาจากการแปลงครั้งก่อน (canConvert) จึงลบไฟล์เดิมได้เมื่อแปลงใหม่สำเร็จ
-    const previous = model.conversion?.status === 'done' ? model.file : undefined;
+    const previous = model.conversion?.status === 'done' ? [model.file, model.elements] : [];
     model.conversion = { status: 'queued' };
     const source = model.sourceFile;
     const fileId = `file-${randomUUID()}`;
     const output = join(config.uploadDir, fileId);
+    // ข้อมูลชิ้นงาน (เฉพาะ IFC) เป็นอีกไฟล์ โหลดเมื่อผู้ใช้คลิกชิ้นงาน
+    const elementsId = `file-${randomUUID()}`;
+    const elementsOutput = join(config.uploadDir, elementsId);
     void (async () => {
         const current = () => stored(code, id);
         try {
             const started = current();
             if (!started) return; // ลบไปก่อนถึงคิว
             started.conversion = { status: 'converting' };
-            const result = await convertModel(kind, join(config.uploadDir, source.id), output);
+            const result = await convertModel(kind, join(config.uploadDir, source.id), output, kind === 'ifc' ? elementsOutput : undefined);
             const done = current();
             if (!done) return;
             const file: ApiSchemas['UploadedFile'] = {
@@ -84,11 +87,19 @@ export function queueConversion(code: string, id: string) {
                 contentType: 'model/gltf-binary'
             };
             uploads.set(fileId, file);
+            let elements: ApiSchemas['UploadedFile'] | undefined;
+            if (kind === 'ifc' && existsSync(elementsOutput)) {
+                elements = { id: elementsId, url: `/api/files/${elementsId}`, name: source.name.replace(/\.ifc$/i, '.elements.json'), sizeKb: Math.ceil(statSync(elementsOutput).size / 1024), contentType: 'application/json' };
+                uploads.set(elementsId, elements);
+            }
             Object.assign(done, { file, format: 'glb', upAxis: 'y', conversion: { status: 'done', triangles: result.triangles, finishedAt: new Date().toISOString() } });
+            if (elements) done.elements = elements;
+            else delete done.elements;
             // แปลงซ้ำ: ลบไฟล์ที่แปลงไว้ครั้งก่อน
-            if (previous) {
-                uploads.delete(previous.id);
-                for (const path of [join(config.uploadDir, previous.id), join(config.uploadDir, `${previous.id}.gz`)]) rmSync(path, { force: true });
+            for (const old of previous) {
+                if (!old) continue;
+                uploads.delete(old.id);
+                for (const path of [join(config.uploadDir, old.id), join(config.uploadDir, `${old.id}.gz`)]) rmSync(path, { force: true });
             }
         } catch (error) {
             const failed = current();
