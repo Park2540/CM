@@ -137,12 +137,18 @@ type PhaseFilter = 'all' | TimelineStatus;
                                                 @switch (task.status) {
                                                     @case ('done') {
                                                         เสร็จแล้ว
+                                                        @if (task.lastUpdatedOn) {
+                                                            <span class="block text-xs font-normal">{{ task.lastUpdatedOn | thaiDate: 'dayMonth' }}</span>
+                                                        }
                                                     }
                                                     @case ('active') {
                                                         {{ task.progress }}%
+                                                        @if (task.lastUpdatedOn) {
+                                                            <span class="block text-xs font-normal text-muted-color">อัปเดต {{ task.lastUpdatedOn | thaiDate: 'dayMonth' }}</span>
+                                                        }
                                                     }
                                                     @default {
-                                                        เริ่ม {{ task.start | thaiDate: 'dayMonth' }}
+                                                        <!-- งานที่ยังไม่มีการอัปเดต: ยังไม่แสดงวันที่ -->
                                                     }
                                                 }
                                                 @if (canUpdate() && task.status !== 'done' && !task.isMilestone) {

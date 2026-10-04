@@ -1,5 +1,5 @@
 import type { ApiSchemas } from '../api/api.js';
-import { CONSTRUCTION_PLAN_TEMPLATE, PlanTaskTemplate, SetupOptions, includesTask } from './construction-plan.template.js';
+import { CONSTRUCTION_PLAN_TEMPLATE, PlanPhaseTemplate, PlanTaskTemplate, SetupOptions, includesTask } from './construction-plan.template.js';
 import { ProjectTimeline, TimelinePhase, TimelineTask } from './shared.js';
 import { ContractedProject } from './shared.js';
 
@@ -27,6 +27,71 @@ export interface TaskOverrides {
 }
 
 export const NO_OVERRIDES: TaskOverrides = { excluded: [], custom: [] };
+
+const isUpperFloorTask = (task: PlanTaskTemplate) => task.when?.['floors']?.includes('2') ?? false;
+const floorName = (name: string, floor: number) => name.replace('ชั้น 1-2', `ชั้น ${floor - 1}-${floor}`).replace(/ชั้น 2(?![\d-])/g, `ชั้น ${floor}`);
+
+/**
+ * อาคารเกิน 2 ชั้น: งาน "ชั้น 2" ในแม่แบบเป็นตัวแทนของชั้นบน สร้างซ้ำเป็นชั้น 3..N
+ * - งานชั้นบนที่ช่วงเวลาซ้อนกัน (เช่น ก่ออิฐ งานระบบ ฉาบ) รวมเป็นชุดเดียว ชั้นถัดไปทำต่อจากชุดของชั้นก่อนหน้า
+ * - งานหลังชุดนั้นเลื่อนออกไปตามจำนวนชั้นที่เพิ่ม (ไทม์ไลน์ถูกย่อ/ขยายให้พอดีสัญญาอีกครั้งตอนสร้าง)
+ * - รหัสงานชั้น 2 คงเดิม ชั้นอื่นต่อท้ายด้วย -<ชั้น> เช่น 06.09-3
+ */
+export function expandFloors(floors: number): PlanPhaseTemplate[] {
+    if (!(floors > 2)) return CONSTRUCTION_PLAN_TEMPLATE;
+    // 1) ชุดงาน = งานชั้นบนที่อยู่ติดกันในขั้นตอนเดียวกัน (เช่น โครงสร้างชั้น 2 ทั้งชุด)
+    type Cluster = { start: number; end: number; tasks: Set<PlanTaskTemplate>; lastPhase: number };
+    const runs: Cluster[] = [];
+    CONSTRUCTION_PLAN_TEMPLATE.forEach((phase, phaseIndex) => {
+        let run: Cluster | null = null;
+        for (const task of phase.tasks) {
+            if (!isUpperFloorTask(task)) {
+                run = null;
+                continue;
+            }
+            if (!run) runs.push((run = { start: toDay(task.start), end: toDay(task.end), tasks: new Set(), lastPhase: phaseIndex }));
+            run.start = Math.min(run.start, toDay(task.start));
+            run.end = Math.max(run.end, toDay(task.end));
+            run.tasks.add(task);
+        }
+    });
+    // 2) ชุดที่ช่วงเวลาซ้อนกันข้ามขั้นตอน (ก่ออิฐ งานระบบ ฉาบ) ทำพร้อมกันในแต่ละชั้น → รวมเป็นชุดเดียว
+    const clusters: Cluster[] = [];
+    for (const run of [...runs].sort((a, b) => a.start - b.start)) {
+        const last = clusters.at(-1);
+        if (last && run.start <= last.end) {
+            last.end = Math.max(last.end, run.end);
+            run.tasks.forEach((task) => last.tasks.add(task));
+            last.lastPhase = Math.max(last.lastPhase, run.lastPhase);
+        } else clusters.push({ ...run, tasks: new Set(run.tasks) });
+    }
+    const extraFloors = floors - 2;
+    const length = (cluster: Cluster) => cluster.end - cluster.start + 1;
+    // เลื่อนงานที่เริ่มหลังชุด หรือเริ่มระหว่างชุดแต่อยู่ขั้นตอนถัดไป (เช่น หลังคาต้องรอโครงสร้างชั้นบนสุด)
+    const shiftOf = (day: number, phaseIndex: number) =>
+        clusters.filter((cluster) => cluster.end < day || (day >= cluster.start && phaseIndex > cluster.lastPhase)).reduce((sum, cluster) => sum + length(cluster) * extraFloors, 0);
+    const clusterOf = (task: PlanTaskTemplate) => clusters.find((cluster) => cluster.tasks.has(task));
+    const move = (task: PlanTaskTemplate, offset: number, floor?: number): PlanTaskTemplate => ({
+        ...task,
+        ...(floor ? { code: `${task.code}-${floor}`, name: floorName(task.name, floor) } : {}),
+        start: addDays(task.start, offset),
+        end: addDays(task.end, offset)
+    });
+
+    return CONSTRUCTION_PLAN_TEMPLATE.map((phase, phaseIndex) => {
+        const tasks: PlanTaskTemplate[] = [];
+        phase.tasks.forEach((task, index) => {
+            tasks.push(move(task, shiftOf(toDay(task.start), phaseIndex)));
+            if (!isUpperFloorTask(task)) return;
+            // ต่อชั้น 3..N หลังงานชั้น 2 ตัวสุดท้ายของชุดนี้ในขั้นตอน
+            const cluster = clusterOf(task)!;
+            if (phase.tasks.slice(index + 1).some((next) => isUpperFloorTask(next) && clusterOf(next) === cluster)) return;
+            const group = phase.tasks.filter((item) => isUpperFloorTask(item) && clusterOf(item) === cluster);
+            for (let floor = 3; floor <= floors; floor++) for (const item of group) tasks.push(move(item, shiftOf(toDay(item.start), phaseIndex) + (floor - 2) * length(cluster), floor));
+        });
+        return { ...phase, tasks };
+    });
+}
 
 /** จุดตรวจและหมุดหมายต้องมีทุกโครงการ (ตัดออกไม่ได้) */
 export const isRequiredTask = (template: PlanTaskTemplate) => HOLD_POINT.test(template.name) || MILESTONE.test(template.name);
@@ -98,7 +163,7 @@ export class TimelineGenerator {
      */
     planTasks(options: SetupOptions, overrides: TaskOverrides = NO_OVERRIDES): PlannedTask[] {
         const excluded = new Set(overrides.excluded);
-        return CONSTRUCTION_PLAN_TEMPLATE.flatMap((phase, phaseIndex) => {
+        return expandFloors(Number(options['floors'])).flatMap((phase, phaseIndex) => {
             const rows: PlannedTask[] = phase.tasks.filter((template) => includesTask(template, options)).map((template) => ({ template, phaseIndex, included: isRequiredTask(template) || !excluded.has(template.code) }));
             const lastWork = [...rows].reverse().find((row) => !MILESTONE.test(row.template.name)) ?? rows.at(-1);
             overrides.custom

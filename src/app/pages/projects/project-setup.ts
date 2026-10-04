@@ -411,7 +411,7 @@ type SetupStep = 'options' | 'tasks' | 'payments';
                                                     @switch (group.type) {
                                                         @case ('single') {
                                                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                                                @for (choice of group.choices; track choice.value) {
+                                                                @for (choice of visibleChoices(group); track choice.value) {
                                                                     <label class="choice" [ngClass]="{ 'choice-active': selected()[group.key] === choice.value }">
                                                                         <input
                                                                             type="radio"
@@ -919,7 +919,21 @@ export class ProjectSetup {
     }
 
     setValue(key: string, value: ConstructionOptionValue) {
-        this.selected.update((options) => ({ ...options, [key]: value }));
+        this.selected.update((options) => {
+            const next: SetupOptions = { ...options, [key]: value };
+            // ตัวเลือกที่เลือกไว้ใช้ไม่ได้แล้ว (เช่น เปลี่ยนเป็นบ้านพักอาศัยขณะเลือก 5 ชั้น) → ใช้ตัวเลือกสูงสุดที่ยังเลือกได้
+            for (const group of this.optionsResource.value()) {
+                if (group.type !== 'single' || group.key === key) continue;
+                const visible = this.visibleChoices(group, next);
+                if (visible.length && !visible.some((choice) => choice.value === next[group.key])) next[group.key] = visible.at(-1)!.value;
+            }
+            return next;
+        });
+    }
+
+    /** ตัวเลือกที่เลือกได้ตามค่าที่เลือกอยู่ (choice.visibleWhen) */
+    visibleChoices(group: ConstructionOptionGroup, options: SetupOptions = this.selected()) {
+        return group.choices.filter((choice) => !choice.visibleWhen || choice.visibleWhen.values.includes(String(options[choice.visibleWhen.key])));
     }
 
     toggleChoice(key: string, value: string) {

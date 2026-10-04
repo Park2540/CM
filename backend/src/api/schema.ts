@@ -406,6 +406,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/projects/{code}/site-location": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** ปักหมุดพิกัดหน้างาน (ต้องมีสิทธิ์ project.manage) — ใช้แสดงแผนที่และปุ่มนำทาง Google Maps */
+        put: operations["setProjectSiteLocation"];
+        post?: never;
+        /** ลบหมุดพิกัดหน้างาน (กลับไปค้นหาจากที่ตั้งหน้างาน) — สิทธิ์ project.manage */
+        delete: operations["clearProjectSiteLocation"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/projects/{code}/setup": {
         parameters: {
             query?: never;
@@ -656,7 +676,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** บันทึกการสั่งซื้อ (ใบขอซื้อต้องอนุมัติแล้ว) — สิทธิ์ procurement.manage */
+        /** ออกใบสั่งซื้อ (ใบขอซื้อต้องอนุมัติแล้ว) ส่งเข้าศูนย์อนุมัติเป็น po — สิทธิ์ procurement.manage */
         post: operations["orderPurchase"];
         delete?: never;
         options?: never;
@@ -676,7 +696,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** รับของ (ทยอยรับได้หลายครั้ง) — สิทธิ์ procurement.manage */
+        /** ตรวจรับของที่หน้างาน (ทยอยรับได้หลายครั้ง ใบสั่งซื้อต้องอนุมัติแล้ว) — สิทธิ์ procurement.receive / procurement.manage */
         post: operations["receivePurchase"];
         delete?: never;
         options?: never;
@@ -698,6 +718,157 @@ export interface paths {
         put?: never;
         /** ยกเลิกใบขอซื้อ (ก่อนรับของ) — ผู้ขอ หรือสิทธิ์ procurement.manage / project.manage */
         post: operations["cancelPurchase"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{code}/boq": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+            };
+            cookie?: never;
+        };
+        /** BOQ วัสดุของโครงการ */
+        get: operations["getProjectBoq"];
+        /** บันทึก BOQ ทั้งชุด (สิทธิ์ project.manage) */
+        put: operations["saveProjectBoq"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{code}/material-usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+            };
+            cookie?: never;
+        };
+        /** เทียบวัสดุที่ใช้จริง (รับ + เบิกคลัง − ส่งคืนคลัง) กับ BOQ รายวัสดุ */
+        get: operations["getMaterialUsage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{code}/stock-movements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+            };
+            cookie?: never;
+        };
+        /** ของเหลือส่งเข้าคลังหลัก / เบิกจากคลังหลัก ของโครงการ (ล่าสุดก่อน) */
+        get: operations["listProjectStockMovements"];
+        put?: never;
+        /**
+         * บันทึกส่งของเหลือเข้าคลังหลัก หรือเบิกจากคลังหลัก (สิทธิ์ procurement.receive / procurement.manage)
+         * @description เบิกได้ไม่เกินยอดคงเหลือในคลังหลัก · ส่งคืนได้ไม่เกินที่ใช้จริงของโครงการ
+         */
+        post: operations["createStockMovement"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/warehouse/stock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** ยอดคงเหลือในคลังหลักของบริษัท รายวัสดุ */
+        get: operations["listWarehouseStock"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/warehouse/movements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** ประวัติการรับเข้า/เบิกออกคลังหลัก ทุกโครงการ (ล่าสุดก่อน) */
+        get: operations["listWarehouseMovements"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/materials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** รายการวัสดุของบริษัท */
+        get: operations["listMaterials"];
+        put?: never;
+        /** เพิ่มวัสดุ (สิทธิ์ procurement.manage / project.manage) */
+        post: operations["createMaterial"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/materials/{materialCode}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                materialCode: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** แก้ไขวัสดุ (สิทธิ์ procurement.manage / project.manage) — active = false เพื่อเลิกใช้ */
+        put: operations["updateMaterial"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/company": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** ข้อมูลบริษัท (หัวกระดาษใบสั่งซื้อ) */
+        get: operations["getCompanyProfile"];
+        /** แก้ไขข้อมูลบริษัท (สิทธิ์ user.manage) */
+        put: operations["saveCompanyProfile"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -739,7 +910,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** รับอุปกรณ์เข้าหน้างาน (เริ่มคิดค่าเช่า) — สิทธิ์ procurement.manage */
+        /** รับอุปกรณ์เข้าหน้างาน (เริ่มคิดค่าเช่า) — สิทธิ์ procurement.receive / procurement.manage */
         post: operations["startRental"];
         delete?: never;
         options?: never;
@@ -779,7 +950,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** คืนอุปกรณ์ (หยุดคิดค่าเช่า) — สิทธิ์ procurement.manage */
+        /** คืนอุปกรณ์ (หยุดคิดค่าเช่า) — สิทธิ์ procurement.receive / procurement.manage */
         post: operations["returnRental"];
         delete?: never;
         options?: never;
@@ -1443,10 +1614,11 @@ export interface components {
          *     - project.manage: จัดการโครงการ เช่น บันทึกสัญญาและเริ่มแผนงาน
          *     - user.manage: จัดการบัญชีผู้ใช้ บทบาท และสิทธิ์ของบุคลากร
          *     - payment.record: บันทึก/ยกเลิกการรับชำระเงินงวดงานของลูกค้า
-         *     - procurement.manage: จัดซื้อและเช่า: ออกใบสั่งซื้อ รับของ รับ/คืนอุปกรณ์ที่เช่า/ยืม
+         *     - procurement.manage: จัดซื้อและเช่า: ออกใบสั่งซื้อ รับของ รับ/คืนอุปกรณ์ที่เช่า/ยืม แก้รายการวัสดุ
+         *     - procurement.receive: ตรวจรับของที่หน้างาน รับ/คืนอุปกรณ์เช่า ส่งของเหลือเข้าคลังหลัก/เบิกจากคลัง (ผู้จัดการโครงการ วิศวกร โฟร์แมน เจ้าของบริษัท)
          * @enum {string}
          */
-        Permission: "progress.update" | "personnel.sensitive" | "finance.company" | "approval.any" | "project.create" | "project.manage" | "user.manage" | "payment.record" | "procurement.manage";
+        Permission: "progress.update" | "personnel.sensitive" | "finance.company" | "approval.any" | "project.create" | "project.manage" | "user.manage" | "payment.record" | "procurement.manage" | "procurement.receive";
         CurrentUser: {
             id: string;
             name: string;
@@ -1626,12 +1798,34 @@ export interface components {
             customerAddress?: string;
             /** @description ผู้รับผิดชอบโครงการ */
             responsibleName: string;
-            /** @description แบบบ้านที่ลูกค้าต้องการ (พิมพ์เองได้) */
-            housePlanName: string;
-            /** @description ถ้าเลือกจากคลังแบบบ้าน (GET /house-plans) จะแสดงแปลนและโมเดล 3D ได้ */
+            /** @description ชื่อแบบบ้าน (ไม่ส่ง = ระบบตั้งจาก designBrief เช่น "บ้าน 2 ชั้น 3 ห้องนอน (รอออกแบบ)") */
+            housePlanName?: string;
+            /** @description (ระบบเดิม) แบบจากคลังแบบบ้าน — หน้าเปิดโครงการไม่ใช้แล้ว */
             housePlanCode?: string;
+            designBrief?: components["schemas"]["DesignBrief"];
             /** @description ความต้องการเพิ่มเติมของลูกค้า */
             requirements?: string;
+            /** @description พิกัดหน้างาน (ไม่บังคับ) — ระบบปักหมุดให้ตั้งแต่เปิดโครงการ ใช้แสดงแผนที่และนำทาง Google Maps */
+            siteCoordinates?: components["schemas"]["SiteLocationInput"];
+        };
+        /** @description ความต้องการคร่าว ๆ ของลูกค้า ใช้เป็นโจทย์ออกแบบบ้าน (ทุกช่องไม่บังคับ) */
+        DesignBrief: {
+            /** @description บ้านพักอาศัยไม่เกิน 3 ชั้น อาคารพาณิชย์ไม่เกิน 8 ชั้น */
+            floors?: number;
+            bedrooms?: number;
+            bathrooms?: number;
+            /** @description ที่จอดรถ (คัน) */
+            parking?: number;
+            /** @description พื้นที่ใช้สอยที่ต้องการโดยประมาณ (ตร.ม.) */
+            usableArea?: number;
+            /** @description ขนาดที่ดิน (ตร.ว.) */
+            landArea?: number;
+            /** @description งบประมาณก่อสร้างที่ตั้งไว้ (บาท) */
+            budget?: number;
+            /** @example โมเดิร์น */
+            style?: string;
+            /** @description ห้อง/พื้นที่พิเศษ เช่น ห้องพระ ห้องทำงาน ห้องแม่บ้าน */
+            rooms?: string[];
         };
         /** @description บันทึกเมื่อได้งาน/เซ็นสัญญาแล้ว หลังบ้านจะสร้างแผนงานจากแม่แบบและงวดงาน */
         ContractInput: {
@@ -1654,6 +1848,8 @@ export interface components {
             deliveryDate: string;
             /** @description ที่ตั้งหน้างาน (เลขที่/ตำบล/อำเภอ) */
             location: string;
+            /** @description พิกัดหน้างาน (ไม่บังคับ) — ระบบปักหมุดให้เพื่อแสดงแผนที่และนำทาง Google Maps */
+            siteCoordinates?: components["schemas"]["SiteLocationInput"];
         };
         /**
          * @description pending-contract = เปิดโครงการแล้วแต่ยังไม่ได้บันทึกสัญญา (ยังไม่มีแผนงาน งวดงาน ภาพ เอกสาร)
@@ -1666,8 +1862,11 @@ export interface components {
             name: string;
             /** @description ที่ตั้งหน้างาน (null จนกว่าจะบันทึกสัญญา) */
             location: string | null;
+            /** @description พิกัดหน้างานที่ปักหมุดไว้ (ไม่มี = แผนที่ค้นหาจากที่ตั้งหน้างาน) */
+            siteCoordinates?: components["schemas"]["SiteLocation"];
             housePlanName: string;
             housePlanCode?: string;
+            designBrief?: components["schemas"]["DesignBrief"];
             requirements?: string;
             customerName: string;
             phone: string;
@@ -1711,6 +1910,17 @@ export interface components {
             changeOrderTotal?: number;
             /** @description มูลค่าสัญญาปัจจุบัน = value + changeOrderTotal (null จนกว่าจะบันทึกสัญญา) */
             revisedValue?: number | null;
+        };
+        SiteLocationInput: {
+            /** @example 19.9105 */
+            lat: number;
+            /** @example 99.8406 */
+            lng: number;
+        };
+        SiteLocation: components["schemas"]["SiteLocationInput"] & {
+            updatedBy: components["schemas"]["UserRef"];
+            /** Format: date-time */
+            updatedAt: string;
         };
         /**
          * @description - customer: ลูกค้าขอเพิ่ม/เปลี่ยนงานนอกสัญญา (ต้องให้ลูกค้ายืนยันก่อนอนุมัติ)
@@ -1780,6 +1990,8 @@ export interface components {
             deliveryDateAfter?: string;
         };
         ProcurementItem: {
+            /** @description รหัสในรายการวัสดุ (ถ้าเลือกจากรายการ) ใช้เทียบกับ BOQ */
+            materialCode?: string;
             name: string;
             quantity: number;
             unit: string;
@@ -1787,11 +1999,11 @@ export interface components {
             unitPrice: number;
         };
         /**
-         * @description pending = รออนุมัติ, approved = อนุมัติแล้ว รอสั่งซื้อ, rejected = ไม่อนุมัติ,
-         *     ordered = สั่งซื้อแล้ว รอรับของ, partial = รับของบางส่วน, received = รับครบ, cancelled = ยกเลิก
+         * @description pending = ใบขอซื้อรออนุมัติ, approved = อนุมัติแล้ว รอออกใบสั่งซื้อ (หรือใบสั่งซื้อไม่ผ่านอนุมัติ ออกใหม่ได้), rejected = ไม่อนุมัติ,
+         *     po-pending = ใบสั่งซื้อรออนุมัติ, ordered = ใบสั่งซื้ออนุมัติแล้ว รอรับของ, partial = รับของบางส่วน, received = รับครบ, cancelled = ยกเลิก
          * @enum {string}
          */
-        PurchaseStatus: "pending" | "approved" | "rejected" | "ordered" | "partial" | "received" | "cancelled";
+        PurchaseStatus: "pending" | "approved" | "rejected" | "po-pending" | "ordered" | "partial" | "received" | "cancelled";
         PurchaseRequestInput: {
             title: string;
             items: components["schemas"]["ProcurementItem"][];
@@ -1806,17 +2018,68 @@ export interface components {
             supplier?: string;
             note?: string;
         };
+        Vendor: {
+            /** @description ชื่อร้าน/บริษัทผู้ขาย */
+            name: string;
+            /** @description เลขประจำตัวผู้เสียภาษี */
+            taxId?: string;
+            address?: string;
+            contactName?: string;
+            phone?: string;
+        };
+        /** @description ออกใบสั่งซื้อจากใบขอซื้อที่อนุมัติแล้ว (ราคาจากใบเสนอราคาที่ดีที่สุด รวม VAT แล้ว) — ส่งเข้าศูนย์อนุมัติเป็น po ด้วยวงเงินเดียวกับใบขอซื้อ */
         PurchaseOrderInput: {
-            supplier: string;
-            /** @description ไม่ระบุ = ระบบออกเลขให้ (PO-<ปีเดือน>-<ลำดับ>) */
-            poNumber?: string;
+            vendor: components["schemas"]["Vendor"];
             /** Format: date */
             orderDate: string;
             /**
              * Format: date
-             * @description วันที่ร้านจะส่งของ
+             * @description วันที่ร้านจะส่งของถึงหน้างาน
              */
             expectedDate?: string;
+            /** @description ราคาต่อหน่วยรวม VAT เรียงตาม items ของใบขอซื้อ */
+            unitPrices: number[];
+            /** @example เครดิต 30 วัน */
+            paymentTerms?: string;
+            note?: string;
+            /** @description ใบเสนอราคาที่เลือก (id จาก POST /uploads) */
+            quotationFileIds?: string[];
+        };
+        PurchaseOrder: {
+            /**
+             * @description เลขใบสั่งซื้อ = เลขคำขอในศูนย์อนุมัติ
+             * @example PO-6910-0008
+             */
+            poNumber: string;
+            approvalId?: string;
+            /**
+             * @description ผลอนุมัติใบสั่งซื้อ
+             * @enum {string}
+             */
+            status: "pending" | "approved" | "rejected";
+            vendor?: components["schemas"]["Vendor"];
+            /** @description ชื่อผู้ขาย (= vendor.name) */
+            supplier: string;
+            /** Format: date */
+            orderDate: string;
+            /** Format: date */
+            expectedDate?: string;
+            /** @description ราคาต่อหน่วยรวม VAT */
+            unitPrices?: number[];
+            /** @description ยอดรวม VAT */
+            amount?: number;
+            amountBeforeVat?: number;
+            /** @description VAT 7% ที่รวมอยู่ในยอด */
+            vatAmount?: number;
+            paymentTerms?: string;
+            note?: string;
+            quotationFiles?: components["schemas"]["UploadedFile"][];
+            orderedBy: components["schemas"]["UserRef"];
+            /** Format: date-time */
+            orderedAt?: string;
+            /** Format: date-time */
+            decidedAt?: string;
+            decisionNote?: string;
         };
         PurchaseReceiveInput: {
             /**
@@ -1857,19 +2120,136 @@ export interface components {
             /** Format: date-time */
             decidedAt?: string;
             decisionNote?: string;
-            order?: {
-                supplier: string;
-                poNumber: string;
-                /** Format: date */
-                orderDate: string;
-                /** Format: date */
-                expectedDate?: string;
-                orderedBy: components["schemas"]["UserRef"];
-            };
+            order?: components["schemas"]["PurchaseOrder"];
+            /** @description ใบสั่งซื้อที่ไม่ผ่านอนุมัติ (ประวัติ) */
+            rejectedOrders?: components["schemas"]["PurchaseOrder"][];
             /** @description จำนวนที่รับแล้วสะสม เรียงตาม items */
             received: number[];
             receipts: components["schemas"]["PurchaseReceipt"][];
             cancelReason?: string;
+        };
+        Material: {
+            /** @example MAT-0001 */
+            code: string;
+            name: string;
+            unit: string;
+            /** @example งานโครงสร้าง */
+            category: string;
+            /** @description ขนาด/มาตรฐาน/ยี่ห้อที่กำหนด */
+            spec?: string;
+            /** @description ราคาต่อหน่วยล่าสุดจากใบสั่งซื้อที่อนุมัติ (รวม VAT) */
+            lastPrice?: number;
+            active: boolean;
+        };
+        MaterialInput: {
+            name: string;
+            unit: string;
+            category: string;
+            spec?: string;
+            active?: boolean;
+        };
+        BoqItem: {
+            materialCode?: string;
+            name: string;
+            unit: string;
+            /** @description ปริมาณตาม BOQ (รวมเผื่อเสียแล้ว) */
+            quantity: number;
+            phaseCode?: string;
+            note?: string;
+        };
+        ProjectBoq: {
+            items: components["schemas"]["BoqItem"][];
+            updatedBy?: components["schemas"]["UserRef"];
+            /** Format: date-time */
+            updatedAt?: string;
+        };
+        ProjectBoqInput: {
+            items: components["schemas"]["BoqItem"][];
+        };
+        /**
+         * @description return = ส่งของเหลือจากหน้างานเข้าคลังหลัก, issue = เบิกจากคลังหลักไปใช้ที่หน้างาน
+         * @enum {string}
+         */
+        StockMovementType: "return" | "issue";
+        StockMovementInput: {
+            type: components["schemas"]["StockMovementType"];
+            materialCode?: string;
+            name: string;
+            unit: string;
+            quantity: number;
+            /**
+             * Format: date
+             * @description ไม่เกินวันนี้
+             */
+            date: string;
+            note?: string;
+        };
+        StockMovement: components["schemas"]["StockMovementInput"] & {
+            /** @example SM-6910-0001 */
+            id: string;
+            projectCode: string;
+            recordedBy: components["schemas"]["UserRef"];
+            /** Format: date-time */
+            recordedAt: string;
+        };
+        StockBalance: {
+            /** @description materialCode หรือ ชื่อ|หน่วย */
+            key: string;
+            materialCode?: string;
+            name: string;
+            unit: string;
+            category?: string;
+            /** @description คงเหลือในคลังหลัก */
+            quantity: number;
+            /** Format: date-time */
+            lastMovementAt: string;
+        };
+        /**
+         * @description over = ใช้เกิน BOQ เกินเกณฑ์, under = ใช้น้อยกว่า BOQ เกินเกณฑ์ (ประเมินเมื่อโครงการเสร็จ), ok = อยู่ในเกณฑ์, in-progress = ยังใช้ไม่ครบ (โครงการยังไม่เสร็จ), not-in-boq = ไม่มีใน BOQ
+         * @enum {string}
+         */
+        MaterialUsageStatus: "over" | "under" | "ok" | "in-progress" | "not-in-boq";
+        MaterialUsageRow: {
+            key: string;
+            materialCode?: string;
+            name: string;
+            unit: string;
+            category?: string;
+            boqQuantity: number;
+            /** @description ขอซื้อ (ไม่นับที่ไม่อนุมัติ/ยกเลิก) */
+            requestedQuantity: number;
+            /** @description อยู่ในใบสั่งซื้อที่อนุมัติแล้ว */
+            orderedQuantity: number;
+            /** @description รับเข้าหน้างานจากการสั่งซื้อ */
+            receivedQuantity: number;
+            /** @description เบิกจากคลังหลัก */
+            issuedQuantity: number;
+            /** @description ส่งของเหลือเข้าคลังหลัก */
+            returnedQuantity: number;
+            /** @description ใช้จริง = รับ + เบิก − ส่งคืน */
+            usedQuantity: number;
+            /** @description ใช้จริง − BOQ (บวก = เกิน) */
+            variance: number;
+            /** @description เทียบกับ BOQ (null เมื่อไม่มีใน BOQ) */
+            variancePercent?: number | null;
+            /** @description มูลค่าที่รับเข้าตามราคาใบสั่งซื้อ (รวม VAT) */
+            spent: number;
+            status: components["schemas"]["MaterialUsageStatus"];
+        };
+        MaterialUsage: {
+            /** @description เกณฑ์ยอมรับส่วนต่าง (%) */
+            tolerancePercent: number;
+            projectCompleted: boolean;
+            rows: components["schemas"]["MaterialUsageRow"][];
+        };
+        CompanyProfile: {
+            name: string;
+            /** @example สำนักงานใหญ่ */
+            branch?: string;
+            address: string;
+            taxId: string;
+            phone: string;
+            email?: string;
         };
         /**
          * @description rent = เช่าจากภายนอก (ต้องอนุมัติ), borrow = ยืมจากคลังบริษัท (ไม่ต้องอนุมัติ)
@@ -1993,6 +2373,11 @@ export interface components {
             value: string;
             label: string;
             description?: string;
+            /** @description เลือกได้เฉพาะเมื่อตัวเลือก key มีค่าอยู่ใน values (เช่น 4-8 ชั้นเฉพาะอาคารพาณิชย์) */
+            visibleWhen?: {
+                key: string;
+                values: string[];
+            };
         };
         ConstructionOptionGroup: {
             /** @example foundation */
@@ -2129,6 +2514,16 @@ export interface components {
             end: string;
             progress: number;
             status: components["schemas"]["TimelineStatus"];
+            /**
+             * Format: date
+             * @description วันที่บันทึกหน้างานครั้งแรกของงานนี้ (ไม่มี = ยังไม่มีการอัปเดต)
+             */
+            startedOn?: string;
+            /**
+             * Format: date
+             * @description วันที่บันทึกหน้างาน/ผลตรวจล่าสุดของงานนี้
+             */
+            lastUpdatedOn?: string;
             isHoldPoint: boolean;
             isMilestone: boolean;
             isPaymentMilestone: boolean;
@@ -3596,6 +3991,59 @@ export interface operations {
             422: components["responses"]["ValidationError"];
         };
     };
+    setProjectSiteLocation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SiteLocationInput"];
+            };
+        };
+        responses: {
+            /** @description บันทึกแล้ว */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Project"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationError"];
+        };
+    };
+    clearProjectSiteLocation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ลบแล้ว */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Project"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
     getProjectSetup: {
         parameters: {
             query?: never;
@@ -4098,6 +4546,297 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationError"];
+        };
+    };
+    getProjectBoq: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectBoq"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    saveProjectBoq: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProjectBoqInput"];
+            };
+        };
+        responses: {
+            /** @description บันทึกแล้ว */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectBoq"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationError"];
+        };
+    };
+    getMaterialUsage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MaterialUsage"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listProjectStockMovements: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockMovement"][];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    createStockMovement: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: components["parameters"]["ProjectCode"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StockMovementInput"];
+            };
+        };
+        responses: {
+            /** @description บันทึกแล้ว */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockMovement"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationError"];
+        };
+    };
+    listWarehouseStock: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockBalance"][];
+                };
+            };
+        };
+    };
+    listWarehouseMovements: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockMovement"][];
+                };
+            };
+        };
+    };
+    listMaterials: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Material"][];
+                };
+            };
+        };
+    };
+    createMaterial: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MaterialInput"];
+            };
+        };
+        responses: {
+            /** @description บันทึกแล้ว */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Material"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationError"];
+        };
+    };
+    updateMaterial: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                materialCode: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MaterialInput"];
+            };
+        };
+        responses: {
+            /** @description บันทึกแล้ว */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Material"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationError"];
+        };
+    };
+    getCompanyProfile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyProfile"];
+                };
+            };
+        };
+    };
+    saveCompanyProfile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompanyProfile"];
+            };
+        };
+        responses: {
+            /** @description บันทึกแล้ว */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyProfile"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
             422: components["responses"]["ValidationError"];
         };
     };

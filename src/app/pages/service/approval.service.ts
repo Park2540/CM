@@ -75,6 +75,10 @@ export class ApprovalService {
         return this.http.get<ApiSchemas['ApprovalPage']>(apiUrl('/approvals'), { params: queryParams({ ...query }) }).pipe(map((page) => ({ ...page, items: page.items.map(fromApi) })));
     }
 
+    get(id: string): Observable<ApprovalRequest> {
+        return this.http.get<ApiSchemas['Approval']>(apiUrl(`/approvals/${encodeURIComponent(id)}`)).pipe(map(fromApi));
+    }
+
     approve(id: string, note?: string): Observable<ApprovalRequest> {
         return this.http.post<ApiSchemas['Approval']>(apiUrl(`/approvals/${encodeURIComponent(id)}/approve`), { note: note || undefined } satisfies ApiSchemas['DecisionInput']).pipe(
             map(fromApi),

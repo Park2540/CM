@@ -10,6 +10,9 @@ export interface TimelineTask {
     end: Date;
     progress: number;
     status: TimelineStatus;
+    /** วันที่อัปเดตครั้งแรก/ล่าสุดจากบันทึกหน้างาน (ไม่มี = ยังไม่มีการอัปเดต) */
+    startedOn?: string;
+    lastUpdatedOn?: string;
     isHoldPoint: boolean;
     isMilestone: boolean;
     isPaymentMilestone: boolean;

@@ -1,6 +1,7 @@
 /**
  * จัดซื้อวัสดุและเช่า/ยืมอุปกรณ์ของโครงการ
- * - ใบขอซื้อ (PR) ส่งเข้าศูนย์อนุมัติ → อนุมัติ → สั่งซื้อ (PO) → รับของ (ทยอยรับได้) → ครบ
+ * - ใบขอซื้อ (PR) ส่งเข้าศูนย์อนุมัติ → อนุมัติ → ออกใบสั่งซื้อ (PO ราคารวม VAT จากใบเสนอราคา) ส่งเข้าศูนย์อนุมัติ → อนุมัติ → ตรวจรับที่หน้างาน (ทยอยรับได้) → ครบ
+ * - ของที่รับถือว่าใช้ที่หน้างานทันที ของเหลือส่งเข้าคลังหลัก / ขาดเบิกจากคลังหลัก → เทียบการใช้วัสดุกับ BOQ
  * - เช่า (rent) ส่งเข้าศูนย์อนุมัติ / ยืม (borrow) จากคลังบริษัทไม่ต้องอนุมัติ → รับเข้าหน้างาน → (ขยายเวลา) → คืน
  * ใบขอซื้อ/คำขอเช่าในศูนย์อนุมัติที่สร้างก่อนมีโมดูลนี้ (ข้อมูลตั้งต้น) สร้างรายการให้อัตโนมัติเมื่ออ่าน (syncFromApprovals)
  */
@@ -8,7 +9,8 @@ import { persistArray } from '../db/state.js';
 import type { ApiSchemas } from '../api/api.js';
 import { approvalLevel, approvals } from './approvals.js';
 import { recordAudit } from './audit-logs.js';
-import { getTimeline, todayIso, uploads } from './projects.js';
+import { boqs, findMaterial, getBoq, materialKey, recordLastPrice, stockMovements, stockOf } from './materials.js';
+import { currentProject, getTimeline, todayIso, uploads } from './projects.js';
 import { CURRENT_USER } from './users.js';
 
 type Approval = ApiSchemas['Approval'];
@@ -107,12 +109,29 @@ export function syncFromApprovals() {
     }
 }
 
-/** หลังตัดสินในศูนย์อนุมัติ: ใบขอซื้อ/คำขอเช่า เปลี่ยนสถานะตาม (เรียกจาก routes/approvals) */
+/** หลังตัดสินในศูนย์อนุมัติ: ใบขอซื้อ / ใบสั่งซื้อ / คำขอเช่า เปลี่ยนสถานะตาม (เรียกจาก routes/approvals) */
 export function applyProcurementDecision(approval: Approval, status: 'approved' | 'rejected', note?: string) {
     syncFromApprovals();
+    const decidedAt = new Date().toISOString();
+    if (approval.type === 'po') {
+        const purchase = purchases.find((item) => item.order?.approvalId === approval.id);
+        if (!purchase?.order || purchase.status !== 'po-pending') return;
+        Object.assign(purchase.order, { status, decidedAt, ...(note ? { decisionNote: note } : {}) });
+        if (status === 'approved') {
+            purchase.status = 'ordered';
+            // ราคาล่าสุดของวัสดุ (รวม VAT) ใช้เป็นราคาอ้างอิงตอนขอซื้อครั้งต่อไป
+            purchase.items.forEach((item, index) => recordLastPrice(item.materialCode, purchase.order!.unitPrices?.[index] ?? 0));
+        } else {
+            // ไม่อนุมัติ: เก็บเป็นประวัติ กลับไปรอออกใบสั่งซื้อใหม่
+            purchase.rejectedOrders = [...(purchase.rejectedOrders ?? []), purchase.order];
+            delete purchase.order;
+            purchase.status = 'approved';
+        }
+        return;
+    }
     const record = approval.type === 'pr' ? purchases.find((item) => item.approvalId === approval.id) : approval.type === 'rental' ? rentals.find((item) => item.approvalId === approval.id) : undefined;
     if (!record || record.status !== 'pending') return;
-    Object.assign(record, { status, decidedAt: new Date().toISOString(), ...(note ? { decisionNote: note } : {}) });
+    Object.assign(record, { status, decidedAt, ...(note ? { decisionNote: note } : {}) });
 }
 
 /** ยกเลิกรายการที่รออนุมัติ: ปิดคำขอในศูนย์อนุมัติด้วย */
@@ -127,6 +146,7 @@ function withdrawApproval(approvalId: string | undefined, reason: string) {
 
 export function listPurchases(code: string): Purchase[] {
     syncFromApprovals();
+    for (const purchase of purchases) if (purchase.order && !purchase.order.status) purchase.order.status = 'approved';
     return purchases.filter((item) => item.projectCode === code).sort((a, b) => b.requestedAt.localeCompare(a.requestedAt));
 }
 
@@ -137,7 +157,10 @@ function validateItems(input: unknown, errors: Record<string, string>): Item[] {
     if (!list.length) errors['items'] = 'กรุณาเพิ่มรายการอย่างน้อย 1 รายการ';
     if (list.length > 50) errors['items'] = 'ได้ไม่เกิน 50 รายการ';
     return list.slice(0, 50).map((raw: Partial<Item>, index) => {
-        const item = { name: text(raw.name), quantity: Number(raw.quantity), unit: text(raw.unit), unitPrice: Number(raw.unitPrice) };
+        const material = findMaterial(text(raw.materialCode));
+        if (raw.materialCode && !material) errors[`items.${index}.materialCode`] = 'ไม่พบวัสดุนี้ในรายการวัสดุ';
+        // เลือกจากรายการวัสดุ: ใช้ชื่อและหน่วยตามรายการ (เทียบ BOQ ได้ตรง)
+        const item: Item = { ...(material ? { materialCode: material.code } : {}), name: material?.name ?? text(raw.name), quantity: Number(raw.quantity), unit: material?.unit ?? text(raw.unit), unitPrice: Number(raw.unitPrice) };
         if (!item.name) errors[`items.${index}.name`] = 'กรุณาระบุชื่อรายการ';
         else if (item.name.length > 200) errors[`items.${index}.name`] = 'ชื่อยาวเกิน 200 ตัวอักษร';
         if (!(item.quantity > 0)) errors[`items.${index}.quantity`] = 'จำนวนต้องมากกว่า 0';
@@ -201,24 +224,80 @@ export function createPurchase(code: string, input: Partial<ApiSchemas['Purchase
     return { ok: purchase };
 }
 
+const VAT_RATE = 0.07;
+const vendorLimits: Record<keyof ApiSchemas['Vendor'], number> = { name: 200, taxId: 20, address: 500, contactName: 100, phone: 30 };
+
+/** ออกใบสั่งซื้อ: ราคาจากใบเสนอราคาที่ดีที่สุด (รวม VAT) → ส่งเข้าศูนย์อนุมัติเป็น po วงเงินเดียวกับใบขอซื้อ */
 export function orderPurchase(code: string, id: string, input: Partial<ApiSchemas['PurchaseOrderInput']>): Result<Purchase> {
     const purchase = findPurchase(code, id);
     if (!purchase) return fail(404, 'ไม่พบใบขอซื้อ');
-    if (purchase.status !== 'approved') return fail(409, purchase.status === 'pending' ? 'ใบขอซื้อยังรออนุมัติ' : 'สั่งซื้อได้เฉพาะใบขอซื้อที่อนุมัติแล้ว');
+    if (purchase.status !== 'approved') return fail(409, purchase.status === 'pending' ? 'ใบขอซื้อยังรออนุมัติ' : purchase.status === 'po-pending' ? 'ใบสั่งซื้อของใบขอซื้อนี้รออนุมัติอยู่' : 'ออกใบสั่งซื้อได้เฉพาะใบขอซื้อที่อนุมัติแล้ว');
     const errors: Record<string, string> = {};
-    const supplier = text(input.supplier);
-    if (!supplier) errors['supplier'] = 'กรุณาระบุร้านค้า';
-    else tooLong(errors, 'supplier', supplier, 200);
-    tooLong(errors, 'poNumber', text(input.poNumber), 50);
+    const rawVendor: Partial<ApiSchemas['Vendor']> = input.vendor ?? {};
+    const vendor: ApiSchemas['Vendor'] = { name: text(rawVendor.name) };
+    for (const field of ['taxId', 'address', 'contactName', 'phone'] as const) if (text(rawVendor[field])) vendor[field] = text(rawVendor[field]);
+    if (vendor.taxId) vendor.taxId = vendor.taxId.replace(/[\s-]/g, '');
+    if (!vendor.name) errors['vendor.name'] = 'กรุณาระบุร้านค้า/ผู้ขาย';
+    for (const [field, max] of Object.entries(vendorLimits)) tooLong(errors, `vendor.${field}`, vendor[field as keyof typeof vendor] ?? '', max);
+    if (vendor.taxId && !errors['vendor.taxId'] && !/^\d{13}$/.test(vendor.taxId)) errors['vendor.taxId'] = 'เลขประจำตัวผู้เสียภาษีต้องเป็นตัวเลข 13 หลัก';
     if (!DATE.test(input.orderDate ?? '')) errors['orderDate'] = 'กรุณาระบุวันที่สั่งซื้อ';
     else if (input.orderDate! > todayIso()) errors['orderDate'] = 'วันที่สั่งซื้อต้องไม่เกินวันนี้';
     if (input.expectedDate && !DATE.test(input.expectedDate)) errors['expectedDate'] = 'วันที่ไม่ถูกต้อง';
     else if (input.expectedDate && input.orderDate && input.expectedDate < input.orderDate) errors['expectedDate'] = 'วันส่งของต้องไม่ก่อนวันสั่งซื้อ';
+    const unitPrices = Array.isArray(input.unitPrices) ? input.unitPrices.map(Number) : [];
+    if (unitPrices.length !== purchase.items.length) errors['unitPrices'] = 'ระบุราคาให้ครบทุกรายการ';
+    else unitPrices.forEach((price, index) => {
+        if (!(price >= 0)) errors[`unitPrices.${index}`] = 'ราคาต้องไม่ติดลบ';
+    });
+    tooLong(errors, 'paymentTerms', text(input.paymentTerms), 200);
+    tooLong(errors, 'note', text(input.note), 1000);
+    const fileIds = Array.isArray(input.quotationFileIds) ? input.quotationFileIds : [];
+    if (fileIds.length > 10) errors['quotationFileIds'] = 'แนบได้ไม่เกิน 10 ไฟล์';
+    else if (fileIds.some((fileId) => !uploads.has(fileId))) errors['quotationFileIds'] = 'ไม่พบไฟล์ที่อัปโหลด กรุณาอัปโหลดใหม่';
     if (Object.keys(errors).length) return fail(422, 'ข้อมูลไม่ถูกต้อง', errors);
-    const poNumber = text(input.poNumber) || nextNumber('PO', purchases.map((item) => item.order?.poNumber ?? '').filter(Boolean));
-    purchase.order = { supplier, poNumber, orderDate: input.orderDate!, ...(input.expectedDate ? { expectedDate: input.expectedDate } : {}), orderedBy: author() };
-    purchase.status = 'ordered';
-    recordAudit({ module: 'procurement', action: 'สั่งซื้อวัสดุ', target: `${code} ${poNumber}`, detail: `${purchase.id} ${purchase.title} · ${supplier} · ${money(purchase.amount)}` });
+
+    syncFromApprovals();
+    const poNumber = nextNumber('PO', [...allIds(), ...purchases.flatMap((item) => [item.order?.poNumber ?? '', ...(item.rejectedOrders ?? []).map((order) => order.poNumber)])]);
+    const now = new Date().toISOString();
+    // ราคารวม VAT แล้ว: ถอด VAT 7% ออกมาแสดง
+    const amount = round2(purchase.items.reduce((sum, item, index) => sum + item.quantity * unitPrices[index]!, 0));
+    const amountBeforeVat = round2(amount / (1 + VAT_RATE));
+    purchase.order = {
+        poNumber,
+        approvalId: poNumber,
+        status: 'pending',
+        vendor,
+        supplier: vendor.name,
+        orderDate: input.orderDate!,
+        ...(input.expectedDate ? { expectedDate: input.expectedDate } : {}),
+        unitPrices,
+        amount,
+        amountBeforeVat,
+        vatAmount: round2(amount - amountBeforeVat),
+        ...(text(input.paymentTerms) ? { paymentTerms: text(input.paymentTerms) } : {}),
+        ...(text(input.note) ? { note: text(input.note) } : {}),
+        quotationFiles: fileIds.map((fileId) => uploads.get(fileId)!),
+        orderedBy: author(),
+        orderedAt: now
+    };
+    purchase.status = 'po-pending';
+    approvals.unshift({
+        id: poNumber,
+        type: 'po',
+        projectCode: code,
+        title: `ใบสั่งซื้อ ${purchase.title} · ${vendor.name}`,
+        reason: `อ้างอิงใบขอซื้อ ${purchase.id} (ประมาณ ${money(purchase.amount)})${text(input.note) ? ` · ${text(input.note)}` : ''}`,
+        amount,
+        requestedBy: author(),
+        requestedAt: now,
+        status: 'pending',
+        // วงเงินอนุมัติเดียวกับใบขอซื้อ
+        approvalLevel: approvalLevel('pr', amount),
+        items: purchase.items.map((item, index) => ({ name: item.name, quantity: item.quantity, unit: item.unit, unitPrice: unitPrices[index]! })),
+        history: [{ action: 'submitted', user: author(), at: now, ...(text(input.note) ? { note: text(input.note) } : {}) }],
+        purchaseId: purchase.id
+    });
+    recordAudit({ module: 'procurement', action: 'ออกใบสั่งซื้อ', target: `${code} ${poNumber}`, detail: `${purchase.id} ${purchase.title} · ${vendor.name} · ${money(amount)} (รวม VAT)` });
     return { ok: purchase };
 }
 
@@ -267,11 +346,15 @@ export function receivePurchase(code: string, id: string, input: Partial<ApiSche
 export function cancelPurchase(code: string, id: string, reason: unknown): Result<Purchase> {
     const purchase = findPurchase(code, id);
     if (!purchase) return fail(404, 'ไม่พบใบขอซื้อ');
-    if (!['pending', 'approved', 'ordered'].includes(purchase.status)) return fail(409, purchase.status === 'partial' ? 'รับของบางส่วนแล้ว ยกเลิกไม่ได้' : 'ยกเลิกรายการนี้ไม่ได้');
+    if (!['pending', 'approved', 'po-pending', 'ordered'].includes(purchase.status)) return fail(409, purchase.status === 'partial' ? 'รับของบางส่วนแล้ว ยกเลิกไม่ได้' : 'ยกเลิกรายการนี้ไม่ได้');
     const note = text(reason);
     if (!note) return fail(422, 'กรุณาระบุเหตุผลที่ยกเลิก', { reason: 'กรุณาระบุเหตุผลที่ยกเลิก' });
     if (note.length > 500) return fail(422, 'ข้อมูลไม่ถูกต้อง', { reason: 'ยาวเกิน 500 ตัวอักษร' });
     withdrawApproval(purchase.approvalId, note);
+    if (purchase.order?.status === 'pending') {
+        withdrawApproval(purchase.order.approvalId, note);
+        purchase.order.status = 'rejected';
+    }
     Object.assign(purchase, { status: 'cancelled', cancelReason: note });
     recordAudit({ module: 'procurement', action: 'ยกเลิกใบขอซื้อ', target: `${code} ${purchase.id}`, detail: note });
     return { ok: purchase };
@@ -443,6 +526,131 @@ export function cancelRental(code: string, id: string, reason: unknown): Result<
 export const isRequester = (record: { requestedBy: ApiSchemas['UserRef'] }) => record.requestedBy.id === CURRENT_USER.id;
 export const findPurchaseRecord = findPurchase;
 export const findRentalRecord = findRental;
+
+// ---------- การใช้วัสดุเทียบ BOQ ----------
+
+/** เกณฑ์ยอมรับส่วนต่างการใช้วัสดุเทียบ BOQ (%) */
+export const USAGE_TOLERANCE_PERCENT = 5;
+const ACTIVE_PURCHASE = ['pending', 'approved', 'po-pending', 'ordered', 'partial', 'received'];
+const ORDERED_PURCHASE = ['ordered', 'partial', 'received'];
+
+export function materialUsage(code: string): ApiSchemas['MaterialUsage'] {
+    syncFromApprovals();
+    const rows = new Map<string, ApiSchemas['MaterialUsageRow']>();
+    const row = (item: { materialCode?: string; name: string; unit: string }) => {
+        const key = materialKey(item);
+        let current = rows.get(key);
+        if (!current) {
+            const material = findMaterial(item.materialCode);
+            current = {
+                key,
+                ...(material ? { materialCode: material.code, category: material.category } : {}),
+                name: material?.name ?? item.name,
+                unit: material?.unit ?? item.unit,
+                boqQuantity: 0,
+                requestedQuantity: 0,
+                orderedQuantity: 0,
+                receivedQuantity: 0,
+                issuedQuantity: 0,
+                returnedQuantity: 0,
+                usedQuantity: 0,
+                variance: 0,
+                variancePercent: null,
+                spent: 0,
+                status: 'ok'
+            };
+            rows.set(key, current);
+        }
+        return current;
+    };
+    const boqKeys = new Set<string>();
+    for (const item of getBoq(code).items) {
+        row(item).boqQuantity += item.quantity;
+        boqKeys.add(materialKey(item));
+    }
+    for (const purchase of purchases.filter((item) => item.projectCode === code)) {
+        purchase.items.forEach((item, index) => {
+            const target = row(item);
+            if (ACTIVE_PURCHASE.includes(purchase.status)) target.requestedQuantity += item.quantity;
+            if (ORDERED_PURCHASE.includes(purchase.status)) target.orderedQuantity += item.quantity;
+            const received = purchase.received[index] ?? 0;
+            target.receivedQuantity += received;
+            target.spent += received * (purchase.order?.unitPrices?.[index] ?? item.unitPrice);
+        });
+    }
+    for (const movement of stockMovements.filter((item) => item.projectCode === code)) {
+        const target = row(movement);
+        if (movement.type === 'issue') target.issuedQuantity += movement.quantity;
+        else target.returnedQuantity += movement.quantity;
+    }
+    const completed = currentProject(code)?.status === 'completed';
+    const tolerance = USAGE_TOLERANCE_PERCENT / 100;
+    const result = [...rows.values()].map((item) => {
+        for (const field of ['boqQuantity', 'requestedQuantity', 'orderedQuantity', 'receivedQuantity', 'issuedQuantity', 'returnedQuantity'] as const) item[field] = round2(item[field]);
+        item.spent = round2(item.spent);
+        item.usedQuantity = round2(item.receivedQuantity + item.issuedQuantity - item.returnedQuantity);
+        item.variance = round2(item.usedQuantity - item.boqQuantity);
+        const inBoq = boqKeys.has(item.key);
+        item.variancePercent = inBoq && item.boqQuantity > 0 ? round2((item.variance / item.boqQuantity) * 100) : null;
+        if (!inBoq) item.status = 'not-in-boq';
+        else if (item.usedQuantity > item.boqQuantity * (1 + tolerance)) item.status = 'over';
+        else if (item.usedQuantity >= item.boqQuantity * (1 - tolerance)) item.status = 'ok';
+        else item.status = completed ? 'under' : 'in-progress';
+        return item;
+    });
+    const order: Record<ApiSchemas['MaterialUsageStatus'], number> = { over: 0, under: 1, 'not-in-boq': 2, 'in-progress': 3, ok: 4 };
+    result.sort((a, b) => order[a.status] - order[b.status] || (a.category ?? '').localeCompare(b.category ?? '', 'th') || a.name.localeCompare(b.name, 'th'));
+    return { tolerancePercent: USAGE_TOLERANCE_PERCENT, projectCompleted: completed, rows: result };
+}
+
+/** ส่งของเหลือเข้าคลังหลัก (ไม่เกินที่ใช้จริงของโครงการ) / เบิกจากคลังหลัก (ไม่เกินคงเหลือ) */
+export function createStockMovement(code: string, input: Partial<ApiSchemas['StockMovementInput']>): Result<ApiSchemas['StockMovement']> {
+    const errors: Record<string, string> = {};
+    const type = input.type;
+    const material = findMaterial(text(input.materialCode));
+    if (input.materialCode && !material) errors['materialCode'] = 'ไม่พบวัสดุนี้ในรายการวัสดุ';
+    const name = material?.name ?? text(input.name);
+    const unit = material?.unit ?? text(input.unit);
+    const quantity = Number(input.quantity);
+    if (type !== 'return' && type !== 'issue') errors['type'] = 'กรุณาเลือกส่งคืนคลังหรือเบิกจากคลัง';
+    if (!name) errors['name'] = 'กรุณาระบุวัสดุ';
+    else tooLong(errors, 'name', name, 200);
+    if (!unit) errors['unit'] = 'กรุณาระบุหน่วย';
+    else tooLong(errors, 'unit', unit, 30);
+    if (!(quantity > 0)) errors['quantity'] = 'จำนวนต้องมากกว่า 0';
+    if (!DATE.test(input.date ?? '')) errors['date'] = 'กรุณาระบุวันที่';
+    else if (input.date! > todayIso()) errors['date'] = 'วันที่ต้องไม่เกินวันนี้';
+    tooLong(errors, 'note', text(input.note), 500);
+    if (Object.keys(errors).length) return fail(422, 'ข้อมูลไม่ถูกต้อง', errors);
+
+    const key = materialKey({ ...(material ? { materialCode: material.code } : {}), name, unit });
+    if (type === 'issue') {
+        const available = stockOf(key);
+        if (quantity > available + 1e-9) return fail(409, 'ของในคลังหลักไม่พอ', { quantity: `คงเหลือในคลังหลัก ${available} ${unit}` });
+    } else {
+        const used = materialUsage(code).rows.find((item) => item.key === key)?.usedQuantity ?? 0;
+        if (quantity > used + 1e-9) return fail(409, 'ส่งคืนเกินจำนวนที่โครงการรับไว้', { quantity: `โครงการนี้มี ${name} อยู่ ${used} ${unit}` });
+    }
+    const now = new Date();
+    const movement: ApiSchemas['StockMovement'] = {
+        id: nextNumber('SM', stockMovements.map((item) => item.id)),
+        projectCode: code,
+        type: type!,
+        ...(material ? { materialCode: material.code } : {}),
+        name,
+        unit,
+        quantity: round2(quantity),
+        date: input.date!,
+        ...(text(input.note) ? { note: text(input.note) } : {}),
+        recordedBy: author(),
+        recordedAt: now.toISOString()
+    };
+    stockMovements.push(movement);
+    recordAudit({ module: 'procurement', action: type === 'return' ? 'ส่งของเหลือเข้าคลังหลัก' : 'เบิกวัสดุจากคลังหลัก', target: `${code} ${movement.id}`, detail: `${name} ${movement.quantity} ${unit}${movement.note ? ` · ${movement.note}` : ''}` });
+    return { ok: movement };
+}
+
+export const hasBoq = (code: string) => boqs.has(code);
 
 // ใบขอซื้อ: ล่าสุดก่อนเมื่อโหลด, การเช่า: ล่าสุดก่อน
 persistArray('purchase_requests', purchases, (item) => item.id, (a, b) => b.requestedAt.localeCompare(a.requestedAt));

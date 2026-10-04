@@ -6,6 +6,7 @@ import { TaskOverrides, TimelineGenerator, isRequiredTask } from './timeline-gen
 import { recordAudit } from './audit-logs.js';
 import { defaultOptions, toPlanOptions } from './construction-options.js';
 import { PROJECT_SEED } from './project-seed.js';
+import { CURRENT_USER } from './users.js';
 import { ContractedProject, isContracted } from './shared.js';
 import { PAYMENT_SCHEDULE } from './records-generator.js';
 
@@ -183,14 +184,33 @@ function nextProjectCode(regionCode: string, openedOn: string): string {
 
 const optional = (value: string | undefined) => value?.trim() || undefined;
 
+/** โจทย์ออกแบบ: เก็บเฉพาะช่องที่กรอก */
+function cleanBrief(input: ApiSchemas['DesignBrief'] | undefined): ApiSchemas['DesignBrief'] {
+    const brief: ApiSchemas['DesignBrief'] = {};
+    if (!input) return brief;
+    for (const field of ['floors', 'bedrooms', 'bathrooms', 'parking', 'usableArea', 'landArea', 'budget'] as const) if (typeof input[field] === 'number') brief[field] = input[field];
+    if (input.style?.trim()) brief.style = input.style.trim();
+    const rooms = (input.rooms ?? []).map((room) => room.trim()).filter(Boolean);
+    if (rooms.length) brief.rooms = [...new Set(rooms)];
+    return brief;
+}
+
+/** ชื่อแบบบ้านจากโจทย์ออกแบบ เช่น "บ้าน 2 ชั้น 3 ห้องนอน (รอออกแบบ)" */
+function briefTitle(brief: ApiSchemas['DesignBrief']): string {
+    const parts = [brief.floors ? `${brief.floors} ชั้น` : '', brief.bedrooms ? `${brief.bedrooms} ห้องนอน` : '', brief.style ?? ''].filter(Boolean);
+    return `บ้าน${parts.length ? ` ${parts.join(' ')}` : 'ออกแบบเฉพาะ'} (รอออกแบบ)`;
+}
+
 /** เปิดโครงการ: ออกรหัสและบันทึกข้อมูลเบื้องต้น สถานะ pending-contract (ยังไม่มีแผนงานจนกว่าจะบันทึกสัญญา) */
 export function createProject(input: ApiSchemas['ProjectInput']): ApiSchemas['Project'] {
     const code = nextProjectCode(input.regionCode, todayIso());
+    const brief = cleanBrief(input.designBrief);
     PROJECT_SEED.push({
         code,
         name: input.name.trim(),
-        housePlanName: input.housePlanName.trim(),
+        housePlanName: optional(input.housePlanName) ?? briefTitle(brief),
         housePlanCode: optional(input.housePlanCode),
+        ...(Object.keys(brief).length ? { designBrief: brief } : {}),
         requirements: optional(input.requirements),
         location: null,
         customerName: input.customerName.trim(),
@@ -207,7 +227,7 @@ export function createProject(input: ApiSchemas['ProjectInput']): ApiSchemas['Pr
         progress: 0,
         status: 'pending-contract'
     });
-    recordAudit({ module: 'project', action: 'เปิดโครงการ', target: code, detail: `${input.customerName.trim()} · แบบบ้าน ${input.housePlanName.trim()}` });
+    recordAudit({ module: 'project', action: 'เปิดโครงการ', target: code, detail: `${input.customerName.trim()} · ${optional(input.housePlanName) ?? briefTitle(brief)}` });
     return currentProject(code)!;
 }
 
@@ -225,6 +245,21 @@ export function recordContract(code: string, input: ApiSchemas['ContractInput'])
         status: 'planning'
     } satisfies Partial<ApiSchemas['Project']>);
     recordAudit({ module: 'project', action: 'บันทึกสัญญา', target: code, detail: `฿${input.value.toLocaleString('th-TH')} · เริ่ม ${input.startDate} ส่งมอบ ${input.deliveryDate}` });
+    return currentProject(code)!;
+}
+
+/** ปักหมุดพิกัดหน้างาน (null = ลบหมุด กลับไปค้นหาจากที่ตั้งหน้างาน) */
+export function setSiteLocation(code: string, point: ApiSchemas['SiteLocationInput'] | null): ApiSchemas['Project'] {
+    const seed = findSeed(code)!;
+    if (point) {
+        const lat = Math.round(point.lat * 1e6) / 1e6;
+        const lng = Math.round(point.lng * 1e6) / 1e6;
+        seed.siteCoordinates = { lat, lng, updatedBy: { id: CURRENT_USER.id, name: CURRENT_USER.name, roleLabel: CURRENT_USER.roleLabel }, updatedAt: new Date().toISOString() };
+        recordAudit({ module: 'project', action: 'ปักหมุดที่ตั้งหน้างาน', target: code, detail: `${lat}, ${lng}` });
+    } else {
+        delete seed.siteCoordinates;
+        recordAudit({ module: 'project', action: 'ลบหมุดที่ตั้งหน้างาน', target: code });
+    }
     return currentProject(code)!;
 }
 

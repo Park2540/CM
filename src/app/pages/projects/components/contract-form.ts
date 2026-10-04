@@ -1,6 +1,6 @@
 import { DecimalPipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, OnInit, computed, inject, input, output, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, input, output, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ButtonModule } from 'primeng/button';
 import { DialogModule } from 'primeng/dialog';
@@ -8,7 +8,8 @@ import { InputNumberModule } from 'primeng/inputnumber';
 import { InputTextModule } from 'primeng/inputtext';
 import { TextareaModule } from 'primeng/textarea';
 import { ApiProblem, problemMessage } from '@/app/api/api';
-import { Project, ProjectService } from '@/app/pages/service/project.service';
+import { Project, ProjectService, SiteLocationInput } from '@/app/pages/service/project.service';
+import { SiteLocationPicker } from './site-location-picker';
 
 const todayLocal = () => new Intl.DateTimeFormat('en-CA').format(new Date());
 
@@ -21,7 +22,7 @@ function addMonths(isoDate: string, months: number): string {
 @Component({
     selector: 'app-contract-form',
     standalone: true,
-    imports: [ButtonModule, DecimalPipe, DialogModule, FormsModule, InputNumberModule, InputTextModule, TextareaModule],
+    imports: [ButtonModule, DecimalPipe, DialogModule, FormsModule, InputNumberModule, InputTextModule, SiteLocationPicker, TextareaModule],
     template: `
         <p-dialog [visible]="true" (visibleChange)="!$event && closed.emit()" [modal]="true" [draggable]="false" [style]="{ width: 'min(40rem, 95vw)' }" header="บันทึกสัญญา">
             <p class="text-sm text-muted-color mt-0 mb-5">{{ project().code }} · {{ project().name }} — ขั้นต่อไปคือตั้งค่างานก่อสร้าง ระบบจะสร้างไทม์ไลน์ให้พอดีกับระยะสัญญาและงวดงานตามมูลค่าสัญญา</p>
@@ -84,6 +85,14 @@ function addMonths(isoDate: string, months: number): string {
                         <small class="text-red-600 dark:text-red-400">{{ errors()['location'] }}</small>
                     }
                 </div>
+                <fieldset class="md:col-span-2 border-0 p-0 m-0">
+                    <legend class="text-sm font-semibold p-0 mb-1">หมุดหน้างานสำหรับนำทาง (ไม่บังคับ)</legend>
+                    <p class="text-xs text-muted-color mt-0 mb-2">{{ project().siteCoordinates ? 'ปักหมุดไว้ตั้งแต่เปิดโครงการ — แก้ได้ถ้าหน้างานจริงอยู่คนละจุด' : 'กรอกละติจูด/ลองจิจูด ระบบจะปักหมุดให้' }}</p>
+                    <app-site-location-picker [(value)]="siteCoordinates" ratio="2 / 1" />
+                    @if (errors()['siteCoordinates.lat'] || errors()['siteCoordinates.lng']) {
+                        <small class="block mt-1 text-red-600 dark:text-red-400">{{ errors()['siteCoordinates.lat'] || errors()['siteCoordinates.lng'] }}</small>
+                    }
+                </fieldset>
             </form>
 
             @if (generalError()) {
@@ -111,6 +120,8 @@ export class ContractForm implements OnInit {
     readonly startDate = signal(this.today);
     readonly deliveryDate = signal(addMonths(this.today, 9));
     readonly location = signal('');
+    readonly siteCoordinates = signal<SiteLocationInput | null>(null);
+    private readonly sitePicker = viewChild.required(SiteLocationPicker);
     readonly saving = signal(false);
     readonly errors = signal<Record<string, string>>({});
     readonly generalError = signal('');
@@ -124,18 +135,28 @@ export class ContractForm implements OnInit {
     ngOnInit() {
         // ที่อยู่ลูกค้ามักเป็นที่ตั้งหน้างาน — เติมไว้ให้แก้ได้
         this.location.set(this.project().customerAddress ?? '');
+        const pin = this.project().siteCoordinates;
+        this.siteCoordinates.set(pin ? { lat: pin.lat, lng: pin.lng } : null);
+    }
+
+    /** ส่งพิกัดเฉพาะเมื่อปักใหม่หรือย้ายหมุด (ไม่บันทึกซ้ำ) */
+    private changedPin() {
+        const next = this.siteCoordinates();
+        const current = this.project().siteCoordinates;
+        return !!next && (!current || current.lat !== next.lat || current.lng !== next.lng);
     }
 
     submit() {
         const errors: Record<string, string> = {};
         if (!this.value()) errors['value'] = 'กรุณาระบุมูลค่าสัญญา';
         if (!this.location().trim()) errors['location'] = 'กรุณาระบุที่ตั้งหน้างาน';
+        if (this.sitePicker().invalid()) errors['siteCoordinates.lat'] = 'พิกัดหน้างานไม่ถูกต้อง — แก้ไขหรือเว้นว่างทั้งสองช่อง';
         this.errors.set(errors);
         this.generalError.set('');
         if (Object.keys(errors).length) return;
 
         this.saving.set(true);
-        this.projectService.recordContract(this.project().code, { value: this.value()!, signedDate: this.signedDate(), startDate: this.startDate(), deliveryDate: this.deliveryDate(), location: this.location().trim() }).subscribe({
+        this.projectService.recordContract(this.project().code, { value: this.value()!, signedDate: this.signedDate(), startDate: this.startDate(), deliveryDate: this.deliveryDate(), location: this.location().trim(), ...(this.changedPin() ? { siteCoordinates: this.siteCoordinates()! } : {}) }).subscribe({
             next: (project) => this.saved.emit(project),
             error: (error) => {
                 this.saving.set(false);

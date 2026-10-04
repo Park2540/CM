@@ -21,6 +21,7 @@ erDiagram
         date deliveryDate
         date contractSignedAt
         string location
+        object siteCoordinates "lat, lng, updatedBy, updatedAt (หมุดสำหรับแผนที่และนำทาง Google Maps)"
         int progress
         string status
         datetime createdAt
@@ -109,14 +110,52 @@ erDiagram
         date neededDate
         string phaseCode "ขั้นตอนในไทม์ไลน์ (ไม่บังคับ)"
         string supplier "ร้านที่เสนอ"
-        array items "ProcurementItem[]: name, quantity, unit, unitPrice"
+        array items "ProcurementItem[]: materialCode, name, quantity, unit, unitPrice"
         number amount
-        string status "pending | approved | rejected | ordered | partial | received | cancelled"
-        object order "supplier, poNumber, orderDate, expectedDate, orderedBy"
+        string status "pending | approved | rejected | po-pending | ordered | partial | received | cancelled"
+        object order "PurchaseOrder: poNumber (= approvalId), status, vendor, orderDate, expectedDate, unitPrices (รวม VAT), amount, amountBeforeVat, vatAmount, paymentTerms, quotationFiles, orderedBy"
+        array rejectedOrders "ใบสั่งซื้อที่ไม่ผ่านอนุมัติ"
         array received "จำนวนที่รับแล้วต่อรายการ"
         array receipts "PurchaseReceipt[]: date, quantities, note, files (UploadedFile[]), receivedBy"
         object requestedBy "UserRef"
         string cancelReason
+    }
+
+    materials {
+        string _id PK "= code เช่น MAT-0001"
+        string name
+        string unit
+        string category
+        string spec
+        number lastPrice "ราคาล่าสุดจากใบสั่งซื้อที่อนุมัติ (รวม VAT)"
+        boolean active
+    }
+
+    project_boq {
+        string _id PK,FK "= projects.code"
+        array items "BoqItem[]: materialCode FK, name, unit, quantity, phaseCode, note"
+        object updatedBy "UserRef"
+        datetime updatedAt
+    }
+
+    stock_movements {
+        string _id PK "SM-yymm-nnnn"
+        string projectCode FK
+        string type "return (ของเหลือเข้าคลังหลัก) | issue (เบิกจากคลังหลัก)"
+        string materialCode FK
+        string name
+        string unit
+        number quantity
+        date date
+        object recordedBy "UserRef"
+    }
+
+    company_profile {
+        string _id PK "singleton"
+        string name
+        string address
+        string taxId
+        string phone
     }
 
     rentals {
@@ -273,6 +312,12 @@ erDiagram
     projects ||--o{ purchase_requests : "จัดซื้อวัสดุ"
     projects ||--o{ rentals : "เช่า/ยืมอุปกรณ์"
     purchase_requests |o--|| approvals : "approvalId / purchaseId"
+    purchase_requests |o--o{ approvals : "order.approvalId (type po) / purchaseId"
+    purchase_requests }o--o{ materials : "items.materialCode"
+    projects ||--o| project_boq : "BOQ วัสดุ"
+    project_boq }o--o{ materials : "items.materialCode"
+    projects ||--o{ stock_movements : "คืนคลัง / เบิกคลัง"
+    stock_movements }o--o| materials : "materialCode"
     rentals |o--o| approvals : "approvalId / rentalId (เฉพาะเช่า)"
     purchase_requests }o--o{ uploads : "receipts.files"
     personnel ||--o{ project_staff : "personnelId"
@@ -301,6 +346,10 @@ erDiagram
 | | `project_houses` | map | รหัสโครงการ (ข้อมูลแบบบ้านที่ผู้ตั้งค่ากรอก ภาพแปลนรายชั้น ทัศนียภาพ 4 มุม) |
 | | `purchase_requests` | array | รหัสใบขอซื้อ (= รหัสคำขออนุมัติ) |
 | | `rentals` | array | รหัสเช่า/ยืม |
+| | `project_boq` | map | รหัสโครงการ (BOQ วัสดุ) |
+| | `stock_movements` | array | รหัสรายการคลัง (ยอดคงเหลือคลังหลักคำนวณจากรายการนี้) |
+| วัสดุ | `materials` | array | รหัสวัสดุ |
+| | `company_profile` | object | `singleton` (หัวกระดาษใบสั่งซื้อ) |
 | การอนุมัติ | `approvals` | array | รหัสคำขอ |
 | | `approval_settings` | object | `singleton` |
 | บุคลากร | `personnel`, `subcontractors` | array | id |

@@ -29,6 +29,8 @@ export interface PlanTaskTemplate {
 export function includesTask(task: PlanTaskTemplate, options: SetupOptions): boolean {
     return Object.entries(task.when ?? {}).every(([key, allowed]) => {
         const value = options[key];
+        // งาน "ชั้น 2" = งานชั้นบน ใช้กับอาคาร 2 ชั้นขึ้นไป (สร้างซ้ำทีละชั้นใน timeline-generator)
+        if (key === 'floors' && allowed.includes('2') && Number(value) >= 2) return true;
         return Array.isArray(value) ? value.some((item) => allowed.includes(item)) : allowed.includes(String(value));
     });
 }

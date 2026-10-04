@@ -13,6 +13,9 @@ export type ProjectPortfolio = ApiSchemas['ProjectPortfolio'];
 export type WarrantyType = ApiSchemas['WarrantyType'];
 export type WarrantyTerm = ApiSchemas['WarrantyTerm'];
 export type WarrantyCoverage = ApiSchemas['WarrantyCoverage'];
+export type SiteLocation = ApiSchemas['SiteLocation'];
+export type DesignBrief = ApiSchemas['DesignBrief'];
+export type SiteLocationInput = ApiSchemas['SiteLocationInput'];
 
 /** ใกล้หมดประกัน: เหลือไม่เกินกี่วัน */
 export const WARRANTY_EXPIRING_DAYS = 60;
@@ -91,6 +94,16 @@ export class ProjectService {
         return this.http.post<Project>(apiUrl(`/projects/${encodeURIComponent(code)}/contract`), input);
     }
 
+    /** ปักหมุดพิกัดหน้างาน */
+    setSiteLocation(code: string, input: SiteLocationInput): Observable<Project> {
+        return this.http.put<Project>(apiUrl(`/projects/${encodeURIComponent(code)}/site-location`), input);
+    }
+
+    /** ลบหมุด (แผนที่กลับไปค้นหาจากที่ตั้งหน้างาน) */
+    clearSiteLocation(code: string): Observable<Project> {
+        return this.http.delete<Project>(apiUrl(`/projects/${encodeURIComponent(code)}/site-location`));
+    }
+
     /** จำนวนโครงการตามกลุ่มสำหรับ Dashboard */
     portfolio(): Observable<ProjectPortfolio> {
         return this.http.get<ProjectPortfolio>(apiUrl('/dashboard/projects'));
@@ -100,3 +113,42 @@ export class ProjectService {
         return this.http.get<ProjectRegion[]>(apiUrl('/settings/project-regions'));
     }
 }
+
+/** พิกัดจากข้อความ: "lat, lng" หรือลิงก์ Google Maps (…/@lat,lng,… · ?q=lat,lng · !3dlat!4dlng) */
+export function parseCoordinates(text: string): SiteLocationInput | null {
+    let value = text.trim();
+    try {
+        value = decodeURIComponent(value);
+    } catch {
+        // ข้อความมี % ที่ไม่ใช่ URL encoding — ใช้ตามที่พิมพ์
+    }
+    const number = String.raw`(-?\d+(?:\.\d+)?)`;
+    const patterns = [
+        new RegExp(`!3d${number}!4d${number}`),
+        new RegExp(`@${number},\\s*${number}`),
+        new RegExp(`[?&](?:q|query|destination|ll)=${number},\\s*${number}`),
+        new RegExp(`^${number}\\s*[,\\s]\\s*${number}$`)
+    ];
+    for (const pattern of patterns) {
+        const match = value.match(pattern);
+        if (!match) continue;
+        const lat = Number(match[1]);
+        const lng = Number(match[2]);
+        if (Math.abs(lat) <= 90 && Math.abs(lng) <= 180) return { lat, lng };
+    }
+    return null;
+}
+
+/** ปลายทางสำหรับ Google Maps: พิกัดที่ปักหมุด หรือที่ตั้งหน้างาน (ตัดหมายเหตุในวงเล็บออก) */
+export function mapDestination(project: Pick<Project, 'location' | 'siteCoordinates'>): string | null {
+    if (project.siteCoordinates) return `${project.siteCoordinates.lat},${project.siteCoordinates.lng}`;
+    const address = project.location?.replace(/\s*\([^)]*\)\s*/g, ' ').trim();
+    return address || null;
+}
+
+/** ลิงก์นำทาง Google Maps (มือถือเปิดแอป Google Maps) */
+export const directionsUrl = (destination: string) => `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}&travelmode=driving`;
+/** ลิงก์เปิดตำแหน่งใน Google Maps */
+export const mapSearchUrl = (destination: string) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(destination)}`;
+/** แผนที่ฝังในหน้า (ไม่ต้องใช้ API key) */
+export const mapEmbedUrl = (destination: string, zoom: number) => `https://maps.google.com/maps?q=${encodeURIComponent(destination)}&z=${zoom}&hl=th&output=embed`;

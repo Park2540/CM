@@ -25,7 +25,7 @@ const SEED_OWNER: CurrentUser = {
     department: 'ผู้บริหาร',
     employeeCode: 'EMP690000',
     lastLoginAt: new Date(Date.now() - 20 * 3_600_000).toISOString(),
-    permissions: ['progress.update', 'personnel.sensitive', 'finance.company', 'approval.any', 'project.create', 'project.manage', 'user.manage', 'payment.record', 'procurement.manage']
+    permissions: ['progress.update', 'personnel.sensitive', 'finance.company', 'approval.any', 'project.create', 'project.manage', 'user.manage', 'payment.record', 'procurement.manage', 'procurement.receive']
 };
 
 /** ผู้ที่ยังไม่ได้เข้าสู่ระบบ (ไม่มีสิทธิ์ใดเลย) */

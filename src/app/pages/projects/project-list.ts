@@ -43,7 +43,7 @@ const GROUPS: ProjectGroup[] = ['in-hand', 'pending-contract', 'active', 'comple
             </div>
             <p-table
                 #dt1
-                [value]="projects.value()"
+                [value]="sortedProjects()"
                 [loading]="projects.isLoading()"
                 dataKey="code"
                 [rows]="10"
@@ -141,6 +141,8 @@ export class ProjectList {
     readonly group = toSignal(this.route.queryParamMap.pipe(map((params) => ((GROUPS as string[]).includes(params.get('group') ?? '') ? (params.get('group') as ProjectGroup) : null))), { initialValue: null });
 
     readonly projects = apiResource({ params: () => ({ group: this.group() }), stream: ({ params }) => this.projectService.list(params), defaultValue: [] });
+    /** โครงการที่เปิดล่าสุดอยู่บนสุด (คลิกหัวคอลัมน์เพื่อเรียงแบบอื่นได้) */
+    readonly sortedProjects = computed(() => [...this.projects.value()].sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.code.localeCompare(a.code)));
 
     setGroup(group: ProjectGroup | null) {
         this.router.navigate([], { relativeTo: this.route, queryParams: { group }, queryParamsHandling: 'merge', replaceUrl: true });

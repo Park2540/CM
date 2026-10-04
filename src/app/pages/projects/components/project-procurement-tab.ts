@@ -25,13 +25,14 @@ import {
 } from '@/app/pages/service/procurement.service';
 import { TimelinePhase } from '@/app/pages/service/project-timeline.service';
 import { ThaiDatePipe } from '../thai-date.pipe';
+import { ProjectMaterialUsage } from './project-material-usage';
+import { PurchaseOrderForm } from './purchase-order-form';
 import { PurchaseRequestForm } from './purchase-request-form';
 import { RentalForm } from './rental-form';
 
 const todayLocal = () => new Intl.DateTimeFormat('en-CA').format(new Date());
 
 type Action =
-    | { kind: 'order'; purchase: PurchaseRequest }
     | { kind: 'receive'; purchase: PurchaseRequest }
     | { kind: 'cancel-purchase'; purchase: PurchaseRequest }
     | { kind: 'start'; rental: Rental }
@@ -40,8 +41,7 @@ type Action =
     | { kind: 'cancel-rental'; rental: Rental };
 
 const ACTION_TITLE: Record<Action['kind'], string> = {
-    order: 'บันทึกการสั่งซื้อ',
-    receive: 'รับของเข้าหน้างาน',
+    receive: 'ตรวจรับของที่หน้างาน',
     'cancel-purchase': 'ยกเลิกใบขอซื้อ',
     start: 'รับอุปกรณ์เข้าหน้างาน',
     extend: 'ขยายกำหนดคืน',
@@ -49,11 +49,16 @@ const ACTION_TITLE: Record<Action['kind'], string> = {
     'cancel-rental': 'ยกเลิกการเช่า/ยืม'
 };
 
-/** แท็บจัดซื้อ/เช่า: ใบขอซื้อ → อนุมัติ → สั่งซื้อ → รับของ และเช่า/ยืมอุปกรณ์ → รับเข้าหน้างาน → คืน */
+/**
+ * แท็บจัดซื้อ/เช่า
+ * - ใบขอซื้อ → อนุมัติ → ออกใบสั่งซื้อ (รวม VAT) → อนุมัติ → ตรวจรับที่หน้างาน
+ * - เช่า/ยืมอุปกรณ์ → รับเข้าหน้างาน → คืน
+ * - วัสดุเทียบ BOQ + ส่งของเหลือเข้าคลังหลัก / เบิกจากคลังหลัก
+ */
 @Component({
     selector: 'app-project-procurement-tab',
     standalone: true,
-    imports: [ButtonModule, DecimalPipe, DialogModule, FormsModule, InputTextModule, NgClass, PurchaseRequestForm, RentalForm, RouterLink, TagModule, TextareaModule, ThaiDatePipe],
+    imports: [ButtonModule, DecimalPipe, DialogModule, FormsModule, InputTextModule, NgClass, ProjectMaterialUsage, PurchaseOrderForm, PurchaseRequestForm, RentalForm, RouterLink, TagModule, TextareaModule, ThaiDatePipe],
     template: `
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <div class="card m-0">
@@ -90,9 +95,10 @@ const ACTION_TITLE: Record<Action['kind'], string> = {
                             <span class="w-5 h-5 rounded-full bg-red-500 text-white text-xs inline-flex items-center justify-center">{{ stats().overdue }}</span>
                         }
                     </button>
+                    <button type="button" role="tab" class="seg" [class.seg-active]="section() === 'usage'" [attr.aria-selected]="section() === 'usage'" (click)="section.set('usage')"><i class="pi pi-chart-bar"></i>วัสดุเทียบ BOQ</button>
                 </div>
                 <h2 id="procurement-heading" class="sr-only">จัดซื้อวัสดุและเช่าอุปกรณ์</h2>
-                @if (canRequest()) {
+                @if (canRequest() && section() !== 'usage') {
                     @if (section() === 'purchase') {
                         <button pButton type="button" icon="pi pi-plus" label="ขอซื้อวัสดุ" (click)="purchaseFormOpen.set(true)"></button>
                     } @else {
@@ -132,7 +138,19 @@ const ACTION_TITLE: Record<Action['kind'], string> = {
                                             @if (order.expectedDate) {
                                                 · กำหนดส่ง {{ order.expectedDate | thaiDate }}
                                             }
+                                            @if (order.paymentTerms) {
+                                                · {{ order.paymentTerms }}
+                                            }
+                                            · ออกโดย {{ order.orderedBy.name }}
                                         </div>
+                                        @if (order.quotationFiles?.length) {
+                                            <div class="text-xs mt-1">
+                                                <span class="text-muted-color">ใบเสนอราคา:</span>
+                                                @for (file of order.quotationFiles; track file.id) {
+                                                    <a [href]="file.url" target="_blank" rel="noopener" class="ml-2 text-primary"><i class="pi pi-paperclip text-[0.65rem] mr-1"></i>{{ file.name }}</a>
+                                                }
+                                            </div>
+                                        }
                                     } @else if (purchase.supplier) {
                                         <div class="text-xs text-muted-color mt-1">ร้านที่เสนอ: {{ purchase.supplier }}</div>
                                     }
@@ -141,10 +159,18 @@ const ACTION_TITLE: Record<Action['kind'], string> = {
                                     } @else if (purchase.decisionNote && purchase.status === 'rejected') {
                                         <div class="text-xs text-muted-color mt-1">เหตุผลที่ไม่อนุมัติ: {{ purchase.decisionNote }}</div>
                                     }
+                                    @for (rejected of purchase.rejectedOrders ?? []; track rejected.poNumber) {
+                                        <div class="text-xs mt-1 text-orange-700 dark:text-orange-300"><i class="pi pi-times-circle text-[0.65rem] mr-1"></i>ใบสั่งซื้อ {{ rejected.poNumber }} ({{ rejected.supplier }} ฿{{ rejected.amount | number: '1.0-0' }}) ไม่ผ่านอนุมัติ{{ rejected.decisionNote ? ': ' + rejected.decisionNote : '' }}</div>
+                                    }
                                 </div>
                                 <div class="text-right">
-                                    <div class="text-lg font-bold">฿{{ purchase.amount | number: '1.0-0' }}</div>
-                                    <div class="text-xs text-muted-color">{{ purchase.items.length }} รายการ</div>
+                                    @if (purchase.order?.amount !== undefined) {
+                                        <div class="text-lg font-bold">฿{{ purchase.order!.amount | number: '1.2-2' }}</div>
+                                        <div class="text-xs text-muted-color">ใบสั่งซื้อ (รวม VAT) · ประมาณ ฿{{ purchase.amount | number: '1.0-0' }}</div>
+                                    } @else {
+                                        <div class="text-lg font-bold">฿{{ purchase.amount | number: '1.0-0' }}</div>
+                                        <div class="text-xs text-muted-color">ประมาณ · {{ purchase.items.length }} รายการ</div>
+                                    }
                                 </div>
                             </div>
 
@@ -156,7 +182,7 @@ const ACTION_TITLE: Record<Action['kind'], string> = {
                                             <tr class="text-left text-muted-color border-b border-surface">
                                                 <th class="py-1 pr-2 font-semibold">รายการ</th>
                                                 <th class="py-1 pr-2 font-semibold text-right">จำนวน</th>
-                                                <th class="py-1 pr-2 font-semibold text-right">ราคา/หน่วย</th>
+                                                <th class="py-1 pr-2 font-semibold text-right">{{ purchase.order ? 'ราคา/หน่วย (รวม VAT)' : 'ราคา/หน่วย (ประมาณ)' }}</th>
                                                 @if (showReceived(purchase)) {
                                                     <th class="py-1 font-semibold text-right">รับแล้ว</th>
                                                 }
@@ -167,7 +193,7 @@ const ACTION_TITLE: Record<Action['kind'], string> = {
                                                 <tr class="border-b border-surface last:border-b-0">
                                                     <td class="py-1 pr-2">{{ item.name }}</td>
                                                     <td class="py-1 pr-2 text-right tabular-nums">{{ item.quantity | number: '1.0-2' }} {{ item.unit }}</td>
-                                                    <td class="py-1 pr-2 text-right tabular-nums">{{ item.unitPrice | number: '1.0-2' }}</td>
+                                                    <td class="py-1 pr-2 text-right tabular-nums">{{ purchase.order?.unitPrices?.[i] ?? item.unitPrice | number: '1.0-2' }}</td>
                                                     @if (showReceived(purchase)) {
                                                         <td class="py-1 text-right tabular-nums" [ngClass]="receivedAt(purchase, i) >= item.quantity ? 'text-green-700 dark:text-green-400' : 'text-orange-700 dark:text-orange-300'">
                                                             {{ receivedAt(purchase, i) | number: '1.0-2' }} / {{ item.quantity | number: '1.0-2' }}
@@ -192,16 +218,19 @@ const ACTION_TITLE: Record<Action['kind'], string> = {
                             </details>
 
                             <div class="flex flex-wrap gap-2 mt-3">
-                                @if (purchase.status === 'pending') {
+                                @if (purchase.status === 'pending' || purchase.status === 'po-pending') {
                                     <a pButton routerLink="/approvals" [text]="true" size="small" icon="pi pi-inbox" label="ดูในศูนย์อนุมัติ"></a>
                                 }
                                 @if (canManage() && purchase.status === 'approved') {
-                                    <button pButton type="button" size="small" icon="pi pi-shopping-cart" label="บันทึกการสั่งซื้อ" (click)="open({ kind: 'order', purchase })"></button>
+                                    <button pButton type="button" size="small" icon="pi pi-file-edit" [label]="purchase.rejectedOrders?.length ? 'ออกใบสั่งซื้อใหม่' : 'ออกใบสั่งซื้อ'" (click)="ordering.set(purchase)"></button>
                                 }
-                                @if (canManage() && (purchase.status === 'ordered' || purchase.status === 'partial')) {
-                                    <button pButton type="button" size="small" icon="pi pi-box" label="รับของ" (click)="open({ kind: 'receive', purchase })"></button>
+                                @if (canReceive() && (purchase.status === 'ordered' || purchase.status === 'partial')) {
+                                    <button pButton type="button" size="small" icon="pi pi-box" label="ตรวจรับของ" (click)="open({ kind: 'receive', purchase })"></button>
                                 }
-                                @if (canCancel(purchase) && ['pending', 'approved', 'ordered'].includes(purchase.status)) {
+                                @if (purchase.order) {
+                                    <a pButton [routerLink]="['/print/purchase-order', projectCode(), purchase.id]" target="_blank" [outlined]="true" size="small" icon="pi pi-print" label="พิมพ์ใบสั่งซื้อ"></a>
+                                }
+                                @if (canCancel(purchase) && ['pending', 'approved', 'po-pending', 'ordered'].includes(purchase.status)) {
                                     <button pButton type="button" [text]="true" size="small" severity="danger" icon="pi pi-times" label="ยกเลิก" (click)="open({ kind: 'cancel-purchase', purchase })"></button>
                                 }
                             </div>
@@ -210,7 +239,7 @@ const ACTION_TITLE: Record<Action['kind'], string> = {
                         <li class="text-center text-muted-color py-10">{{ purchasesResource.isLoading() ? 'กำลังโหลด...' : 'ยังไม่มีใบขอซื้อวัสดุ' }}</li>
                     }
                 </ul>
-            } @else {
+            } @else if (section() === 'rental') {
                 <ul class="list-none p-0 m-0 flex flex-col gap-3">
                     @for (rental of rentals(); track rental.id) {
                         <li class="border rounded-lg p-4" [ngClass]="rental.overdue ? 'border-red-300 dark:border-red-500/50' : 'border-surface'" [class.opacity-70]="rental.status === 'cancelled' || rental.status === 'rejected'">
@@ -269,10 +298,10 @@ const ACTION_TITLE: Record<Action['kind'], string> = {
                                 @if (rental.status === 'pending') {
                                     <a pButton routerLink="/approvals" [text]="true" size="small" icon="pi pi-inbox" label="ดูในศูนย์อนุมัติ"></a>
                                 }
-                                @if (canManage() && rental.status === 'approved') {
+                                @if (canReceive() && rental.status === 'approved') {
                                     <button pButton type="button" size="small" icon="pi pi-sign-in" label="รับเข้าหน้างาน" (click)="open({ kind: 'start', rental })"></button>
                                 }
-                                @if (canManage() && rental.status === 'in-use') {
+                                @if (canReceive() && rental.status === 'in-use') {
                                     <button pButton type="button" size="small" icon="pi pi-sign-out" label="คืนอุปกรณ์" (click)="open({ kind: 'return', rental })"></button>
                                 }
                                 @if (canManage() && (rental.status === 'approved' || rental.status === 'in-use')) {
@@ -287,11 +316,16 @@ const ACTION_TITLE: Record<Action['kind'], string> = {
                         <li class="text-center text-muted-color py-10">{{ rentalsResource.isLoading() ? 'กำลังโหลด...' : 'ยังไม่มีการเช่า/ยืมอุปกรณ์' }}</li>
                     }
                 </ul>
+            } @else {
+                <app-project-material-usage [projectCode]="projectCode()" [phases]="phases()" [refreshKey]="usageRefresh()" (notify)="notify.emit($event)" />
             }
         </section>
 
         @if (purchaseFormOpen()) {
             <app-purchase-request-form [projectCode]="projectCode()" [phases]="phases()" (saved)="onCreated('ส่งใบขอซื้อ ' + $event.id + ' เข้าศูนย์อนุมัติแล้ว')" (closed)="purchaseFormOpen.set(false)" />
+        }
+        @if (ordering(); as purchase) {
+            <app-purchase-order-form [projectCode]="projectCode()" [purchase]="purchase" (saved)="onOrdered($event)" (closed)="ordering.set(null)" />
         }
         @if (rentalFormOpen()) {
             <app-rental-form [projectCode]="projectCode()" [phases]="phases()" (saved)="onCreated(($event.source === 'rent' ? 'ส่งขออนุมัติเช่า ' : 'บันทึกการยืม ') + $event.id + ' แล้ว')" (closed)="rentalFormOpen.set(false)" />
@@ -300,25 +334,6 @@ const ACTION_TITLE: Record<Action['kind'], string> = {
         @if (action(); as current) {
             <p-dialog [visible]="true" (visibleChange)="!$event && !busy() && action.set(null)" [modal]="true" [draggable]="false" [closable]="!busy()" [style]="{ width: current.kind === 'receive' ? 'min(40rem, 96vw)' : 'min(30rem, 96vw)' }" [header]="actionTitle[current.kind]">
                 @switch (current.kind) {
-                    @case ('order') {
-                        <p class="mt-0 text-sm">{{ current.purchase.id }} · {{ current.purchase.title }} · ฿{{ current.purchase.amount | number: '1.0-0' }}</p>
-                        <div class="flex flex-col gap-3">
-                            <label class="text-sm font-semibold">ร้านค้า <span class="text-red-600">*</span>
-                                <input pInputText class="w-full mt-1 font-normal" maxlength="200" [ngModel]="form().supplier" (ngModelChange)="patch({ supplier: $event })" [attr.aria-invalid]="!!errors()['supplier']" />
-                            </label>
-                            <label class="text-sm font-semibold">เลขที่ใบสั่งซื้อ
-                                <input pInputText class="w-full mt-1 font-normal" maxlength="50" placeholder="ไม่ระบุ = ระบบออกเลขให้" [ngModel]="form().poNumber" (ngModelChange)="patch({ poNumber: $event })" />
-                            </label>
-                            <div class="grid grid-cols-2 gap-3">
-                                <label class="text-sm font-semibold">วันที่สั่งซื้อ <span class="text-red-600">*</span>
-                                    <input pInputText type="date" class="w-full mt-1 font-normal" [max]="today" [ngModel]="form().date" (ngModelChange)="patch({ date: $event })" />
-                                </label>
-                                <label class="text-sm font-semibold">กำหนดส่งของ
-                                    <input pInputText type="date" class="w-full mt-1 font-normal" [min]="form().date" [ngModel]="form().expectedDate" (ngModelChange)="patch({ expectedDate: $event })" />
-                                </label>
-                            </div>
-                        </div>
-                    }
                     @case ('receive') {
                         <p class="mt-0 text-sm">{{ current.purchase.order?.poNumber }} · {{ current.purchase.order?.supplier }}</p>
                         <label class="text-sm font-semibold block mb-3">วันที่รับของ <span class="text-red-600">*</span>
@@ -464,7 +479,10 @@ export class ProjectProcurementTab {
     readonly today = todayLocal();
     readonly conditions = (Object.keys(RETURN_CONDITION_LABEL) as Array<keyof typeof RETURN_CONDITION_LABEL>).map((value) => ({ value, label: RETURN_CONDITION_LABEL[value] }));
 
-    readonly section = signal<'purchase' | 'rental'>('purchase');
+    readonly section = signal<'purchase' | 'rental' | 'usage'>('purchase');
+    readonly ordering = signal<PurchaseRequest | null>(null);
+    /** เปลี่ยนเมื่อรับของ → ตารางเทียบ BOQ โหลดใหม่ */
+    readonly usageRefresh = signal(0);
     readonly purchaseFormOpen = signal(false);
     readonly rentalFormOpen = signal(false);
 
@@ -479,16 +497,18 @@ export class ProjectProcurementTab {
 
     /** ขอซื้อ/ขอเช่า: ทีมหน้างาน ผู้จัดการโครงการ ฝ่ายจัดซื้อ (หลังบ้านตรวจซ้ำ) */
     readonly canRequest = computed(() => this.auth.can('progress.update') || this.auth.can('project.manage') || this.auth.can('procurement.manage'));
-    /** สั่งซื้อ รับของ รับ/คืนอุปกรณ์ */
+    /** ออกใบสั่งซื้อ ขยายเวลาเช่า */
     readonly canManage = computed(() => this.auth.can('procurement.manage'));
+    /** ตรวจรับของ รับ/คืนอุปกรณ์: ผู้จัดการโครงการ วิศวกร โฟร์แมน เจ้าของบริษัท (หรือฝ่ายจัดซื้อ) */
+    readonly canReceive = computed(() => this.auth.can('procurement.receive') || this.auth.can('procurement.manage'));
 
     readonly stats = computed(() => {
         const active = this.purchases().filter((p) => p.status !== 'rejected' && p.status !== 'cancelled');
         const ordered = active.filter((p) => ['ordered', 'partial', 'received'].includes(p.status));
         return {
             requested: active.reduce((sum, p) => sum + p.amount, 0),
-            pendingCount: active.filter((p) => p.status === 'pending').length,
-            ordered: ordered.reduce((sum, p) => sum + p.amount, 0),
+            pendingCount: active.filter((p) => p.status === 'pending' || p.status === 'po-pending').length,
+            ordered: ordered.reduce((sum, p) => sum + (p.order?.amount ?? p.amount), 0),
             awaitingDelivery: active.filter((p) => p.status === 'ordered' || p.status === 'partial').length,
             rentCost: this.rentals().reduce((sum, r) => sum + r.cost, 0),
             inUse: this.rentals().filter((r) => r.status === 'in-use').length,
@@ -513,6 +533,12 @@ export class ProjectProcurementTab {
         return phase ? `ขั้นตอนที่ ${phase.step} ${phase.shortName}` : '';
     }
 
+    onOrdered(purchase: PurchaseRequest) {
+        this.ordering.set(null);
+        this.reload();
+        this.notify.emit(`ส่งใบสั่งซื้อ ${purchase.order?.poNumber ?? ''} เข้าศูนย์อนุมัติแล้ว`);
+    }
+
     onCreated(message: string) {
         this.purchaseFormOpen.set(false);
         this.rentalFormOpen.set(false);
@@ -522,7 +548,7 @@ export class ProjectProcurementTab {
 
     // ---------- หน้าต่างดำเนินการ (สั่งซื้อ รับของ ยกเลิก รับเข้า ขยายเวลา คืน) ----------
     readonly action = signal<Action | null>(null);
-    readonly form = signal<{ supplier: string; poNumber: string; date: string; expectedDate: string; note: string; condition: 'good' | 'damaged' | 'lost'; quantities: number[] }>(this.emptyForm());
+    readonly form = signal<{ date: string; note: string; condition: 'good' | 'damaged' | 'lost'; quantities: number[] }>(this.emptyForm());
     readonly files = signal<UploadedFile[]>([]);
     readonly uploading = signal(0);
     readonly busy = signal(false);
@@ -532,12 +558,11 @@ export class ProjectProcurementTab {
     readonly fieldErrors = computed(() => Object.entries(this.errors()).filter(([key]) => !key.startsWith('quantities.')).map(([, message]) => message));
 
     private emptyForm() {
-        return { supplier: '', poNumber: '', date: todayLocal(), expectedDate: '', note: '', condition: 'good' as 'good' | 'damaged' | 'lost', quantities: [] as number[] };
+        return { date: todayLocal(), note: '', condition: 'good' as 'good' | 'damaged' | 'lost', quantities: [] as number[] };
     }
 
     open(action: Action) {
         const form = this.emptyForm();
-        if (action.kind === 'order') form.supplier = action.purchase.supplier ?? '';
         if (action.kind === 'receive') form.quantities = action.purchase.items.map((item, i) => Math.max(0, item.quantity - this.receivedAt(action.purchase, i)));
         if (action.kind === 'extend') form.date = '';
         this.form.set(form);
@@ -591,10 +616,6 @@ export class ProjectProcurementTab {
         let request: Observable<unknown>;
         let message: string;
         switch (action.kind) {
-            case 'order':
-                request = this.service.order(code, action.purchase.id, { supplier: form.supplier.trim(), orderDate: form.date, ...(form.poNumber.trim() ? { poNumber: form.poNumber.trim() } : {}), ...(form.expectedDate ? { expectedDate: form.expectedDate } : {}) });
-                message = `บันทึกการสั่งซื้อ ${action.purchase.id} แล้ว`;
-                break;
             case 'receive':
                 request = this.service.receive(code, action.purchase.id, { date: form.date, quantities: form.quantities, ...(note ? { note } : {}), fileIds: this.files().map((file) => file.id) });
                 message = `บันทึกรับของ ${action.purchase.id} แล้ว`;
@@ -642,5 +663,6 @@ export class ProjectProcurementTab {
     private reload() {
         this.purchasesResource.reload();
         this.rentalsResource.reload();
+        this.usageRefresh.update((n) => n + 1);
     }
 }

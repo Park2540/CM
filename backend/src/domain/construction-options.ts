@@ -28,9 +28,18 @@ const OPTION_DEFINITIONS: Omit<OptionGroup, 'affectsPhases'>[] = [
         label: 'จำนวนชั้น',
         type: 'single',
         default: '2',
+        description: 'บ้านพักอาศัยไม่เกิน 3 ชั้น · อาคารพาณิชย์ไม่เกิน 8 ชั้น',
+        // ชั้น 2 ขึ้นไป: งาน "ชั้น 2" ในแม่แบบถูกสร้างซ้ำทีละชั้น (timeline-generator)
         choices: [
             { value: '1', label: '1 ชั้น' },
-            { value: '2', label: '2 ชั้น', description: 'เพิ่มงานโครงสร้าง ผนัง ฝ้า พื้น และงานระบบของชั้น 2' }
+            { value: '2', label: '2 ชั้น', description: 'เพิ่มงานโครงสร้าง ผนัง ฝ้า พื้น และงานระบบของชั้น 2' },
+            { value: '3', label: '3 ชั้น', description: 'เพิ่มงานโครงสร้าง ผนัง ฝ้า พื้น และงานระบบของชั้น 2–3' },
+            ...[4, 5, 6, 7, 8].map((floors) => ({
+                value: String(floors),
+                label: `${floors} ชั้น`,
+                description: `งานชั้นบน ชั้น 2–${floors} · เฉพาะอาคารพาณิชย์`,
+                visibleWhen: { key: 'buildingType', values: ['commercial'] }
+            }))
         ]
     },
     {
@@ -229,6 +238,13 @@ export function normalizeOptions(input: Options | undefined): { options: Options
         const value = input?.[group.key] ?? group.default;
         const allowed = group.choices.map((choice) => choice.value);
         if (group.type === 'single' && !(typeof value === 'string' && allowed.includes(value))) errors[group.key] = `กรุณาเลือก${group.label}`;
+        else if (group.type === 'single' && input) {
+            // ตัวเลือกที่ใช้ได้เฉพาะบางกรณี เช่น 4-8 ชั้นเฉพาะอาคารพาณิชย์
+            const choice = group.choices.find((item) => item.value === value);
+            const when = choice?.visibleWhen;
+            const other = when ? (input[when.key] ?? CONSTRUCTION_OPTIONS.find((item) => item.key === when.key)?.default) : undefined;
+            if (when && !when.values.includes(String(other))) errors[group.key] = group.key === 'floors' ? 'บ้านพักอาศัยสูงได้ไม่เกิน 3 ชั้น (4-8 ชั้นเลือกได้เมื่อเป็นอาคารพาณิชย์)' : `${choice!.label} ใช้ไม่ได้กับตัวเลือกที่เลือกไว้`;
+        }
         else if (group.type === 'multiple' && !(Array.isArray(value) && value.every((item) => allowed.includes(item)))) errors[group.key] = `${group.label}ไม่ถูกต้อง`;
         else if (group.type === 'boolean' && typeof value !== 'boolean') errors[group.key] = `${group.label}ต้องเป็นใช่/ไม่ใช่`;
         options[group.key] = Array.isArray(value) ? allowed.filter((item) => value.includes(item)) : value;

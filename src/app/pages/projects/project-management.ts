@@ -10,7 +10,7 @@ import { ToastModule } from 'primeng/toast';
 import { problemMessage } from '@/app/api/api';
 import { AuthService } from '@/app/pages/service/auth.service';
 import { ProgressUpdate, ProjectProgressService } from '@/app/pages/service/project-progress.service';
-import { PROJECT_STATUS_LABEL, Project, ProjectService, getProjectSeverity, isContracted } from '@/app/pages/service/project.service';
+import { PROJECT_STATUS_LABEL, Project, ProjectService, directionsUrl, getProjectSeverity, isContracted, mapDestination } from '@/app/pages/service/project.service';
 import { HttpErrorResponse } from '@angular/common/http';
 import { TimelinePhase, TimelineTask, todayAsDate } from '@/app/pages/service/project-timeline.service';
 import { ContractForm } from './components/contract-form';
@@ -29,6 +29,7 @@ import { ProjectStepsOverview } from './components/project-steps-overview';
 import { ProjectTimelineTab } from './components/project-timeline-tab';
 import { ProjectChangeOrdersTab } from './components/project-change-orders-tab';
 import { ProjectProcurementTab } from './components/project-procurement-tab';
+import { ProjectSiteMap } from './components/project-site-map';
 import { ChangeOrderService } from '@/app/pages/service/change-order.service';
 import { ProjectModel } from '@/app/pages/service/project-model.service';
 import { PROJECT_TABS, ProjectTab } from './components/project-ui';
@@ -61,6 +62,7 @@ const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
         ProjectPlanTab,
         ProjectChangeOrdersTab,
         ProjectProcurementTab,
+        ProjectSiteMap,
         ProjectStepsOverview,
         ProjectTimelineTab,
         RecentPhotosCard,
@@ -95,9 +97,12 @@ const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
                         </div>
                     </div>
                     <h1 class="text-2xl font-bold m-0">{{ project.name }}</h1>
-                    <div class="flex items-center gap-2 text-muted-color mt-2">
+                    <div class="flex flex-wrap items-center gap-2 text-muted-color mt-2">
                         <i class="pi pi-map-marker"></i>
                         <span>{{ project.location }}</span>
+                        @if (navigateUrl(); as url) {
+                            <a [href]="url" target="_blank" rel="noopener" class="text-primary text-sm font-semibold no-underline hover:underline"><i class="pi pi-directions text-xs mr-1"></i>นำทาง</a>
+                        }
                     </div>
                     <dl class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 mb-0">
                         <div>
@@ -215,6 +220,7 @@ const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
                                 </div>
                                 <aside class="col-span-12 xl:col-span-4 flex flex-col gap-6">
                                     <app-owner-actions-card [actions]="ownerActions()" (navigate)="setTab($event)" />
+                                    <app-project-site-map [project]="project" [canManage]="canManage()" (changed)="onSiteLocationChanged($event)" />
                                     <app-team-card [team]="team()" />
                                     <app-hold-points-card [phases]="timeline.phases" />
                                     <app-milestones-card [phases]="timeline.phases" />
@@ -388,18 +394,43 @@ const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
                     </dl>
                 </section>
                 <section class="card m-0 col-span-12 lg:col-span-7" aria-labelledby="requested-plan-heading">
-                    <h2 id="requested-plan-heading" class="text-lg font-semibold m-0 mb-4">แบบบ้านที่ลูกค้าต้องการ</h2>
+                    <h2 id="requested-plan-heading" class="text-lg font-semibold m-0 mb-4">ความต้องการของลูกค้า</h2>
                     <div class="flex items-start gap-3">
                         <i class="pi pi-home text-xl text-primary mt-1"></i>
                         <div>
                             <div class="font-semibold">{{ project.housePlanName }}</div>
-                            <div class="text-sm text-muted-color mt-1">{{ project.housePlanCode ? 'แบบจากคลังแบบบ้าน ดูแปลนและโมเดล 3D ด้านล่าง' : 'แบบที่กำหนดเอง ยังไม่มีแปลนในระบบ' }}</div>
+                            <div class="text-sm text-muted-color mt-1">{{ project.housePlanCode ? 'แบบจากคลังแบบบ้าน ดูแปลนและโมเดล 3D ด้านล่าง' : 'โจทย์สำหรับออกแบบ — แนบแบบและโมเดล 3D ได้ด้านล่างเมื่อออกแบบแล้ว' }}</div>
                         </div>
                     </div>
-                    <h3 class="text-sm font-semibold mt-5 mb-2">ความต้องการเพิ่มเติม</h3>
+                    @if (briefFacts(); as facts) {
+                        @if (facts.length) {
+                            <dl class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 mb-0">
+                                @for (fact of facts; track fact.label) {
+                                    <div class="rounded-lg bg-emphasis px-3 py-2">
+                                        <dt class="text-xs text-muted-color">{{ fact.label }}</dt>
+                                        <dd class="m-0 font-semibold">{{ fact.value }}</dd>
+                                    </div>
+                                }
+                            </dl>
+                        }
+                    }
+                    @if (project.designBrief?.rooms?.length) {
+                        <div class="flex flex-wrap gap-2 mt-3">
+                            @for (room of project.designBrief!.rooms!; track room) {
+                                <span class="text-xs px-2 py-1 rounded-full border border-surface">{{ room }}</span>
+                            }
+                        </div>
+                    }
+                    <h3 class="text-sm font-semibold mt-5 mb-2">รายละเอียดเพิ่มเติม</h3>
                     <p class="m-0 whitespace-pre-line" [class.text-muted-color]="!project.requirements">{{ project.requirements || 'ยังไม่ได้ระบุ' }}</p>
                 </section>
             </div>
+
+            @if (navigateUrl() || canManage()) {
+                <div class="mb-6 max-w-xl">
+                    <app-project-site-map [project]="project" [canManage]="canManage()" (changed)="onSiteLocationChanged($event)" />
+                </div>
+            }
 
             <!-- แนบแบบ 3 มิติได้ตั้งแต่ยังไม่เซ็นสัญญา (เช่น แบบที่เสนอลูกค้า) -->
             @if (!housePlanResource.isLoading()) {
@@ -559,6 +590,35 @@ export class ProjectManagement {
             }));
         return [...payments, ...tasks];
     });
+
+    /** ลิงก์นำทาง Google Maps ไปหน้างาน (หมุดที่ปักไว้ หรือที่ตั้งหน้างาน) */
+    readonly navigateUrl = computed(() => {
+        const project = this.project();
+        const destination = project ? mapDestination(project) : null;
+        return destination ? directionsUrl(destination) : null;
+    });
+
+    /** โจทย์ออกแบบที่กรอกตอนเปิดโครงการ (เฉพาะช่องที่มีค่า) */
+    readonly briefFacts = computed(() => {
+        const brief = this.project()?.designBrief;
+        if (!brief) return [];
+        const number = (value: number) => value.toLocaleString('th-TH');
+        return [
+            brief.floors ? { label: 'จำนวนชั้น', value: `${brief.floors} ชั้น` } : null,
+            brief.bedrooms !== undefined ? { label: 'ห้องนอน', value: `${brief.bedrooms} ห้อง` } : null,
+            brief.bathrooms !== undefined ? { label: 'ห้องน้ำ', value: `${brief.bathrooms} ห้อง` } : null,
+            brief.parking !== undefined ? { label: 'ที่จอดรถ', value: `${brief.parking} คัน` } : null,
+            brief.usableArea ? { label: 'พื้นที่ใช้สอย', value: `~${number(brief.usableArea)} ตร.ม.` } : null,
+            brief.landArea ? { label: 'ขนาดที่ดิน', value: `${number(brief.landArea)} ตร.ว.` } : null,
+            brief.budget ? { label: 'งบประมาณ', value: `฿${number(brief.budget)}` } : null,
+            brief.style ? { label: 'สไตล์', value: brief.style } : null
+        ].filter((fact): fact is { label: string; value: string } => !!fact);
+    });
+
+    onSiteLocationChanged(project: Project) {
+        this.projectResource.set(project);
+        this.messages.add({ severity: 'success', summary: project.siteCoordinates ? 'บันทึกหมุดที่ตั้งหน้างานแล้ว' : 'ลบหมุดที่ตั้งหน้างานแล้ว' });
+    }
 
     onContracted(project: Project) {
         this.contractFormOpen.set(false);

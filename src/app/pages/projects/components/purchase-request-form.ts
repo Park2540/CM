@@ -7,8 +7,10 @@ import { DialogModule } from 'primeng/dialog';
 import { InputTextModule } from 'primeng/inputtext';
 import { TextareaModule } from 'primeng/textarea';
 import { ApiProblem, problemMessage } from '@/app/api/api';
+import { apiResource } from '@/app/api/api-resource';
 import { ProcurementItem, ProcurementService, PurchaseRequest } from '@/app/pages/service/procurement.service';
 import { TimelinePhase } from '@/app/pages/service/project-timeline.service';
+import { findMaterialByText, materialLabel } from './material-picker';
 
 const todayLocal = () => new Intl.DateTimeFormat('en-CA').format(new Date());
 const emptyItem = (): ProcurementItem => ({ name: '', quantity: 1, unit: '', unitPrice: 0 });
@@ -58,6 +60,11 @@ const emptyItem = (): ProcurementItem => ({ name: '', quantity: 1, unit: '', uni
                         <small class="block mb-2 text-red-600 dark:text-red-400">{{ errors()['items'] }}</small>
                     }
                     <div class="overflow-x-auto">
+                        <datalist id="pr-materials">
+                            @for (material of materials(); track material.code) {
+                                <option [value]="label(material)">{{ material.lastPrice ? '฿' + material.lastPrice + '/' + material.unit : material.category }}</option>
+                            }
+                        </datalist>
                         <table class="w-full text-sm border-collapse" style="min-width: 36rem">
                             <thead>
                                 <tr class="text-left text-muted-color border-b border-surface">
@@ -73,13 +80,18 @@ const emptyItem = (): ProcurementItem => ({ name: '', quantity: 1, unit: '', uni
                                 @for (item of items(); track $index; let i = $index) {
                                     <tr class="border-b border-surface align-top">
                                         <td class="py-1 pr-2">
-                                            <input pInputText class="w-full" maxlength="200" [attr.aria-label]="'ชื่อรายการที่ ' + (i + 1)" [value]="item.name" (input)="patch(i, { name: $any($event.target).value })" [attr.aria-invalid]="!!errors()['items.' + i + '.name']" />
+                                            <input pInputText class="w-full" maxlength="200" list="pr-materials" placeholder="พิมพ์หรือเลือกจากรายการวัสดุ" [attr.aria-label]="'ชื่อรายการที่ ' + (i + 1)" [value]="texts()[i] || item.name" (input)="setName(i, $any($event.target).value)" [attr.aria-invalid]="!!errors()['items.' + i + '.name']" />
+                                            @if (item.materialCode) {
+                                                <small class="text-xs text-green-700 dark:text-green-400"><i class="pi pi-check text-[0.6rem] mr-1"></i>{{ item.materialCode }}</small>
+                                            } @else if (item.name.trim()) {
+                                                <small class="text-xs text-muted-color">ไม่อยู่ในรายการวัสดุ (เทียบ BOQ ด้วยชื่อ+หน่วย)</small>
+                                            }
                                         </td>
                                         <td class="py-1 pr-2">
                                             <input pInputText type="number" min="0" step="any" class="w-full text-right" [attr.aria-label]="'จำนวนรายการที่ ' + (i + 1)" [value]="item.quantity" (input)="patch(i, { quantity: +$any($event.target).value })" [attr.aria-invalid]="!!errors()['items.' + i + '.quantity']" />
                                         </td>
                                         <td class="py-1 pr-2">
-                                            <input pInputText class="w-full" maxlength="30" placeholder="ถุง" [attr.aria-label]="'หน่วยรายการที่ ' + (i + 1)" [value]="item.unit" (input)="patch(i, { unit: $any($event.target).value })" [attr.aria-invalid]="!!errors()['items.' + i + '.unit']" />
+                                            <input pInputText class="w-full" maxlength="30" placeholder="ถุง" [attr.aria-label]="'หน่วยรายการที่ ' + (i + 1)" [value]="item.unit" [readonly]="!!item.materialCode" (input)="patch(i, { unit: $any($event.target).value })" [attr.aria-invalid]="!!errors()['items.' + i + '.unit']" />
                                         </td>
                                         <td class="py-1 pr-2">
                                             <input pInputText type="number" min="0" step="any" class="w-full text-right" [attr.aria-label]="'ราคาต่อหน่วยรายการที่ ' + (i + 1)" [value]="item.unitPrice" (input)="patch(i, { unitPrice: +$any($event.target).value })" />
@@ -141,6 +153,11 @@ export class PurchaseRequestForm {
     readonly supplier = signal('');
     readonly note = signal('');
     readonly items = signal<ProcurementItem[]>([emptyItem()]);
+    /** ข้อความในช่องชื่อ (แสดง "ชื่อ (หน่วย)" เมื่อเลือกจากรายการวัสดุ) */
+    readonly texts = signal<string[]>(['']);
+    readonly materialsResource = apiResource({ stream: () => this.service.materials(), defaultValue: [] });
+    readonly materials = computed(() => this.materialsResource.value().filter((item) => item.active));
+    readonly label = materialLabel;
     readonly saving = signal(false);
     readonly errors = signal<Record<string, string>>({});
     readonly generalError = signal('');
@@ -148,10 +165,25 @@ export class PurchaseRequestForm {
 
     addItem() {
         this.items.update((items) => [...items, emptyItem()]);
+        this.texts.update((texts) => [...texts, '']);
     }
 
     removeItem(index: number) {
         this.items.update((items) => items.filter((_, i) => i !== index));
+        this.texts.update((texts) => texts.filter((_, i) => i !== index));
+    }
+
+    /** เลือกจากรายการวัสดุ: ใช้ชื่อ หน่วย และราคาล่าสุด (ถ้ายังไม่ได้ใส่ราคา) */
+    setName(index: number, text: string) {
+        this.texts.update((texts) => texts.map((value, i) => (i === index ? text : value)));
+        const material = findMaterialByText(this.materials(), text);
+        const current = this.items()[index]!;
+        if (material) {
+            this.texts.update((texts) => texts.map((value, i) => (i === index ? materialLabel(material) : value)));
+            this.patch(index, { materialCode: material.code, name: material.name, unit: material.unit, unitPrice: current.unitPrice || material.lastPrice || 0 });
+        } else {
+            this.patch(index, { materialCode: undefined, name: text, unit: current.materialCode ? '' : current.unit });
+        }
     }
 
     patch(index: number, change: Partial<ProcurementItem>) {
@@ -177,7 +209,7 @@ export class PurchaseRequestForm {
             .createPurchase(this.projectCode(), {
                 title: this.title().trim(),
                 neededDate: this.neededDate(),
-                items: this.items().map((item) => ({ ...item, name: item.name.trim(), unit: item.unit.trim(), unitPrice: item.unitPrice || 0 })),
+                items: this.items().map(({ materialCode, ...item }) => ({ ...(materialCode ? { materialCode } : {}), ...item, name: item.name.trim(), unit: item.unit.trim(), unitPrice: item.unitPrice || 0 })),
                 ...(this.phaseCode() ? { phaseCode: this.phaseCode() } : {}),
                 ...(this.supplier().trim() ? { supplier: this.supplier().trim() } : {}),
                 ...(this.note().trim() ? { note: this.note().trim() } : {})

@@ -15,6 +15,9 @@ import { ProjectList } from './app/pages/projects/project-list';
 import { ProjectManagement } from './app/pages/projects/project-management';
 import { ProjectSetup } from './app/pages/projects/project-setup';
 import { WarrantyList } from './app/pages/warranty/warranty-list';
+import { MaterialList } from './app/pages/procurement/material-list';
+import { PurchaseOrderPrint } from './app/pages/procurement/purchase-order-print';
+import { Warehouse } from './app/pages/procurement/warehouse';
 
 export const appRoutes: Routes = [
     {
@@ -32,12 +35,16 @@ export const appRoutes: Routes = [
             { path: 'projects/:code', component: ProjectManagement },
             { path: 'projects/:code/setup', component: ProjectSetup },
             { path: 'warranty', component: WarrantyList },
+            { path: 'inventory/materials', component: MaterialList },
+            { path: 'inventory/warehouse', component: Warehouse },
             { path: 'approvals', component: ApprovalCenter },
             { path: 'system/users', component: Users },
             { path: 'system/roles', component: Roles },
             { path: 'system/audit-log', component: AuditLog }
         ]
     },
+    // หน้าพิมพ์เอกสาร: ไม่มีเมนูระบบ
+    { path: 'print/purchase-order/:code/:id', component: PurchaseOrderPrint, canActivate: [authGuard] },
     { path: 'notfound', component: Notfound },
     { path: 'auth', loadChildren: () => import('./app/pages/auth/auth.routes') },
     { path: '**', redirectTo: '/notfound' }

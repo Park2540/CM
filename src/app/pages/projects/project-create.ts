@@ -1,6 +1,6 @@
-import { NgClass } from '@angular/common';
+import { DecimalPipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { ButtonModule } from 'primeng/button';
@@ -9,10 +9,10 @@ import { SelectModule } from 'primeng/select';
 import { TextareaModule } from 'primeng/textarea';
 import { ApiProblem, problemMessage } from '@/app/api/api';
 import { AuthService } from '@/app/pages/service/auth.service';
-import { HousePlan, HousePlanService, countRooms, usableArea } from '@/app/pages/service/house-plan.service';
 import { PersonnelService } from '@/app/pages/service/personnel.service';
-import { ProjectService } from '@/app/pages/service/project.service';
+import { DesignBrief, ProjectService, SiteLocationInput } from '@/app/pages/service/project.service';
 import { apiResource } from '@/app/api/api-resource';
+import { SiteLocationPicker } from './components/site-location-picker';
 
 /**
  * เปิดโครงการ (POST /projects) — เก็บเฉพาะข้อมูลเบื้องต้น: ลูกค้า ผู้รับผิดชอบ และแบบบ้านที่ลูกค้าต้องการ
@@ -21,7 +21,7 @@ import { apiResource } from '@/app/api/api-resource';
 @Component({
     selector: 'app-project-create',
     standalone: true,
-    imports: [ButtonModule, FormsModule, InputTextModule, NgClass, RouterLink, SelectModule, TextareaModule],
+    imports: [ButtonModule, DecimalPipe, FormsModule, InputTextModule, RouterLink, SelectModule, SiteLocationPicker, TextareaModule],
     template: `
         <a routerLink="/projects" class="inline-flex items-center gap-2 text-muted-color hover:text-primary mb-4">
             <i class="pi pi-arrow-left"></i>
@@ -30,7 +30,7 @@ import { apiResource } from '@/app/api/api-resource';
 
         <div class="mb-6">
             <h1 class="text-2xl font-bold m-0">เปิดโครงการใหม่</h1>
-            <p class="text-muted-color mt-1 mb-0">บันทึกข้อมูลเบื้องต้นของลูกค้าและแบบบ้านที่ต้องการ เมื่อได้งานหรือเซ็นสัญญาแล้ว จึงบันทึกสัญญาและเริ่มแผนงานในหน้าโครงการ</p>
+            <p class="text-muted-color mt-1 mb-0">บันทึกข้อมูลลูกค้าและความต้องการคร่าว ๆ สำหรับออกแบบบ้าน เมื่อได้งานหรือเซ็นสัญญาแล้ว จึงบันทึกสัญญาและเริ่มแผนงานในหน้าโครงการ</p>
         </div>
 
         @if (!canCreate()) {
@@ -80,57 +80,76 @@ import { apiResource } from '@/app/api/api-resource';
                         </div>
                     </section>
 
-                    <!-- 2. แบบบ้าน -->
-                    <section class="card m-0" aria-labelledby="plan-heading">
-                        <h2 id="plan-heading" class="text-lg font-semibold m-0 mb-1">2. แบบบ้านที่ลูกค้าต้องการ</h2>
-                        <p class="text-sm text-muted-color mt-0 mb-4">พิมพ์ชื่อแบบเองได้ หรือเลือกจากคลังแบบบ้าน (แบบในคลังจะดูแปลนและโมเดล 3D ได้ในหน้าโครงการ)</p>
+                    <!-- 2. ความต้องการของลูกค้า (โจทย์ออกแบบ) -->
+                    <section class="card m-0" aria-labelledby="brief-heading">
+                        <h2 id="brief-heading" class="text-lg font-semibold m-0 mb-1">2. ความต้องการของลูกค้า</h2>
+                        <p class="text-sm text-muted-color mt-0 mb-4">ความต้องการคร่าว ๆ ใช้เป็นโจทย์ให้ทีมออกแบบ — กรอกเท่าที่ทราบ ไม่บังคับทุกช่อง</p>
 
-                        @if (plans.value().length) {
-                            <div class="flex flex-wrap gap-2 mb-4" role="group" aria-label="เลือกจากคลังแบบบ้าน">
-                                @for (plan of plans.value(); track plan.code) {
-                                    <button
-                                        type="button"
-                                        class="flex items-center gap-2 px-3 py-2 rounded-lg border text-sm cursor-pointer bg-transparent"
-                                        [ngClass]="matchedPlan()?.code === plan.code ? 'border-primary bg-primary-50 dark:bg-primary-500/10 font-semibold' : 'border-surface hover:border-primary'"
-                                        [attr.aria-pressed]="matchedPlan()?.code === plan.code"
-                                        (click)="housePlanName.set(plan.name)"
-                                    >
-                                        <i class="pi pi-home"></i>{{ plan.name }} <span class="text-muted-color font-normal">{{ area(plan) }} ตร.ม.</span>
-                                    </button>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <fieldset class="border-0 p-0 m-0 col-span-2 md:col-span-4">
+                                <legend class="text-sm font-semibold p-0 mb-2">จำนวนชั้น</legend>
+                                <div class="flex flex-wrap gap-2">
+                                    @for (option of floorOptions; track option) {
+                                        <button type="button" class="chip" [class.chip-active]="brief().floors === option" [attr.aria-pressed]="brief().floors === option" (click)="patchBrief({ floors: brief().floors === option ? undefined : option })">{{ option }} ชั้น</button>
+                                    }
+                                </div>
+                            </fieldset>
+                            @for (field of countFields; track field.key) {
+                                <div>
+                                    <label [for]="'brief-' + field.key" class="block text-sm font-semibold mb-2">{{ field.label }}</label>
+                                    <input pInputText [id]="'brief-' + field.key" [name]="'brief-' + field.key" type="number" min="0" max="20" step="1" inputmode="numeric" class="w-full" [placeholder]="field.placeholder" [ngModel]="brief()[field.key]" (ngModelChange)="setNumber(field.key, $event)" [attr.aria-invalid]="!!errors()['designBrief.' + field.key]" />
+                                </div>
+                            }
+                            <div>
+                                <label for="brief-usable" class="block text-sm font-semibold mb-2">พื้นที่ใช้สอย (ตร.ม.)</label>
+                                <input pInputText id="brief-usable" name="briefUsableArea" type="number" min="0" step="any" inputmode="decimal" class="w-full" placeholder="ประมาณ" [ngModel]="brief().usableArea" (ngModelChange)="setNumber('usableArea', $event)" [attr.aria-invalid]="!!errors()['designBrief.usableArea']" />
+                            </div>
+                            <div>
+                                <label for="brief-land" class="block text-sm font-semibold mb-2">ขนาดที่ดิน (ตร.ว.)</label>
+                                <input pInputText id="brief-land" name="briefLandArea" type="number" min="0" step="any" inputmode="decimal" class="w-full" [ngModel]="brief().landArea" (ngModelChange)="setNumber('landArea', $event)" [attr.aria-invalid]="!!errors()['designBrief.landArea']" />
+                            </div>
+                            <div class="col-span-2">
+                                <label for="brief-budget" class="block text-sm font-semibold mb-2">งบประมาณที่ตั้งไว้ (บาท)</label>
+                                <input pInputText id="brief-budget" name="briefBudget" type="number" min="0" step="10000" inputmode="numeric" class="w-full" placeholder="เช่น 3500000" [ngModel]="brief().budget" (ngModelChange)="setNumber('budget', $event)" [attr.aria-invalid]="!!errors()['designBrief.budget']" />
+                                @if (brief().budget) {
+                                    <small class="text-muted-color">฿{{ brief().budget | number: '1.0-0' }}</small>
                                 }
                             </div>
-                        }
+                            <div class="col-span-2">
+                                <label for="brief-style" class="block text-sm font-semibold mb-2">สไตล์บ้าน</label>
+                                <input pInputText id="brief-style" name="briefStyle" class="w-full" maxlength="100" list="brief-styles" placeholder="พิมพ์หรือเลือก" [ngModel]="brief().style" (ngModelChange)="patchBrief({ style: $event })" />
+                                <datalist id="brief-styles">
+                                    @for (style of styleOptions; track style) {
+                                        <option [value]="style"></option>
+                                    }
+                                </datalist>
+                            </div>
+                        </div>
 
-                        <label for="house-plan" class="block text-sm font-semibold mb-2">ชื่อแบบบ้าน <span class="text-red-600" aria-hidden="true">*</span></label>
-                        <input
-                            pInputText
-                            id="house-plan"
-                            name="housePlanName"
-                            class="w-full"
-                            placeholder="เช่น บ้านชั้นเดียว 3 ห้องนอน (ออกแบบเฉพาะ)"
-                            [ngModel]="housePlanName()"
-                            (ngModelChange)="housePlanName.set($event)"
-                            [attr.aria-invalid]="!!errors()['housePlanName']"
-                        />
-                        @if (errors()['housePlanName']) {
-                            <small class="text-red-600 dark:text-red-400">{{ errors()['housePlanName'] }}</small>
-                        }
-                        @if (matchedPlan(); as plan) {
-                            <p class="text-sm mt-2 mb-0">
-                                <i class="pi pi-check-circle text-primary mr-1"></i>แบบในคลัง: {{ area(plan) }} ตร.ม. · {{ plan.floors.length }} ชั้น · {{ rooms(plan, 'bedroom') }} ห้องนอน · {{ rooms(plan, 'bathroom') }} ห้องน้ำ
-                            </p>
-                        } @else if (housePlanName().trim()) {
-                            <p class="text-sm text-muted-color mt-2 mb-0"><i class="pi pi-pencil mr-1"></i>แบบที่กำหนดเอง (ยังไม่มีแปลนในระบบ)</p>
-                        }
+                        <fieldset class="border-0 p-0 m-0 mt-4">
+                            <legend class="text-sm font-semibold p-0 mb-2">ห้อง/พื้นที่พิเศษ</legend>
+                            <div class="flex flex-wrap gap-2">
+                                @for (room of roomOptions(); track room) {
+                                    <button type="button" class="chip" [class.chip-active]="hasRoom(room)" [attr.aria-pressed]="hasRoom(room)" (click)="toggleRoom(room)">
+                                        @if (hasRoom(room)) {
+                                            <i class="pi pi-check text-xs"></i>
+                                        }
+                                        {{ room }}
+                                    </button>
+                                }
+                                <input pInputText name="briefCustomRoom" class="w-40" maxlength="50" placeholder="+ เพิ่มเอง แล้วกด Enter" aria-label="เพิ่มห้องพิเศษ" [ngModel]="customRoom()" (ngModelChange)="customRoom.set($event)" (keydown.enter)="$event.preventDefault(); addCustomRoom()" />
+                            </div>
+                        </fieldset>
 
-                        <label for="requirements" class="block text-sm font-semibold mt-4 mb-2">ความต้องการเพิ่มเติมของลูกค้า</label>
+                        <label for="requirements" class="block text-sm font-semibold mt-4 mb-2">รายละเอียดเพิ่มเติม</label>
                         <textarea
                             pTextarea
                             id="requirements"
                             name="requirements"
                             rows="3"
                             class="w-full"
-                            placeholder="เช่น จำนวนห้อง ห้องพระ ที่จอดรถ งบประมาณที่ตั้งไว้"
+                            maxlength="2000"
+                            placeholder="เช่น อยากได้ห้องนอนผู้สูงอายุชั้นล่าง ครัวไทยแยกนอกบ้าน หน้าบ้านหันทิศเหนือ"
                             [ngModel]="requirements()"
                             (ngModelChange)="requirements.set($event)"
                         ></textarea>
@@ -198,6 +217,15 @@ import { apiResource } from '@/app/api/api-resource';
                         </div>
                     </section>
 
+                    <section class="card m-0" aria-labelledby="site-heading">
+                        <h2 id="site-heading" class="text-lg font-semibold m-0 mb-1">4. ที่ตั้งหน้างาน (ปักหมุดแผนที่)</h2>
+                        <p class="text-sm text-muted-color mt-0 mb-4">กรอกละติจูด/ลองจิจูด ระบบจะปักหมุดให้ ทีมงานกด "นำทาง" ในหน้าโครงการแล้วไปหน้างานด้วย Google Maps ได้ทันที (ไม่บังคับ แก้ไขภายหลังได้)</p>
+                        <app-site-location-picker [(value)]="siteCoordinates" />
+                        @if (errors()['siteCoordinates.lat'] || errors()['siteCoordinates.lng']) {
+                            <small class="block mt-2 text-red-600 dark:text-red-400">{{ errors()['siteCoordinates.lat'] || errors()['siteCoordinates.lng'] }}</small>
+                        }
+                    </section>
+
                     @if (generalError()) {
                         <div class="rounded-lg px-4 py-3 bg-red-50 text-red-800 dark:bg-red-500/15 dark:text-red-200" role="alert"><i class="pi pi-exclamation-triangle mr-2"></i>{{ generalError() }}</div>
                     }
@@ -217,12 +245,22 @@ import { apiResource } from '@/app/api/api-resource';
                                 <dd class="m-0 text-right">{{ customerName() || '-' }}</dd>
                             </div>
                             <div class="flex justify-between gap-3">
-                                <dt class="text-muted-color">แบบบ้าน</dt>
-                                <dd class="m-0 text-right">{{ housePlanName() || '-' }}</dd>
+                                <dt class="text-muted-color">โจทย์ออกแบบ</dt>
+                                <dd class="m-0 text-right">{{ briefSummary() || '-' }}</dd>
                             </div>
                             <div class="flex justify-between gap-3">
                                 <dt class="text-muted-color">ผู้รับผิดชอบ</dt>
                                 <dd class="m-0 text-right">{{ responsibleName() || '-' }}</dd>
+                            </div>
+                            <div class="flex justify-between gap-3">
+                                <dt class="text-muted-color">หมุดหน้างาน</dt>
+                                <dd class="m-0 text-right">
+                                    @if (siteCoordinates(); as point) {
+                                        <i class="pi pi-map-marker text-primary mr-1"></i>{{ point.lat }}, {{ point.lng }}
+                                    } @else {
+                                        ยังไม่ปักหมุด
+                                    }
+                                </dd>
                             </div>
                             <div class="flex justify-between gap-3">
                                 <dt class="text-muted-color">สถานะเริ่มต้น</dt>
@@ -247,17 +285,39 @@ import { apiResource } from '@/app/api/api-resource';
                 </aside>
             </form>
         }
+    `,
+    styles: `
+        .chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.4rem 0.85rem;
+            border-radius: 999px;
+            border: 1px solid var(--p-content-border-color);
+            background: transparent;
+            color: var(--p-text-color);
+            font: inherit;
+            font-size: 0.875rem;
+            cursor: pointer;
+        }
+        .chip:hover {
+            border-color: var(--p-primary-color);
+        }
+        .chip-active {
+            border-color: var(--p-primary-color);
+            background: color-mix(in srgb, var(--p-primary-color) 12%, transparent);
+            color: var(--p-primary-color);
+            font-weight: 600;
+        }
     `
 })
 export class ProjectCreate {
     private readonly router = inject(Router);
     private readonly projectService = inject(ProjectService);
     private readonly auth = inject(AuthService);
-    private readonly housePlanService = inject(HousePlanService);
     private readonly personnelService = inject(PersonnelService);
 
     readonly canCreate = computed(() => this.auth.can('project.create'));
-    readonly plans = apiResource({ stream: () => this.housePlanService.list(), defaultValue: [] });
     readonly regions = apiResource({ stream: () => this.projectService.regions(), defaultValue: [] });
     readonly personnel = apiResource({ stream: () => this.personnelService.list(), defaultValue: [] });
 
@@ -266,17 +326,29 @@ export class ProjectCreate {
     readonly customerEmail = signal('');
     readonly customerLineId = signal('');
     readonly customerAddress = signal('');
-    readonly housePlanName = signal('');
+    readonly brief = signal<DesignBrief>({});
+    readonly customRoom = signal('');
+    readonly floorOptions = [1, 2, 3];
+    readonly countFields: Array<{ key: 'bedrooms' | 'bathrooms' | 'parking'; label: string; placeholder: string }> = [
+        { key: 'bedrooms', label: 'ห้องนอน', placeholder: 'เช่น 3' },
+        { key: 'bathrooms', label: 'ห้องน้ำ', placeholder: 'เช่น 2' },
+        { key: 'parking', label: 'ที่จอดรถ (คัน)', placeholder: 'เช่น 2' }
+    ];
+    readonly styleOptions = ['โมเดิร์น', 'มินิมอล', 'นอร์ดิก', 'ลอฟท์', 'ไทยร่วมสมัย', 'ล้านนาประยุกต์', 'โคโลเนียล'];
+    private readonly baseRooms = ['ห้องพระ', 'ห้องทำงาน', 'ห้องนอนผู้สูงอายุชั้นล่าง', 'ห้องแม่บ้าน', 'ห้องเก็บของ', 'ครัวไทย', 'ห้องซักรีด', 'ระเบียง/ชานบ้าน'];
+    readonly roomOptions = computed(() => [...new Set([...this.baseRooms, ...(this.brief().rooms ?? [])])]);
+    /** สรุปสั้น ๆ (ระบบใช้ตั้งชื่อแบบบ้านแบบเดียวกัน) */
+    readonly briefSummary = computed(() => {
+        const brief = this.brief();
+        return [brief.floors ? `${brief.floors} ชั้น` : '', brief.bedrooms ? `${brief.bedrooms} ห้องนอน` : '', brief.bathrooms ? `${brief.bathrooms} ห้องน้ำ` : '', brief.style ?? ''].filter(Boolean).join(' · ');
+    });
     readonly requirements = signal('');
     readonly name = signal('');
     readonly regionCode = signal<string | null>(null);
     readonly responsibleName = signal<string | null>(null);
+    readonly siteCoordinates = signal<SiteLocationInput | null>(null);
+    private readonly sitePicker = viewChild.required(SiteLocationPicker);
 
-    /** แบบในคลังที่ชื่อตรงกับที่พิมพ์ (ส่ง housePlanCode ไปด้วย เพื่อให้ดูแปลนได้) */
-    readonly matchedPlan = computed(() => {
-        const name = this.housePlanName().trim().toLowerCase();
-        return this.plans.value().find((plan) => plan.name.toLowerCase() === name);
-    });
     readonly codePreview = computed(() => {
         const region = this.regionCode();
         return region ? `${region}${String(new Date().getFullYear() + 543).slice(-2)}xxxx` : 'ออกให้เมื่อบันทึก';
@@ -286,22 +358,38 @@ export class ProjectCreate {
     readonly errors = signal<Record<string, string>>({});
     readonly generalError = signal('');
 
-    area(plan: HousePlan) {
-        return usableArea(plan);
+    patchBrief(change: Partial<DesignBrief>) {
+        this.brief.update((brief) => ({ ...brief, ...change }));
     }
 
-    rooms(plan: HousePlan, kind: 'bedroom' | 'bathroom') {
-        return countRooms(plan, kind);
+    setNumber(key: 'bedrooms' | 'bathrooms' | 'parking' | 'usableArea' | 'landArea' | 'budget', value: number | string | null) {
+        const number = value === '' || value === null ? undefined : Number(value);
+        this.patchBrief({ [key]: number !== undefined && Number.isFinite(number) ? number : undefined });
+    }
+
+    hasRoom(room: string) {
+        return (this.brief().rooms ?? []).includes(room);
+    }
+
+    toggleRoom(room: string) {
+        const rooms = this.brief().rooms ?? [];
+        this.patchBrief({ rooms: rooms.includes(room) ? rooms.filter((item) => item !== room) : [...rooms, room] });
+    }
+
+    addCustomRoom() {
+        const room = this.customRoom().trim();
+        if (room && !this.hasRoom(room)) this.toggleRoom(room);
+        this.customRoom.set('');
     }
 
     submit() {
         const errors: Record<string, string> = {};
         if (!this.customerName().trim()) errors['customerName'] = 'กรุณาระบุชื่อลูกค้า';
         if (!this.phone().trim()) errors['phone'] = 'กรุณาระบุเบอร์โทร';
-        if (!this.housePlanName().trim()) errors['housePlanName'] = 'กรุณาระบุแบบบ้านที่ลูกค้าต้องการ';
         if (!this.name().trim()) errors['name'] = 'กรุณาตั้งชื่อโครงการ';
         if (!this.regionCode()) errors['regionCode'] = 'กรุณาเลือกจังหวัด';
         if (!this.responsibleName()) errors['responsibleName'] = 'กรุณาเลือกผู้รับผิดชอบโครงการ';
+        if (this.sitePicker().invalid()) errors['siteCoordinates.lat'] = 'พิกัดหน้างานไม่ถูกต้อง — แก้ไขหรือเว้นว่างทั้งสองช่อง';
         this.errors.set(errors);
         this.generalError.set(Object.keys(errors).length ? 'กรุณากรอกข้อมูลที่จำเป็นให้ครบ' : '');
         if (Object.keys(errors).length) return;
@@ -318,9 +406,9 @@ export class ProjectCreate {
                 customerLineId: optional(this.customerLineId()),
                 customerAddress: optional(this.customerAddress()),
                 responsibleName: this.responsibleName()!,
-                housePlanName: this.housePlanName().trim(),
-                housePlanCode: this.matchedPlan()?.code,
-                requirements: optional(this.requirements())
+                designBrief: Object.fromEntries(Object.entries(this.brief()).filter(([, value]) => value !== undefined && value !== '' && !(Array.isArray(value) && !value.length))) as DesignBrief,
+                requirements: optional(this.requirements()),
+                ...(this.siteCoordinates() ? { siteCoordinates: this.siteCoordinates()! } : {})
             })
             .subscribe({
                 next: (project) => this.router.navigate(['/projects', project.code]),

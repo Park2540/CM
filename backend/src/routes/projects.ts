@@ -25,6 +25,7 @@ import {
     previewSetup,
     recalculate,
     recordContract,
+    setSiteLocation,
     normalizePaymentPercents,
     saveSetup,
     todayIso,
@@ -100,6 +101,16 @@ projectRouter.get('/projects', (req, res) => {
     res.json(listProjects().filter((project) => (!status || project.status === status) && (!group || inGroup(project, group)) && matchesQuery(q, project.code, project.customerName, project.responsibleName)));
 });
 
+/** ตรวจพิกัดหน้างาน (ไม่ส่ง = ไม่ปักหมุด) — คืนพิกัดที่ถูกต้อง หรือเติมข้อผิดพลาดที่ `${prefix}lat` / `${prefix}lng` */
+function readCoordinates(point: Partial<ApiSchemas['SiteLocationInput']> | null | undefined, errors: Record<string, string>, prefix = ''): ApiSchemas['SiteLocationInput'] | null {
+    if (point === undefined || point === null) return null;
+    const lat = point.lat === null || point.lat === undefined || String(point.lat).trim() === '' ? NaN : Number(point.lat);
+    const lng = point.lng === null || point.lng === undefined || String(point.lng).trim() === '' ? NaN : Number(point.lng);
+    if (!(lat >= -90 && lat <= 90)) errors[`${prefix}lat`] = 'ละติจูดต้องอยู่ระหว่าง -90 ถึง 90';
+    if (!(lng >= -180 && lng <= 180)) errors[`${prefix}lng`] = 'ลองจิจูดต้องอยู่ระหว่าง -180 ถึง 180';
+    return lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180 ? { lat, lng } : null;
+}
+
 projectRouter.post('/projects', (req, res) => {
     if (!can('project.create')) fail(403, 'ไม่มีสิทธิ์เปิดโครงการ');
     const input = body<ApiSchemas['ProjectInput']>(req);
@@ -107,7 +118,6 @@ projectRouter.post('/projects', (req, res) => {
     const required: Array<[keyof ApiSchemas['ProjectInput'], string]> = [
         ['customerName', 'กรุณาระบุชื่อลูกค้า'],
         ['name', 'กรุณาระบุชื่อโครงการ'],
-        ['housePlanName', 'กรุณาระบุแบบบ้านที่ลูกค้าต้องการ'],
         ['responsibleName', 'กรุณาเลือกผู้รับผิดชอบโครงการ']
     ];
     for (const [field, message] of required) if (!String(input[field] ?? '').trim()) errors[field] = message;
@@ -115,8 +125,23 @@ projectRouter.post('/projects', (req, res) => {
     if (input.customerEmail?.trim() && !/^[^\s@]+@[^\s@]+$/.test(input.customerEmail.trim())) errors['customerEmail'] = 'รูปแบบอีเมลไม่ถูกต้อง';
     if (!PROJECT_REGIONS.some((region) => region.code === input.regionCode)) errors['regionCode'] = 'กรุณาเลือกจังหวัด';
     if (input.housePlanCode && !HOUSE_PLANS.some((plan) => plan.code === input.housePlanCode)) errors['housePlanCode'] = 'ไม่พบแบบบ้านนี้ในคลัง';
+    if ((input.housePlanName ?? '').trim().length > 200) errors['housePlanName'] = 'ยาวเกิน 200 ตัวอักษร';
+    const brief = input.designBrief ?? {};
+    const integers: Array<[keyof ApiSchemas['DesignBrief'], number, number]> = [['floors', 1, 8], ['bedrooms', 0, 20], ['bathrooms', 0, 20], ['parking', 0, 20]];
+    for (const [field, min, max] of integers) {
+        const value = brief[field];
+        if (value !== undefined && value !== null && !(Number.isInteger(value) && (value as number) >= min && (value as number) <= max)) errors[`designBrief.${field}`] = `ต้องเป็นจำนวนเต็ม ${min}–${max}`;
+    }
+    for (const field of ['usableArea', 'landArea', 'budget'] as const) {
+        const value = brief[field];
+        if (value !== undefined && value !== null && !(typeof value === 'number' && value >= 0)) errors[`designBrief.${field}`] = 'ต้องเป็นตัวเลขไม่ติดลบ';
+    }
+    if ((brief.style ?? '').length > 100) errors['designBrief.style'] = 'ยาวเกิน 100 ตัวอักษร';
+    if ((brief.rooms ?? []).length > 20 || (brief.rooms ?? []).some((room) => typeof room !== 'string' || room.length > 50)) errors['designBrief.rooms'] = 'ห้องพิเศษไม่เกิน 20 รายการ รายการละไม่เกิน 50 ตัวอักษร';
+    const point = readCoordinates(input.siteCoordinates, errors, 'siteCoordinates.');
     failIfInvalid(errors);
-    res.status(201).json(createProject(input as ApiSchemas['ProjectInput']));
+    const project = createProject(input as ApiSchemas['ProjectInput']);
+    res.status(201).json(point ? setSiteLocation(project.code, point) : project);
 });
 
 projectRouter.post('/projects/:code/contract', (req, res) => {
@@ -134,8 +159,27 @@ projectRouter.post('/projects/:code/contract', (req, res) => {
     else if (DATE.test(input.signedDate ?? '') && input.startDate < input.signedDate) errors['startDate'] = 'วันเริ่มงานต้องไม่ก่อนวันเซ็นสัญญา';
     if (!DATE.test(input.deliveryDate ?? '')) errors['deliveryDate'] = 'กรุณาระบุกำหนดส่งมอบ';
     else if (DATE.test(input.startDate ?? '') && (Date.parse(input.deliveryDate) - Date.parse(input.startDate)) / 86_400_000 < 30) errors['deliveryDate'] = 'กำหนดส่งมอบต้องห่างจากวันเริ่มอย่างน้อย 30 วัน';
+    const point = readCoordinates(input.siteCoordinates, errors, 'siteCoordinates.');
     failIfInvalid(errors);
-    res.json(recordContract(code, input));
+    const project = recordContract(code, input);
+    res.json(point ? setSiteLocation(code, point) : project);
+});
+
+projectRouter.put('/projects/:code/site-location', (req, res) => {
+    const code = req.params['code']!;
+    if (!can('project.manage')) fail(403, 'ไม่มีสิทธิ์แก้ไขที่ตั้งหน้างาน');
+    if (!findProject(code)) fail(404, 'ไม่พบโครงการ');
+    const errors: Record<string, string> = {};
+    const point = readCoordinates(body<ApiSchemas['SiteLocationInput']>(req) ?? {}, errors);
+    failIfInvalid(errors);
+    res.json(setSiteLocation(code, point!));
+});
+
+projectRouter.delete('/projects/:code/site-location', (req, res) => {
+    const code = req.params['code']!;
+    if (!can('project.manage')) fail(403, 'ไม่มีสิทธิ์แก้ไขที่ตั้งหน้างาน');
+    if (!findProject(code)) fail(404, 'ไม่พบโครงการ');
+    res.json(setSiteLocation(code, null));
 });
 
 projectRouter.get('/settings/construction-options', (_req, res) => {
@@ -436,7 +480,28 @@ projectRouter.get('/projects/:code/team', (req, res) => {
 projectRouter.get('/projects/:code/timeline', (req, res) => {
     const code = req.params['code']!;
     requirePlan(code);
-    res.json(getTimeline(code));
+    // วันที่จริงจากบันทึกหน้างาน/ผลตรวจ: งานที่ยังไม่เคยอัปเดตไม่มีวันที่
+    const dates = new Map<string, { first: string; last: string }>();
+    for (const update of getUpdates(code)) {
+        for (const change of update.taskChanges) {
+            const current = dates.get(change.taskCode);
+            dates.set(change.taskCode, {
+                first: current && current.first < update.reportDate ? current.first : update.reportDate,
+                last: current && current.last > update.reportDate ? current.last : update.reportDate
+            });
+        }
+    }
+    const timeline = getTimeline(code)!;
+    res.json({
+        ...timeline,
+        phases: timeline.phases.map((phase) => ({
+            ...phase,
+            tasks: phase.tasks.map((task) => {
+                const known = dates.get(task.code);
+                return known ? { ...task, startedOn: known.first, lastUpdatedOn: known.last } : task;
+            })
+        }))
+    });
 });
 
 projectRouter.get('/projects/:code/updates', (req, res) => {

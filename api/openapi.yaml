@@ -489,6 +489,28 @@ paths:
                 '409': { $ref: '#/components/responses/Conflict' }
                 '422': { $ref: '#/components/responses/ValidationError' }
 
+    /projects/{code}/site-location:
+        parameters:
+            - $ref: '#/components/parameters/ProjectCode'
+        put:
+            tags: [projects]
+            summary: ปักหมุดพิกัดหน้างาน (ต้องมีสิทธิ์ project.manage) — ใช้แสดงแผนที่และปุ่มนำทาง Google Maps
+            operationId: setProjectSiteLocation
+            requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/SiteLocationInput' } } } }
+            responses:
+                '200': { description: บันทึกแล้ว, content: { application/json: { schema: { $ref: '#/components/schemas/Project' } } } }
+                '403': { $ref: '#/components/responses/Forbidden' }
+                '404': { $ref: '#/components/responses/NotFound' }
+                '422': { $ref: '#/components/responses/ValidationError' }
+        delete:
+            tags: [projects]
+            summary: ลบหมุดพิกัดหน้างาน (กลับไปค้นหาจากที่ตั้งหน้างาน) — สิทธิ์ project.manage
+            operationId: clearProjectSiteLocation
+            responses:
+                '200': { description: ลบแล้ว, content: { application/json: { schema: { $ref: '#/components/schemas/Project' } } } }
+                '403': { $ref: '#/components/responses/Forbidden' }
+                '404': { $ref: '#/components/responses/NotFound' }
+
     /projects/{code}/setup:
         parameters:
             - $ref: '#/components/parameters/ProjectCode'
@@ -785,7 +807,7 @@ paths:
             - { name: id, in: path, required: true, schema: { type: string } }
         post:
             tags: [procurement]
-            summary: บันทึกการสั่งซื้อ (ใบขอซื้อต้องอนุมัติแล้ว) — สิทธิ์ procurement.manage
+            summary: ออกใบสั่งซื้อ (ใบขอซื้อต้องอนุมัติแล้ว) ส่งเข้าศูนย์อนุมัติเป็น po — สิทธิ์ procurement.manage
             operationId: orderPurchase
             requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/PurchaseOrderInput' } } } }
             responses:
@@ -801,7 +823,7 @@ paths:
             - { name: id, in: path, required: true, schema: { type: string } }
         post:
             tags: [procurement]
-            summary: รับของ (ทยอยรับได้หลายครั้ง) — สิทธิ์ procurement.manage
+            summary: ตรวจรับของที่หน้างาน (ทยอยรับได้หลายครั้ง ใบสั่งซื้อต้องอนุมัติแล้ว) — สิทธิ์ procurement.receive / procurement.manage
             operationId: receivePurchase
             requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/PurchaseReceiveInput' } } } }
             responses:
@@ -825,6 +847,127 @@ paths:
                 '403': { $ref: '#/components/responses/Forbidden' }
                 '404': { $ref: '#/components/responses/NotFound' }
                 '409': { $ref: '#/components/responses/Conflict' }
+                '422': { $ref: '#/components/responses/ValidationError' }
+
+    /projects/{code}/boq:
+        parameters:
+            - $ref: '#/components/parameters/ProjectCode'
+        get:
+            tags: [procurement]
+            summary: BOQ วัสดุของโครงการ
+            operationId: getProjectBoq
+            responses:
+                '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/ProjectBoq' } } } }
+                '404': { $ref: '#/components/responses/NotFound' }
+        put:
+            tags: [procurement]
+            summary: บันทึก BOQ ทั้งชุด (สิทธิ์ project.manage)
+            operationId: saveProjectBoq
+            requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ProjectBoqInput' } } } }
+            responses:
+                '200': { description: บันทึกแล้ว, content: { application/json: { schema: { $ref: '#/components/schemas/ProjectBoq' } } } }
+                '403': { $ref: '#/components/responses/Forbidden' }
+                '404': { $ref: '#/components/responses/NotFound' }
+                '422': { $ref: '#/components/responses/ValidationError' }
+
+    /projects/{code}/material-usage:
+        parameters:
+            - $ref: '#/components/parameters/ProjectCode'
+        get:
+            tags: [procurement]
+            summary: เทียบวัสดุที่ใช้จริง (รับ + เบิกคลัง − ส่งคืนคลัง) กับ BOQ รายวัสดุ
+            operationId: getMaterialUsage
+            responses:
+                '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/MaterialUsage' } } } }
+                '404': { $ref: '#/components/responses/NotFound' }
+
+    /projects/{code}/stock-movements:
+        parameters:
+            - $ref: '#/components/parameters/ProjectCode'
+        get:
+            tags: [procurement]
+            summary: ของเหลือส่งเข้าคลังหลัก / เบิกจากคลังหลัก ของโครงการ (ล่าสุดก่อน)
+            operationId: listProjectStockMovements
+            responses:
+                '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/StockMovement' } } } } }
+                '404': { $ref: '#/components/responses/NotFound' }
+        post:
+            tags: [procurement]
+            summary: บันทึกส่งของเหลือเข้าคลังหลัก หรือเบิกจากคลังหลัก (สิทธิ์ procurement.receive / procurement.manage)
+            description: เบิกได้ไม่เกินยอดคงเหลือในคลังหลัก · ส่งคืนได้ไม่เกินที่ใช้จริงของโครงการ
+            operationId: createStockMovement
+            requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/StockMovementInput' } } } }
+            responses:
+                '201': { description: บันทึกแล้ว, content: { application/json: { schema: { $ref: '#/components/schemas/StockMovement' } } } }
+                '403': { $ref: '#/components/responses/Forbidden' }
+                '404': { $ref: '#/components/responses/NotFound' }
+                '409': { $ref: '#/components/responses/Conflict' }
+                '422': { $ref: '#/components/responses/ValidationError' }
+
+    /warehouse/stock:
+        get:
+            tags: [procurement]
+            summary: ยอดคงเหลือในคลังหลักของบริษัท รายวัสดุ
+            operationId: listWarehouseStock
+            responses:
+                '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/StockBalance' } } } } }
+
+    /warehouse/movements:
+        get:
+            tags: [procurement]
+            summary: ประวัติการรับเข้า/เบิกออกคลังหลัก ทุกโครงการ (ล่าสุดก่อน)
+            operationId: listWarehouseMovements
+            responses:
+                '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/StockMovement' } } } } }
+
+    /materials:
+        get:
+            tags: [procurement]
+            summary: รายการวัสดุของบริษัท
+            operationId: listMaterials
+            responses:
+                '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Material' } } } } }
+        post:
+            tags: [procurement]
+            summary: เพิ่มวัสดุ (สิทธิ์ procurement.manage / project.manage)
+            operationId: createMaterial
+            requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/MaterialInput' } } } }
+            responses:
+                '201': { description: บันทึกแล้ว, content: { application/json: { schema: { $ref: '#/components/schemas/Material' } } } }
+                '403': { $ref: '#/components/responses/Forbidden' }
+                '409': { $ref: '#/components/responses/Conflict' }
+                '422': { $ref: '#/components/responses/ValidationError' }
+
+    /materials/{materialCode}:
+        parameters:
+            - { name: materialCode, in: path, required: true, schema: { type: string } }
+        put:
+            tags: [procurement]
+            summary: แก้ไขวัสดุ (สิทธิ์ procurement.manage / project.manage) — active = false เพื่อเลิกใช้
+            operationId: updateMaterial
+            requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/MaterialInput' } } } }
+            responses:
+                '200': { description: บันทึกแล้ว, content: { application/json: { schema: { $ref: '#/components/schemas/Material' } } } }
+                '403': { $ref: '#/components/responses/Forbidden' }
+                '404': { $ref: '#/components/responses/NotFound' }
+                '409': { $ref: '#/components/responses/Conflict' }
+                '422': { $ref: '#/components/responses/ValidationError' }
+
+    /settings/company:
+        get:
+            tags: [procurement]
+            summary: ข้อมูลบริษัท (หัวกระดาษใบสั่งซื้อ)
+            operationId: getCompanyProfile
+            responses:
+                '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/CompanyProfile' } } } }
+        put:
+            tags: [procurement]
+            summary: แก้ไขข้อมูลบริษัท (สิทธิ์ user.manage)
+            operationId: saveCompanyProfile
+            requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CompanyProfile' } } } }
+            responses:
+                '200': { description: บันทึกแล้ว, content: { application/json: { schema: { $ref: '#/components/schemas/CompanyProfile' } } } }
+                '403': { $ref: '#/components/responses/Forbidden' }
                 '422': { $ref: '#/components/responses/ValidationError' }
 
     /projects/{code}/rentals:
@@ -856,7 +999,7 @@ paths:
             - { name: id, in: path, required: true, schema: { type: string } }
         post:
             tags: [procurement]
-            summary: รับอุปกรณ์เข้าหน้างาน (เริ่มคิดค่าเช่า) — สิทธิ์ procurement.manage
+            summary: รับอุปกรณ์เข้าหน้างาน (เริ่มคิดค่าเช่า) — สิทธิ์ procurement.receive / procurement.manage
             operationId: startRental
             requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/RentalStartInput' } } } }
             responses:
@@ -888,7 +1031,7 @@ paths:
             - { name: id, in: path, required: true, schema: { type: string } }
         post:
             tags: [procurement]
-            summary: คืนอุปกรณ์ (หยุดคิดค่าเช่า) — สิทธิ์ procurement.manage
+            summary: คืนอุปกรณ์ (หยุดคิดค่าเช่า) — สิทธิ์ procurement.receive / procurement.manage
             operationId: returnRental
             requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/RentalReturnInput' } } } }
             responses:
@@ -1705,8 +1848,9 @@ components:
                 - project.manage: จัดการโครงการ เช่น บันทึกสัญญาและเริ่มแผนงาน
                 - user.manage: จัดการบัญชีผู้ใช้ บทบาท และสิทธิ์ของบุคลากร
                 - payment.record: บันทึก/ยกเลิกการรับชำระเงินงวดงานของลูกค้า
-                - procurement.manage: จัดซื้อและเช่า: ออกใบสั่งซื้อ รับของ รับ/คืนอุปกรณ์ที่เช่า/ยืม
-            enum: [progress.update, personnel.sensitive, finance.company, approval.any, project.create, project.manage, user.manage, payment.record, procurement.manage]
+                - procurement.manage: จัดซื้อและเช่า: ออกใบสั่งซื้อ รับของ รับ/คืนอุปกรณ์ที่เช่า/ยืม แก้รายการวัสดุ
+                - procurement.receive: ตรวจรับของที่หน้างาน รับ/คืนอุปกรณ์เช่า ส่งของเหลือเข้าคลังหลัก/เบิกจากคลัง (ผู้จัดการโครงการ วิศวกร โฟร์แมน เจ้าของบริษัท)
+            enum: [progress.update, personnel.sensitive, finance.company, approval.any, project.create, project.manage, user.manage, payment.record, procurement.manage, procurement.receive]
         CurrentUser:
             type: object
             required: [id, name, roleId, roleLabel, projectCodes, email, lastLoginAt, permissions]
@@ -1878,7 +2022,7 @@ components:
         ProjectInput:
             type: object
             description: ข้อมูลเบื้องต้นตอนเปิดโครงการ (ก่อนเซ็นสัญญา) — มูลค่าและวันที่บันทึกภายหลังที่ POST /projects/{code}/contract
-            required: [name, regionCode, customerName, phone, responsibleName, housePlanName]
+            required: [name, regionCode, customerName, phone, responsibleName]
             properties:
                 name: { type: string, minLength: 1, maxLength: 200, description: ชื่อโครงการ (ผู้ใช้ตั้งเอง) }
                 regionCode: { type: string, description: จังหวัดที่ตั้งโครงการ ใช้ออกรหัส (GET /settings/project-regions) }
@@ -1888,9 +2032,24 @@ components:
                 customerLineId: { type: string }
                 customerAddress: { type: string, description: ที่อยู่ติดต่อลูกค้า }
                 responsibleName: { type: string, minLength: 1, description: ผู้รับผิดชอบโครงการ }
-                housePlanName: { type: string, minLength: 1, maxLength: 200, description: แบบบ้านที่ลูกค้าต้องการ (พิมพ์เองได้) }
-                housePlanCode: { type: string, description: ถ้าเลือกจากคลังแบบบ้าน (GET /house-plans) จะแสดงแปลนและโมเดล 3D ได้ }
+                housePlanName: { type: string, maxLength: 200, description: ชื่อแบบบ้าน (ไม่ส่ง = ระบบตั้งจาก designBrief เช่น "บ้าน 2 ชั้น 3 ห้องนอน (รอออกแบบ)") }
+                housePlanCode: { type: string, description: (ระบบเดิม) แบบจากคลังแบบบ้าน — หน้าเปิดโครงการไม่ใช้แล้ว }
+                designBrief: { $ref: '#/components/schemas/DesignBrief' }
                 requirements: { type: string, maxLength: 2000, description: ความต้องการเพิ่มเติมของลูกค้า }
+                siteCoordinates: { $ref: '#/components/schemas/SiteLocationInput', description: พิกัดหน้างาน (ไม่บังคับ) — ระบบปักหมุดให้ตั้งแต่เปิดโครงการ ใช้แสดงแผนที่และนำทาง Google Maps }
+        DesignBrief:
+            type: object
+            description: ความต้องการคร่าว ๆ ของลูกค้า ใช้เป็นโจทย์ออกแบบบ้าน (ทุกช่องไม่บังคับ)
+            properties:
+                floors: { type: integer, minimum: 1, maximum: 8, description: บ้านพักอาศัยไม่เกิน 3 ชั้น อาคารพาณิชย์ไม่เกิน 8 ชั้น }
+                bedrooms: { type: integer, minimum: 0, maximum: 20 }
+                bathrooms: { type: integer, minimum: 0, maximum: 20 }
+                parking: { type: integer, minimum: 0, maximum: 20, description: ที่จอดรถ (คัน) }
+                usableArea: { type: number, minimum: 0, description: พื้นที่ใช้สอยที่ต้องการโดยประมาณ (ตร.ม.) }
+                landArea: { type: number, minimum: 0, description: ขนาดที่ดิน (ตร.ว.) }
+                budget: { type: number, minimum: 0, description: งบประมาณก่อสร้างที่ตั้งไว้ (บาท) }
+                style: { type: string, maxLength: 100, examples: [โมเดิร์น] }
+                rooms: { type: array, maxItems: 20, items: { type: string, maxLength: 50 }, description: ห้อง/พื้นที่พิเศษ เช่น ห้องพระ ห้องทำงาน ห้องแม่บ้าน }
         ContractInput:
             type: object
             description: บันทึกเมื่อได้งาน/เซ็นสัญญาแล้ว หลังบ้านจะสร้างแผนงานจากแม่แบบและงวดงาน
@@ -1901,6 +2060,7 @@ components:
                 startDate: { type: string, format: date, description: วันเริ่มงาน (ไม่ก่อนวันเซ็นสัญญา) }
                 deliveryDate: { type: string, format: date, description: ต้องห่างจากวันเริ่มอย่างน้อย 30 วัน }
                 location: { type: string, minLength: 1, description: ที่ตั้งหน้างาน (เลขที่/ตำบล/อำเภอ) }
+                siteCoordinates: { $ref: '#/components/schemas/SiteLocationInput', description: พิกัดหน้างาน (ไม่บังคับ) — ระบบปักหมุดให้เพื่อแสดงแผนที่และนำทาง Google Maps }
         ProjectStatus:
             type: string
             description: pending-contract = เปิดโครงการแล้วแต่ยังไม่ได้บันทึกสัญญา (ยังไม่มีแผนงาน งวดงาน ภาพ เอกสาร)
@@ -1912,8 +2072,10 @@ components:
                 code: { type: string, examples: [CR690001] }
                 name: { type: string }
                 location: { type: [string, 'null'], description: ที่ตั้งหน้างาน (null จนกว่าจะบันทึกสัญญา) }
+                siteCoordinates: { $ref: '#/components/schemas/SiteLocation', description: พิกัดหน้างานที่ปักหมุดไว้ (ไม่มี = แผนที่ค้นหาจากที่ตั้งหน้างาน) }
                 housePlanName: { type: string }
                 housePlanCode: { type: string }
+                designBrief: { $ref: '#/components/schemas/DesignBrief' }
                 requirements: { type: string }
                 customerName: { type: string }
                 phone: { type: string }
@@ -1937,6 +2099,21 @@ components:
                     items: { $ref: '#/components/schemas/WarrantyCoverage' }
                 changeOrderTotal: { type: number, description: ยอดสุทธิของงานเพิ่ม-ลดที่อนุมัติแล้ว (บวก = เพิ่ม ลบ = ลด) }
                 revisedValue: { type: [number, 'null'], description: มูลค่าสัญญาปัจจุบัน = value + changeOrderTotal (null จนกว่าจะบันทึกสัญญา) }
+
+        SiteLocationInput:
+            type: object
+            required: [lat, lng]
+            properties:
+                lat: { type: number, minimum: -90, maximum: 90, examples: [19.9105] }
+                lng: { type: number, minimum: -180, maximum: 180, examples: [99.8406] }
+        SiteLocation:
+            allOf:
+                - $ref: '#/components/schemas/SiteLocationInput'
+                - type: object
+                  required: [updatedBy, updatedAt]
+                  properties:
+                      updatedBy: { $ref: '#/components/schemas/UserRef' }
+                      updatedAt: { type: string, format: date-time }
 
         ChangeOrderSource:
             type: string
@@ -2007,6 +2184,7 @@ components:
             type: object
             required: [name, quantity, unit, unitPrice]
             properties:
+                materialCode: { type: string, description: รหัสในรายการวัสดุ (ถ้าเลือกจากรายการ) ใช้เทียบกับ BOQ }
                 name: { type: string, minLength: 1, maxLength: 200 }
                 quantity: { type: number, exclusiveMinimum: 0 }
                 unit: { type: string, minLength: 1, maxLength: 30 }
@@ -2014,9 +2192,9 @@ components:
         PurchaseStatus:
             type: string
             description: |
-                pending = รออนุมัติ, approved = อนุมัติแล้ว รอสั่งซื้อ, rejected = ไม่อนุมัติ,
-                ordered = สั่งซื้อแล้ว รอรับของ, partial = รับของบางส่วน, received = รับครบ, cancelled = ยกเลิก
-            enum: [pending, approved, rejected, ordered, partial, received, cancelled]
+                pending = ใบขอซื้อรออนุมัติ, approved = อนุมัติแล้ว รอออกใบสั่งซื้อ (หรือใบสั่งซื้อไม่ผ่านอนุมัติ ออกใหม่ได้), rejected = ไม่อนุมัติ,
+                po-pending = ใบสั่งซื้อรออนุมัติ, ordered = ใบสั่งซื้ออนุมัติแล้ว รอรับของ, partial = รับของบางส่วน, received = รับครบ, cancelled = ยกเลิก
+            enum: [pending, approved, rejected, po-pending, ordered, partial, received, cancelled]
         PurchaseRequestInput:
             type: object
             required: [title, items, neededDate]
@@ -2027,14 +2205,49 @@ components:
                 phaseCode: { type: string, description: ขั้นตอนในไทม์ไลน์ที่ใช้วัสดุนี้ (ถ้ามี) }
                 supplier: { type: string, maxLength: 200, description: ร้านค้าที่เสนอ (ถ้ามี) }
                 note: { type: string, maxLength: 1000 }
+        Vendor:
+            type: object
+            required: [name]
+            properties:
+                name: { type: string, minLength: 1, maxLength: 200, description: ชื่อร้าน/บริษัทผู้ขาย }
+                taxId: { type: string, maxLength: 20, description: เลขประจำตัวผู้เสียภาษี }
+                address: { type: string, maxLength: 500 }
+                contactName: { type: string, maxLength: 100 }
+                phone: { type: string, maxLength: 30 }
         PurchaseOrderInput:
             type: object
-            required: [supplier, orderDate]
+            description: ออกใบสั่งซื้อจากใบขอซื้อที่อนุมัติแล้ว (ราคาจากใบเสนอราคาที่ดีที่สุด รวม VAT แล้ว) — ส่งเข้าศูนย์อนุมัติเป็น po ด้วยวงเงินเดียวกับใบขอซื้อ
+            required: [vendor, orderDate, unitPrices]
             properties:
-                supplier: { type: string, minLength: 1, maxLength: 200 }
-                poNumber: { type: string, maxLength: 50, description: ไม่ระบุ = ระบบออกเลขให้ (PO-<ปีเดือน>-<ลำดับ>) }
+                vendor: { $ref: '#/components/schemas/Vendor' }
                 orderDate: { type: string, format: date }
-                expectedDate: { type: string, format: date, description: วันที่ร้านจะส่งของ }
+                expectedDate: { type: string, format: date, description: วันที่ร้านจะส่งของถึงหน้างาน }
+                unitPrices: { type: array, maxItems: 50, items: { type: number, minimum: 0 }, description: ราคาต่อหน่วยรวม VAT เรียงตาม items ของใบขอซื้อ }
+                paymentTerms: { type: string, maxLength: 200, examples: [เครดิต 30 วัน] }
+                note: { type: string, maxLength: 1000 }
+                quotationFileIds: { type: array, maxItems: 10, items: { type: string }, description: ใบเสนอราคาที่เลือก (id จาก POST /uploads) }
+        PurchaseOrder:
+            type: object
+            required: [poNumber, status, supplier, orderDate, orderedBy]
+            properties:
+                poNumber: { type: string, examples: [PO-6910-0008], description: เลขใบสั่งซื้อ = เลขคำขอในศูนย์อนุมัติ }
+                approvalId: { type: string }
+                status: { type: string, enum: [pending, approved, rejected], description: ผลอนุมัติใบสั่งซื้อ }
+                vendor: { $ref: '#/components/schemas/Vendor' }
+                supplier: { type: string, description: ชื่อผู้ขาย (= vendor.name) }
+                orderDate: { type: string, format: date }
+                expectedDate: { type: string, format: date }
+                unitPrices: { type: array, items: { type: number }, description: ราคาต่อหน่วยรวม VAT }
+                amount: { type: number, description: ยอดรวม VAT }
+                amountBeforeVat: { type: number }
+                vatAmount: { type: number, description: VAT 7% ที่รวมอยู่ในยอด }
+                paymentTerms: { type: string }
+                note: { type: string }
+                quotationFiles: { type: array, items: { $ref: '#/components/schemas/UploadedFile' } }
+                orderedBy: { $ref: '#/components/schemas/UserRef' }
+                orderedAt: { type: string, format: date-time }
+                decidedAt: { type: string, format: date-time }
+                decisionNote: { type: string }
         PurchaseReceiveInput:
             type: object
             required: [date, quantities]
@@ -2068,18 +2281,130 @@ components:
                       requestedAt: { type: string, format: date-time }
                       decidedAt: { type: string, format: date-time }
                       decisionNote: { type: string }
-                      order:
-                          type: object
-                          required: [supplier, poNumber, orderDate, orderedBy]
-                          properties:
-                              supplier: { type: string }
-                              poNumber: { type: string }
-                              orderDate: { type: string, format: date }
-                              expectedDate: { type: string, format: date }
-                              orderedBy: { $ref: '#/components/schemas/UserRef' }
+                      order: { $ref: '#/components/schemas/PurchaseOrder' }
+                      rejectedOrders: { type: array, items: { $ref: '#/components/schemas/PurchaseOrder' }, description: ใบสั่งซื้อที่ไม่ผ่านอนุมัติ (ประวัติ) }
                       received: { type: array, items: { type: number }, description: จำนวนที่รับแล้วสะสม เรียงตาม items }
                       receipts: { type: array, items: { $ref: '#/components/schemas/PurchaseReceipt' } }
                       cancelReason: { type: string }
+        Material:
+            type: object
+            required: [code, name, unit, category, active]
+            properties:
+                code: { type: string, examples: [MAT-0001] }
+                name: { type: string, minLength: 1, maxLength: 200 }
+                unit: { type: string, minLength: 1, maxLength: 30 }
+                category: { type: string, maxLength: 50, examples: [งานโครงสร้าง] }
+                spec: { type: string, maxLength: 300, description: ขนาด/มาตรฐาน/ยี่ห้อที่กำหนด }
+                lastPrice: { type: number, description: ราคาต่อหน่วยล่าสุดจากใบสั่งซื้อที่อนุมัติ (รวม VAT) }
+                active: { type: boolean }
+        MaterialInput:
+            type: object
+            required: [name, unit, category]
+            properties:
+                name: { type: string, minLength: 1, maxLength: 200 }
+                unit: { type: string, minLength: 1, maxLength: 30 }
+                category: { type: string, minLength: 1, maxLength: 50 }
+                spec: { type: string, maxLength: 300 }
+                active: { type: boolean }
+        BoqItem:
+            type: object
+            required: [name, unit, quantity]
+            properties:
+                materialCode: { type: string }
+                name: { type: string, minLength: 1, maxLength: 200 }
+                unit: { type: string, minLength: 1, maxLength: 30 }
+                quantity: { type: number, minimum: 0, description: ปริมาณตาม BOQ (รวมเผื่อเสียแล้ว) }
+                phaseCode: { type: string }
+                note: { type: string, maxLength: 300 }
+        ProjectBoq:
+            type: object
+            required: [items]
+            properties:
+                items: { type: array, items: { $ref: '#/components/schemas/BoqItem' } }
+                updatedBy: { $ref: '#/components/schemas/UserRef' }
+                updatedAt: { type: string, format: date-time }
+        ProjectBoqInput:
+            type: object
+            required: [items]
+            properties:
+                items: { type: array, maxItems: 500, items: { $ref: '#/components/schemas/BoqItem' } }
+        StockMovementType:
+            type: string
+            description: return = ส่งของเหลือจากหน้างานเข้าคลังหลัก, issue = เบิกจากคลังหลักไปใช้ที่หน้างาน
+            enum: [return, issue]
+        StockMovementInput:
+            type: object
+            required: [type, name, unit, quantity, date]
+            properties:
+                type: { $ref: '#/components/schemas/StockMovementType' }
+                materialCode: { type: string }
+                name: { type: string, minLength: 1, maxLength: 200 }
+                unit: { type: string, minLength: 1, maxLength: 30 }
+                quantity: { type: number, exclusiveMinimum: 0 }
+                date: { type: string, format: date, description: ไม่เกินวันนี้ }
+                note: { type: string, maxLength: 500 }
+        StockMovement:
+            allOf:
+                - $ref: '#/components/schemas/StockMovementInput'
+                - type: object
+                  required: [id, projectCode, recordedBy, recordedAt]
+                  properties:
+                      id: { type: string, examples: [SM-6910-0001] }
+                      projectCode: { type: string }
+                      recordedBy: { $ref: '#/components/schemas/UserRef' }
+                      recordedAt: { type: string, format: date-time }
+        StockBalance:
+            type: object
+            required: [key, name, unit, quantity, lastMovementAt]
+            properties:
+                key: { type: string, description: materialCode หรือ ชื่อ|หน่วย }
+                materialCode: { type: string }
+                name: { type: string }
+                unit: { type: string }
+                category: { type: string }
+                quantity: { type: number, description: คงเหลือในคลังหลัก }
+                lastMovementAt: { type: string, format: date-time }
+        MaterialUsageStatus:
+            type: string
+            description: over = ใช้เกิน BOQ เกินเกณฑ์, under = ใช้น้อยกว่า BOQ เกินเกณฑ์ (ประเมินเมื่อโครงการเสร็จ), ok = อยู่ในเกณฑ์, in-progress = ยังใช้ไม่ครบ (โครงการยังไม่เสร็จ), not-in-boq = ไม่มีใน BOQ
+            enum: [over, under, ok, in-progress, not-in-boq]
+        MaterialUsageRow:
+            type: object
+            required: [key, name, unit, boqQuantity, requestedQuantity, orderedQuantity, receivedQuantity, issuedQuantity, returnedQuantity, usedQuantity, variance, spent, status]
+            properties:
+                key: { type: string }
+                materialCode: { type: string }
+                name: { type: string }
+                unit: { type: string }
+                category: { type: string }
+                boqQuantity: { type: number }
+                requestedQuantity: { type: number, description: ขอซื้อ (ไม่นับที่ไม่อนุมัติ/ยกเลิก) }
+                orderedQuantity: { type: number, description: อยู่ในใบสั่งซื้อที่อนุมัติแล้ว }
+                receivedQuantity: { type: number, description: รับเข้าหน้างานจากการสั่งซื้อ }
+                issuedQuantity: { type: number, description: เบิกจากคลังหลัก }
+                returnedQuantity: { type: number, description: ส่งของเหลือเข้าคลังหลัก }
+                usedQuantity: { type: number, description: ใช้จริง = รับ + เบิก − ส่งคืน }
+                variance: { type: number, description: ใช้จริง − BOQ (บวก = เกิน) }
+                variancePercent: { type: [number, 'null'], description: เทียบกับ BOQ (null เมื่อไม่มีใน BOQ) }
+                spent: { type: number, description: มูลค่าที่รับเข้าตามราคาใบสั่งซื้อ (รวม VAT) }
+                status: { $ref: '#/components/schemas/MaterialUsageStatus' }
+        MaterialUsage:
+            type: object
+            required: [tolerancePercent, projectCompleted, rows]
+            properties:
+                tolerancePercent: { type: number, description: เกณฑ์ยอมรับส่วนต่าง (%) }
+                projectCompleted: { type: boolean }
+                rows: { type: array, items: { $ref: '#/components/schemas/MaterialUsageRow' } }
+        CompanyProfile:
+            type: object
+            required: [name, address, taxId, phone]
+            properties:
+                name: { type: string, minLength: 1, maxLength: 200 }
+                branch: { type: string, maxLength: 100, examples: [สำนักงานใหญ่] }
+                address: { type: string, maxLength: 500 }
+                taxId: { type: string, maxLength: 20 }
+                phone: { type: string, maxLength: 50 }
+                email: { type: string, maxLength: 100 }
         RentalSource:
             type: string
             description: rent = เช่าจากภายนอก (ต้องอนุมัติ), borrow = ยืมจากคลังบริษัท (ไม่ต้องอนุมัติ)
@@ -2167,6 +2492,13 @@ components:
                 value: { type: string }
                 label: { type: string }
                 description: { type: string }
+                visibleWhen:
+                    type: object
+                    description: เลือกได้เฉพาะเมื่อตัวเลือก key มีค่าอยู่ใน values (เช่น 4-8 ชั้นเฉพาะอาคารพาณิชย์)
+                    required: [key, values]
+                    properties:
+                        key: { type: string }
+                        values: { type: array, items: { type: string } }
         ConstructionOptionGroup:
             type: object
             required: [key, section, label, type, choices, default, affectsPhases]
@@ -2314,6 +2646,8 @@ components:
                 end: { type: string, format: date }
                 progress: { type: integer, minimum: 0, maximum: 100 }
                 status: { $ref: '#/components/schemas/TimelineStatus' }
+                startedOn: { type: string, format: date, description: วันที่บันทึกหน้างานครั้งแรกของงานนี้ (ไม่มี = ยังไม่มีการอัปเดต) }
+                lastUpdatedOn: { type: string, format: date, description: วันที่บันทึกหน้างาน/ผลตรวจล่าสุดของงานนี้ }
                 isHoldPoint: { type: boolean }
                 isMilestone: { type: boolean }
                 isPaymentMilestone: { type: boolean }

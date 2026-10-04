@@ -99,7 +99,8 @@ export class AppMenu {
                         icon: 'pi pi-fw pi-box',
                         path: '/inventory',
                         items: [
-                            { label: 'คลัง', icon: 'pi pi-fw pi-warehouse' },
+                            { label: 'รายการวัสดุ', icon: 'pi pi-fw pi-th-large', routerLink: ['/inventory/materials'] },
+                            { label: 'คลังหลัก', icon: 'pi pi-fw pi-warehouse', routerLink: ['/inventory/warehouse'] },
                             { label: 'เบิก', icon: 'pi pi-fw pi-sign-out' },
                             { label: 'คืน', icon: 'pi pi-fw pi-replay' },
                             { label: 'โอน', icon: 'pi pi-fw pi-arrow-right-arrow-left' },

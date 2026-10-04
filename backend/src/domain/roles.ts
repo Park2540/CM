@@ -22,7 +22,7 @@ export const ROLE_CATALOG: ApiSchemas['RoleCatalog'] = {
             label: 'เจ้าของบริษัท',
             access: 'ทุกระบบย่อยและทุกโครงการ อนุมัติทุกยอด ดู Dashboard กำไร-ขาดทุน',
             restriction: 'ไม่มี (แต่ทุกการกระทำมีบันทึกประวัติ)',
-            permissions: ['progress.update', 'personnel.sensitive', 'finance.company', 'approval.any', 'project.create', 'project.manage', 'user.manage', 'payment.record', 'procurement.manage']
+            permissions: ['progress.update', 'personnel.sensitive', 'finance.company', 'approval.any', 'project.create', 'project.manage', 'user.manage', 'payment.record', 'procurement.manage', 'procurement.receive']
         },
         { id: 'admin-staff', group: 'internal', label: 'ธุรการ', access: 'เอกสาร สัญญา จดหมายโต้ตอบ ทะเบียนบุคลากร ทะเบียนครุภัณฑ์ (ดู/แก้ข้อมูลทั่วไป)', restriction: 'ไม่เห็นราคาต้นทุนและกำไร', permissions: [] },
         {
@@ -42,9 +42,9 @@ export const ROLE_CATALOG: ApiSchemas['RoleCatalog'] = {
             label: 'ผู้จัดการโครงการ',
             access: 'ทุกอย่างในโครงการตน: แผนงาน BOQ งบ PR อนุมัติ ≤ เกณฑ์ (ตัวอย่าง ฿50,000) เช่าอุปกรณ์ รายงาน',
             restriction: 'ยอดเกินเกณฑ์ส่งเจ้าของอนุมัติ',
-            permissions: ['progress.update', 'project.manage', 'procurement.manage']
+            permissions: ['progress.update', 'project.manage', 'procurement.manage', 'procurement.receive']
         },
-        { id: 'engineer', group: 'project', label: 'วิศวกร', access: 'แบบ แผนงาน งานตรวจรับ ปัญหาคุณภาพ ขอเปลี่ยนแปลงงาน ดู BOQ', restriction: 'ไม่เห็นข้อมูลต้นทุนบริษัท ไม่อนุมัติจัดซื้อ', permissions: ['progress.update'] },
+        { id: 'engineer', group: 'project', label: 'วิศวกร', access: 'แบบ แผนงาน งานตรวจรับ ปัญหาคุณภาพ ขอเปลี่ยนแปลงงาน ดู BOQ', restriction: 'ไม่เห็นข้อมูลต้นทุนบริษัท ไม่อนุมัติจัดซื้อ', permissions: ['progress.update', 'procurement.receive'] },
         { id: 'architect', group: 'project', label: 'สถาปนิก', access: 'แบบสถาปัตย์ ข้อกำหนดวัสดุ การอนุมัติแบบกับลูกค้า', restriction: 'เหมือนวิศวกร', permissions: ['progress.update'] },
         {
             id: 'foreman',
@@ -52,7 +52,7 @@ export const ROLE_CATALOG: ApiSchemas['RoleCatalog'] = {
             label: 'โฟร์แมน',
             access: 'บันทึกความคืบหน้ารายวัน รูปหน้างาน ขอซื้อ (PR) รับของ รับ-คืนของเช่า เช็กชื่อแรงงาน',
             restriction: 'ไม่เห็นราคา งบ หรืออัตราเช่า และเห็นเฉพาะโครงการของตน',
-            permissions: ['progress.update']
+            permissions: ['progress.update', 'procurement.receive']
         },
         { id: 'safety-officer', group: 'project', label: 'เจ้าหน้าที่ความปลอดภัย (จป.)', access: 'รายงานความปลอดภัย อุบัติเหตุ ตรวจนั่งร้าน', restriction: 'ไม่เห็นการเงิน', permissions: [], suggested: true },
         { id: 'subcontractor', group: 'external', label: 'ผู้รับเหมาช่วง', access: 'งานที่ได้รับมอบ ความคืบหน้าของตน ส่งงวดงาน/ใบเรียกเก็บ ดูแบบที่เกี่ยวข้อง', restriction: 'ไม่เห็นผู้รับเหมารายอื่น ไม่เห็นงบรวม', permissions: [] },
