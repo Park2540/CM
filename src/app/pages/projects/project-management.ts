@@ -104,6 +104,17 @@ const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
                             <a [href]="url" target="_blank" rel="noopener" class="text-primary text-sm font-semibold no-underline hover:underline"><i class="pi pi-directions text-xs mr-1"></i>นำทาง</a>
                         }
                     </div>
+                    <!-- ช่องทางติดต่อลูกค้า: กดแล้วโทร / เปิด LINE / ส่งอีเมลได้ทันที -->
+                    <div class="flex flex-wrap items-center gap-2 mt-3" role="group" aria-label="ช่องทางติดต่อลูกค้า">
+                        <span class="text-sm text-muted-color"><i class="pi pi-user mr-1"></i>{{ project.customerName }}</span>
+                        <a [href]="'tel:' + phoneDigits(project.phone)" class="contact-chip"><i class="pi pi-phone"></i>{{ project.phone }}</a>
+                        @if (project.customerLineId) {
+                            <a [href]="lineUrl(project.customerLineId)" target="_blank" rel="noopener" class="contact-chip contact-line" [attr.aria-label]="'LINE ' + project.customerLineId"><i class="pi pi-comment"></i>LINE {{ project.customerLineId }}</a>
+                        }
+                        @if (project.customerEmail) {
+                            <a [href]="'mailto:' + project.customerEmail + '?subject=' + encode('โครงการ ' + project.code + ' ' + project.name)" class="contact-chip"><i class="pi pi-envelope"></i>{{ project.customerEmail }}</a>
+                        }
+                    </div>
                     <dl class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 mb-0">
                         <div>
                             <dt class="text-sm text-muted-color">วันเริ่มงาน</dt>
@@ -453,6 +464,29 @@ const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
         } @else {
             <div class="card text-center text-muted-color py-12"><i class="pi pi-spin pi-spinner mr-2"></i>กำลังโหลดข้อมูลโครงการ...</div>
         }
+    `,
+    styles: `
+        .contact-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.3rem 0.75rem;
+            border-radius: 999px;
+            border: 1px solid var(--p-content-border-color);
+            color: var(--p-text-color);
+            font-size: 0.875rem;
+            text-decoration: none;
+        }
+        .contact-chip:hover {
+            border-color: var(--p-primary-color);
+            color: var(--p-primary-color);
+        }
+        .contact-chip .pi {
+            font-size: 0.8rem;
+        }
+        .contact-line .pi {
+            color: #06c755;
+        }
     `
 })
 export class ProjectManagement {
@@ -550,6 +584,19 @@ export class ProjectManagement {
     readonly canApproveChanges = computed(() => this.auth.can('approval.any'));
     readonly canRecordPayment = computed(() => this.auth.can('payment.record'));
     readonly abs = Math.abs;
+    readonly encode = encodeURIComponent;
+
+    /** เบอร์สำหรับลิงก์ tel: (ตัดขีด/ช่องว่าง) */
+    phoneDigits(phone: string) {
+        return phone.replace(/[^\d+]/g, '');
+    }
+
+    /** เปิดแชต LINE จาก LINE ID (บัญชีทางการขึ้นต้นด้วย @) */
+    lineUrl(lineId: string) {
+        const id = lineId.trim();
+        return id.startsWith('@') ? `https://line.me/R/ti/p/${encodeURIComponent(id)}` : `https://line.me/ti/p/~${encodeURIComponent(id)}`;
+    }
+
     readonly team = this.teamResource.value;
     readonly recentPhotos = this.recentPhotosResource.value;
 

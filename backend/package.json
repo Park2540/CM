@@ -11,6 +11,7 @@
     "api:types": "openapi-typescript ../api/openapi.yaml -o src/api/schema.ts"
   },
   "dependencies": {
+    "exceljs": "^4.4.0",
     "express": "^5.2.1",
     "koffi": "^2.16.3",
     "mongoose": "^8.24.4",

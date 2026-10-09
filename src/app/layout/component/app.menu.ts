@@ -61,6 +61,10 @@ export class AppMenu {
                 ]
             },
             {
+                label: 'ออกแบบและประมาณราคา',
+                items: [{ label: 'ถอดปริมาณและ BOQ', icon: 'pi pi-fw pi-calculator', routerLink: ['/estimates'] }]
+            },
+            {
                 label: 'การเงินและจัดซื้อ',
                 items: [
                     {

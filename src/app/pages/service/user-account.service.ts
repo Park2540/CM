@@ -26,6 +26,7 @@ export const PERMISSION_INFO: Record<Permission, { label: string; description: s
     'payment.record': { label: 'บันทึกรับชำระเงิน', description: 'บันทึกและยกเลิกการรับชำระเงินงวดงานจากลูกค้า พร้อมหลักฐาน' },
     'procurement.manage': { label: 'จัดซื้อและเช่าอุปกรณ์', description: 'ออกใบสั่งซื้อ รับของเข้าหน้างาน รับ/คืนอุปกรณ์ที่เช่าหรือยืม' },
     'procurement.receive': { label: 'ตรวจรับของและคลังหน้างาน', description: 'ตรวจรับของที่หน้างาน รับ/คืนอุปกรณ์เช่า ส่งของเหลือเข้าคลังหลักและเบิกจากคลัง' },
+    'estimate.manage': { label: 'ถอดปริมาณและ BOQ', description: 'สร้าง แก้ไข และลบใบถอดปริมาณ/BOQ ประมาณราคาค่าก่อสร้าง' }
 };
 export const PERMISSIONS = Object.keys(PERMISSION_INFO) as Permission[];
 

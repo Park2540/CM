@@ -3,6 +3,7 @@ import { existsSync, readdirSync } from 'node:fs';
 import { delimiter, join } from 'node:path';
 import { Worker } from 'node:worker_threads';
 import { config } from '../config.js';
+import type { IfcTakeoffResult } from './ifc-takeoff.js';
 
 
 export class ConversionError extends Error {
@@ -56,7 +57,14 @@ export function convertModel(kind: ConvertKind, input: string, output: string, e
     return job;
 }
 
-function runWorker(kind: ConvertKind, input: string, output: string, elementsOutput?: string): Promise<ConversionSummary> {
+/** ถอดปริมาณจากไฟล์ IFC (คิวเดียวกับการแปลง เพราะใช้หน่วยความจำมากเหมือนกัน) */
+export function runIfcTakeoff(input: string): Promise<IfcTakeoffResult> {
+    const job = queue.then(() => runWorker('takeoff', input, '') as unknown as Promise<IfcTakeoffResult>);
+    queue = job.catch(() => undefined);
+    return job;
+}
+
+function runWorker(kind: ConvertKind | 'takeoff', input: string, output: string, elementsOutput?: string): Promise<ConversionSummary> {
     const apiDir = kind === 'skp' ? sketchupApiDir() : '';
     if (kind === 'skp' && !apiDir) return Promise.reject(new ConversionError('เซิร์ฟเวอร์ไม่มี SketchUp สำหรับแปลงไฟล์'));
     // ตอนพัฒนารันผ่าน tsx (ไฟล์ .ts) — worker ใช้ execArgv เดียวกับ process หลักจึงโหลด .ts ได้

@@ -100,6 +100,15 @@ const OPTION_DEFINITIONS: Omit<OptionGroup, 'affectsPhases'>[] = [
         visibleWhen: { key: 'foundation', values: ['driven', 'bored', 'micropile'] }
     },
     {
+        key: 'termite',
+        section: 'งานฐานราก',
+        label: 'ระบบท่อป้องกันกำจัดปลวก',
+        description: 'วางท่อใต้พื้นและรอบคานคอดิน ทดสอบก่อนเทพื้น อัดน้ำยาครั้งแรกตอนส่งมอบ',
+        type: 'boolean',
+        default: true,
+        choices: []
+    },
+    {
         key: 'slabType',
         section: 'งานโครงสร้าง',
         label: 'ระบบพื้นชั้นบน',
@@ -130,7 +139,25 @@ const OPTION_DEFINITIONS: Omit<OptionGroup, 'affectsPhases'>[] = [
         default: 'aac',
         choices: [
             { value: 'aac', label: 'อิฐมวลเบา', description: 'ใช้ปูนก่อและปูนฉาบสำหรับอิฐมวลเบา' },
-            { value: 'brick', label: 'อิฐมอญ' }
+            { value: 'brick', label: 'อิฐมอญ', description: 'ก่อด้วยปูนก่อทั่วไป ฉาบปูน' },
+            { value: 'block', label: 'คอนกรีตบล็อก', description: 'เสริมเหล็ก/กรอกปูนตามแบบ เหมาะกับผนังรับแรงหรือรั้ว' },
+            { value: 'exposedBrick', label: 'อิฐโชว์แนว', description: 'ไม่ฉาบด้านนอก ยาแนวและเคลือบกันซึมแทน' },
+            { value: 'precast', label: 'ผนังคอนกรีตสำเร็จรูป (Precast)', description: 'ติดตั้งเร็ว ยาแนวรอยต่อ ฉาบบางแทนฉาบหนา' },
+            { value: 'lightFrame', label: 'โครงเหล็กเบา + แผ่นบอร์ด', description: 'ไฟเบอร์ซีเมนต์ภายนอก ยิปซัมภายใน ไม่ต้องฉาบปูน' }
+        ]
+    },
+    {
+        key: 'partitions',
+        section: 'งานผนังและฉาบ',
+        label: 'ผนังเพิ่มเติม',
+        description: 'ผนังกั้นห้องหรือผนังตกแต่งที่ใช้วัสดุต่างจากผนังหลัก',
+        type: 'multiple',
+        default: [],
+        choices: [
+            { value: 'gypsum', label: 'ผนังเบายิปซัมบอร์ด', description: 'ผนังกั้นห้องภายใน โครงเหล็กชุบสังกะสี' },
+            { value: 'fiberCement', label: 'ผนังไฟเบอร์ซีเมนต์บอร์ด', description: 'ห้องน้ำหรือผนังภายนอกที่ต้องการน้ำหนักเบา' },
+            { value: 'glassBlock', label: 'บล็อกแก้ว' },
+            { value: 'ventBlock', label: 'บล็อกช่องลม' }
         ]
     },
     {
@@ -173,6 +200,7 @@ const OPTION_DEFINITIONS: Omit<OptionGroup, 'affectsPhases'>[] = [
         default: ['aircon'],
         choices: [
             { value: 'aircon', label: 'เครื่องปรับอากาศ', description: 'ออกแบบ เดินท่อน้ำยาก่อนฉาบ ติดตั้งและทดสอบ' },
+            { value: 'hotWater', label: 'ระบบท่อน้ำร้อน', description: 'เดินท่อ PPR หุ้มฉนวนก่อนฉาบ ติดตั้งเครื่องทำน้ำร้อน/ปั๊มความร้อน' },
             { value: 'solar', label: 'โซลาร์เซลล์', description: 'ติดตั้งแผงและอินเวอร์เตอร์ ขออนุญาตขนานไฟ' },
             { value: 'lightning', label: 'ระบบป้องกันฟ้าผ่า' },
             { value: 'fire', label: 'ระบบป้องกันอัคคีภัย', description: 'ออกแบบ ติดตั้ง และทดสอบระบบดับเพลิง/สัญญาณเตือน' },

@@ -22,7 +22,7 @@ export const ROLE_CATALOG: ApiSchemas['RoleCatalog'] = {
             label: 'เจ้าของบริษัท',
             access: 'ทุกระบบย่อยและทุกโครงการ อนุมัติทุกยอด ดู Dashboard กำไร-ขาดทุน',
             restriction: 'ไม่มี (แต่ทุกการกระทำมีบันทึกประวัติ)',
-            permissions: ['progress.update', 'personnel.sensitive', 'finance.company', 'approval.any', 'project.create', 'project.manage', 'user.manage', 'payment.record', 'procurement.manage', 'procurement.receive']
+            permissions: ['progress.update', 'personnel.sensitive', 'finance.company', 'approval.any', 'project.create', 'project.manage', 'user.manage', 'payment.record', 'procurement.manage', 'procurement.receive', 'estimate.manage']
         },
         { id: 'admin-staff', group: 'internal', label: 'ธุรการ', access: 'เอกสาร สัญญา จดหมายโต้ตอบ ทะเบียนบุคลากร ทะเบียนครุภัณฑ์ (ดู/แก้ข้อมูลทั่วไป)', restriction: 'ไม่เห็นราคาต้นทุนและกำไร', permissions: [] },
         {
@@ -42,10 +42,10 @@ export const ROLE_CATALOG: ApiSchemas['RoleCatalog'] = {
             label: 'ผู้จัดการโครงการ',
             access: 'ทุกอย่างในโครงการตน: แผนงาน BOQ งบ PR อนุมัติ ≤ เกณฑ์ (ตัวอย่าง ฿50,000) เช่าอุปกรณ์ รายงาน',
             restriction: 'ยอดเกินเกณฑ์ส่งเจ้าของอนุมัติ',
-            permissions: ['progress.update', 'project.manage', 'procurement.manage', 'procurement.receive']
+            permissions: ['progress.update', 'project.manage', 'procurement.manage', 'procurement.receive', 'estimate.manage']
         },
-        { id: 'engineer', group: 'project', label: 'วิศวกร', access: 'แบบ แผนงาน งานตรวจรับ ปัญหาคุณภาพ ขอเปลี่ยนแปลงงาน ดู BOQ', restriction: 'ไม่เห็นข้อมูลต้นทุนบริษัท ไม่อนุมัติจัดซื้อ', permissions: ['progress.update', 'procurement.receive'] },
-        { id: 'architect', group: 'project', label: 'สถาปนิก', access: 'แบบสถาปัตย์ ข้อกำหนดวัสดุ การอนุมัติแบบกับลูกค้า', restriction: 'เหมือนวิศวกร', permissions: ['progress.update'] },
+        { id: 'engineer', group: 'project', label: 'วิศวกร', access: 'แบบ แผนงาน งานตรวจรับ ปัญหาคุณภาพ ขอเปลี่ยนแปลงงาน ดู BOQ', restriction: 'ไม่เห็นข้อมูลต้นทุนบริษัท ไม่อนุมัติจัดซื้อ', permissions: ['progress.update', 'procurement.receive', 'estimate.manage'] },
+        { id: 'architect', group: 'project', label: 'สถาปนิก', access: 'แบบสถาปัตย์ ข้อกำหนดวัสดุ การอนุมัติแบบกับลูกค้า', restriction: 'เหมือนวิศวกร', permissions: ['progress.update', 'estimate.manage'] },
         {
             id: 'foreman',
             group: 'project',

@@ -970,6 +970,129 @@ paths:
                 '403': { $ref: '#/components/responses/Forbidden' }
                 '422': { $ref: '#/components/responses/ValidationError' }
 
+    /estimates:
+        get:
+            tags: [estimates]
+            summary: ใบถอดปริมาณ/BOQ ทั้งหมด (แก้ไขล่าสุดก่อน)
+            operationId: listEstimates
+            responses:
+                '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/EstimateSummary' } } } } }
+        post:
+            tags: [estimates]
+            summary: สร้าง BOQ ใหม่ (สิทธิ์ estimate.manage)
+            operationId: createEstimate
+            requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/EstimateCreateInput' } } } }
+            responses:
+                '201': { description: สร้างแล้ว, content: { application/json: { schema: { $ref: '#/components/schemas/Estimate' } } } }
+                '403': { $ref: '#/components/responses/Forbidden' }
+                '404': { $ref: '#/components/responses/NotFound' }
+                '422': { $ref: '#/components/responses/ValidationError' }
+
+    /estimates/{id}:
+        parameters:
+            - { name: id, in: path, required: true, schema: { type: string } }
+        get:
+            tags: [estimates]
+            summary: BOQ พร้อมยอดรวม
+            operationId: getEstimate
+            responses:
+                '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Estimate' } } } }
+                '404': { $ref: '#/components/responses/NotFound' }
+        put:
+            tags: [estimates]
+            summary: บันทึก BOQ ทั้งฉบับ (สิทธิ์ estimate.manage) — หลังบ้านคำนวณปริมาณจากการถอดและยอดรวมใหม่
+            operationId: saveEstimate
+            requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/EstimateInput' } } } }
+            responses:
+                '200': { description: บันทึกแล้ว, content: { application/json: { schema: { $ref: '#/components/schemas/Estimate' } } } }
+                '403': { $ref: '#/components/responses/Forbidden' }
+                '404': { $ref: '#/components/responses/NotFound' }
+                '422': { $ref: '#/components/responses/ValidationError' }
+        delete:
+            tags: [estimates]
+            summary: ลบ BOQ (สิทธิ์ estimate.manage)
+            operationId: deleteEstimate
+            responses:
+                '204': { description: ลบแล้ว }
+                '403': { $ref: '#/components/responses/Forbidden' }
+                '404': { $ref: '#/components/responses/NotFound' }
+
+    /estimates/from-model:
+        post:
+            tags: [estimates]
+            summary: ถอด BOQ และรายการวัสดุจากโมเดล IFC ของโครงการ (สิทธิ์ estimate.manage) — สร้าง BOQ ฉบับร่าง
+            description: |
+                ใช้ปริมาณในไฟล์ (BaseQuantities) ถ้ามี ไม่มีคำนวณจากรูปทรง: คอนกรีต (ลบ.ม.) ไม้แบบ (ตร.ม. ผิวข้าง/ล่าง) เหล็กเสริม (กก. จากแนวเหล็ก)
+                เหล็กรูปพรรณ (กก. = ปริมาตร × 7,850) แผ่นพื้นสำเร็จ (ตร.ม.) เสาเข็ม (ต้น) หลังคา (ตร.ม.) — ราคาต่อหน่วยจากคลังราคา
+            operationId: createEstimateFromModel
+            requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/EstimateFromModelInput' } } } }
+            responses:
+                '201': { description: สร้างแล้ว, content: { application/json: { schema: { $ref: '#/components/schemas/Estimate' } } } }
+                '403': { $ref: '#/components/responses/Forbidden' }
+                '404': { $ref: '#/components/responses/NotFound' }
+                '409': { $ref: '#/components/responses/Conflict' }
+                '422': { $ref: '#/components/responses/ValidationError' }
+
+    /estimates/{id}/apply-materials:
+        parameters:
+            - { name: id, in: path, required: true, schema: { type: string } }
+        post:
+            tags: [estimates]
+            summary: ส่งรายการวัสดุของ BOQ (ถอดจากโมเดล) เข้า BOQ วัสดุของโครงการ — แทนที่ทั้งชุด (สิทธิ์ project.manage)
+            operationId: applyEstimateMaterials
+            responses:
+                '200': { description: บันทึกแล้ว, content: { application/json: { schema: { $ref: '#/components/schemas/ProjectBoq' } } } }
+                '403': { $ref: '#/components/responses/Forbidden' }
+                '404': { $ref: '#/components/responses/NotFound' }
+                '409': { $ref: '#/components/responses/Conflict' }
+
+    /estimates/{id}/export:
+        parameters:
+            - { name: id, in: path, required: true, schema: { type: string } }
+        get:
+            tags: [estimates]
+            summary: ส่งออก BOQ เป็นไฟล์ Excel (.xlsx) — sheet สรุปราคา + sheet ละหมวดงาน (ช่องราคารวมเป็นสูตร) + ถอดปริมาณ + รายการวัสดุจากโมเดล
+            operationId: exportEstimate
+            responses:
+                '200':
+                    description: ไฟล์ Excel
+                    content:
+                        application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+                            schema: { type: string, format: binary }
+                '404': { $ref: '#/components/responses/NotFound' }
+
+    /settings/overhead-statement:
+        get:
+            tags: [estimates]
+            summary: แม่แบบเอกสารชี้แจงค่าดำเนินการของบริษัท (BOQ ใหม่คัดลอกแม่แบบนี้)
+            operationId: getStatementTemplate
+            responses:
+                '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/OverheadStatement' } } } }
+        put:
+            tags: [estimates]
+            summary: บันทึกแม่แบบเอกสารชี้แจงค่าดำเนินการ (สิทธิ์ project.manage) — ไม่กระทบ BOQ ที่สร้างไปแล้ว
+            operationId: saveStatementTemplate
+            requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/OverheadStatement' } } } }
+            responses:
+                '200': { description: บันทึกแล้ว, content: { application/json: { schema: { $ref: '#/components/schemas/OverheadStatement' } } } }
+                '403': { $ref: '#/components/responses/Forbidden' }
+                '422': { $ref: '#/components/responses/ValidationError' }
+        delete:
+            tags: [estimates]
+            summary: คืนแม่แบบเป็นค่าตั้งต้นของระบบ (สิทธิ์ project.manage)
+            operationId: resetStatementTemplate
+            responses:
+                '200': { description: คืนค่าแล้ว, content: { application/json: { schema: { $ref: '#/components/schemas/OverheadStatement' } } } }
+                '403': { $ref: '#/components/responses/Forbidden' }
+
+    /estimate-rates:
+        get:
+            tags: [estimates]
+            summary: คลังราคาต่อหน่วย (วัสดุ + ค่าแรง) ใช้เพิ่มรายการใน BOQ — รวมรายการจาก BOQ ทุกฉบับ ราคาล่าสุดก่อน
+            operationId: listEstimateRates
+            responses:
+                '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/EstimateRate' } } } } }
+
     /projects/{code}/rentals:
         parameters:
             - $ref: '#/components/parameters/ProjectCode'
@@ -1850,7 +1973,8 @@ components:
                 - payment.record: บันทึก/ยกเลิกการรับชำระเงินงวดงานของลูกค้า
                 - procurement.manage: จัดซื้อและเช่า: ออกใบสั่งซื้อ รับของ รับ/คืนอุปกรณ์ที่เช่า/ยืม แก้รายการวัสดุ
                 - procurement.receive: ตรวจรับของที่หน้างาน รับ/คืนอุปกรณ์เช่า ส่งของเหลือเข้าคลังหลัก/เบิกจากคลัง (ผู้จัดการโครงการ วิศวกร โฟร์แมน เจ้าของบริษัท)
-            enum: [progress.update, personnel.sensitive, finance.company, approval.any, project.create, project.manage, user.manage, payment.record, procurement.manage, procurement.receive]
+                - estimate.manage: ถอดปริมาณและจัดทำ BOQ/ใบประมาณราคา
+            enum: [progress.update, personnel.sensitive, finance.company, approval.any, project.create, project.manage, user.manage, payment.record, procurement.manage, procurement.receive, estimate.manage]
         CurrentUser:
             type: object
             required: [id, name, roleId, roleLabel, projectCodes, email, lastLoginAt, permissions]
@@ -2405,6 +2529,251 @@ components:
                 taxId: { type: string, maxLength: 20 }
                 phone: { type: string, maxLength: 50 }
                 email: { type: string, maxLength: 100 }
+        TakeoffMethod:
+            type: string
+            description: |
+                วิธีถอดปริมาณ
+                - volume: กว้าง × ยาว × สูง/ลึก × จำนวน (ลบ.ม.)
+                - area: กว้าง × ยาว × จำนวน (ตร.ม.)
+                - length: ยาว × จำนวน (เมตร)
+                - count: จำนวน
+                - rebar: น้ำหนักเหล็กเส้น = ยาวต่อเส้น × จำนวนเส้น × น้ำหนักต่อเมตรตามขนาด (กก.)
+                - steel: เหล็กรูปพรรณ = ยาว × จำนวน × กก./ม. (กก.)
+                - model: ปริมาณจากโมเดล IFC (ค่าใน count) — label บอกชิ้นงานที่นับ
+            enum: [volume, area, length, count, rebar, steel, model]
+        TakeoffLine:
+            type: object
+            required: [id, method, count]
+            properties:
+                id: { type: string }
+                label: { type: string, maxLength: 200, examples: [F1 ฐานราก 1.20x1.20 ม.] }
+                method: { $ref: '#/components/schemas/TakeoffMethod' }
+                width: { type: number, minimum: 0, description: กว้าง (ม.) }
+                length: { type: number, minimum: 0, description: ยาว (ม.) }
+                height: { type: number, minimum: 0, description: สูง/ลึก/หนา (ม.) }
+                count: { type: number, minimum: 0, description: จำนวน (ชิ้น/ต้น/เส้น) }
+                diameter: { type: number, minimum: 0, description: ขนาดเหล็กเส้น (มม.) สำหรับ rebar }
+                kgPerMeter: { type: number, minimum: 0, description: น้ำหนักต่อเมตร สำหรับ steel }
+                deduct: { type: boolean, description: บรรทัดหัก (เช่น หักช่องเปิด) }
+                result: { type: number, description: ผลของบรรทัด (หลังบ้านคำนวณ) }
+        EstimateItem:
+            type: object
+            required: [id, kind, description, quantity, materialPrice, laborPrice]
+            properties:
+                id: { type: string }
+                kind: { type: string, enum: [item, heading], description: heading = หัวข้อย่อยในหมวด (เช่น งานเหล็กเสริมคอนกรีต) ไม่มีปริมาณ }
+                description: { type: string, maxLength: 300 }
+                unit: { type: string, maxLength: 30 }
+                quantity: { type: number, minimum: 0, description: ปริมาณ (มีบรรทัดถอดปริมาณ = หลังบ้านคำนวณจาก takeoff × (1 + waste%)) }
+                materialPrice: { type: number, minimum: 0, description: ราคาวัสดุต่อหน่วย }
+                laborPrice: { type: number, minimum: 0, description: ราคาค่าแรงต่อหน่วย }
+                waste: { type: number, minimum: 0, maximum: 100, description: เผื่อเสีย (%) ใช้กับปริมาณจากการถอด }
+                indent: { type: boolean, description: รายการย่อยใต้หัวข้อ (แสดงเยื้อง) }
+                takeoff: { type: array, maxItems: 200, items: { $ref: '#/components/schemas/TakeoffLine' } }
+                note: { type: string, maxLength: 300 }
+        EstimateGroup:
+            type: object
+            required: [id, title, items]
+            properties:
+                id: { type: string }
+                title: { type: string, maxLength: 200, examples: [ฐานราก-ต่อม่อ] }
+                items: { type: array, maxItems: 300, items: { $ref: '#/components/schemas/EstimateItem' } }
+        EstimateCategory:
+            type: object
+            required: [id, name, groups]
+            properties:
+                id: { type: string }
+                name: { type: string, maxLength: 200, examples: [งานโครงสร้างคอนกรีตเสริมเหล็ก] }
+                excluded: { type: boolean, description: ไม่รวมในสรุปราคา (เช่น งานเสนอเพิ่ม) }
+                groups: { type: array, maxItems: 50, items: { $ref: '#/components/schemas/EstimateGroup' } }
+        EstimateInput:
+            type: object
+            required: [title, categories]
+            properties:
+                title: { type: string, minLength: 1, maxLength: 200, examples: [บ้านพักอาศัย ค.ส.ล. 1 ชั้น] }
+                projectCode: { type: string, description: โครงการที่เกี่ยวข้อง (ไม่บังคับ) }
+                location: { type: string, maxLength: 300 }
+                ownerName: { type: string, maxLength: 200, description: เจ้าของโครงการ }
+                estimator: { type: string, maxLength: 200, description: ผู้เสนอราคา }
+                estimateDate: { type: string, format: date }
+                area: { type: number, minimum: 0, description: พื้นที่ทั้งหมด (ตร.ม.) ใช้คำนวณราคาเฉลี่ยต่อ ตร.ม. }
+                overheadPercent: { type: number, minimum: 0, maximum: 100, description: ค่าดำเนินการ (%) คิดจากค่าวัสดุ + ค่าแรง }
+                profitPercent: { type: number, minimum: 0, maximum: 100, description: กำไรของบริษัท (%) คิดจากค่าวัสดุ + ค่าแรง }
+                vatPercent: { type: number, minimum: 0, maximum: 100, description: ภาษีมูลค่าเพิ่ม (%) คิดจากราคารวมก่อนภาษี — BOQ ใหม่ตั้งต้น 7 }
+                status: { type: string, enum: [draft, final], description: draft = ร่าง, final = ส่งลูกค้าแล้ว }
+                notes: { type: array, maxItems: 20, items: { type: string, maxLength: 300 }, description: หมายเหตุท้ายสรุป เช่น ไม่รวมปั๊มน้ำ ถังเก็บน้ำ }
+                categories: { type: array, maxItems: 30, items: { $ref: '#/components/schemas/EstimateCategory' } }
+                statement: { $ref: '#/components/schemas/OverheadStatement' }
+        ResponsibilityRow:
+            type: object
+            required: [id, item, contractor, owner]
+            properties:
+                id: { type: string }
+                item: { type: string, maxLength: 300, examples: [ค่าไฟฟ้าระหว่างก่อสร้าง] }
+                contractor: { type: boolean, description: ผู้รับเหมารับผิดชอบ }
+                owner: { type: boolean, description: เจ้าของโครงการรับผิดชอบ }
+                note: { type: string, maxLength: 300 }
+        StatementBlock:
+            type: object
+            description: |
+                เนื้อหาในหัวข้อ
+                - paragraph: ย่อหน้า (text)
+                - list: รายการ (items) — style number = 1. 2. 3., bullet = จุด, clause = เลขตามหัวข้อ (3.1 3.2 …) มีหัวรายการ (title) ได้
+                - responsibility: ตารางแบ่งความรับผิดชอบค่าใช้จ่าย (rows)
+            required: [id, kind]
+            properties:
+                id: { type: string }
+                kind: { type: string, enum: [paragraph, list, responsibility] }
+                text: { type: string, maxLength: 3000 }
+                style: { type: string, enum: [number, bullet, clause] }
+                title: { type: string, maxLength: 300 }
+                items: { type: array, maxItems: 60, items: { type: string, maxLength: 3000 } }
+                rows: { type: array, maxItems: 60, items: { $ref: '#/components/schemas/ResponsibilityRow' } }
+        StatementSubsection:
+            type: object
+            required: [id, title, blocks]
+            properties:
+                id: { type: string }
+                title: { type: string, maxLength: 300 }
+                blocks: { type: array, maxItems: 30, items: { $ref: '#/components/schemas/StatementBlock' } }
+        StatementSection:
+            type: object
+            required: [id, title, blocks, subsections]
+            properties:
+                id: { type: string }
+                title: { type: string, maxLength: 300 }
+                blocks: { type: array, maxItems: 30, items: { $ref: '#/components/schemas/StatementBlock' } }
+                subsections: { type: array, maxItems: 40, items: { $ref: '#/components/schemas/StatementSubsection' } }
+        OverheadStatement:
+            type: object
+            description: เอกสารชี้แจงรายละเอียดค่าดำเนินการก่อสร้าง (แนบท้าย BOQ) — เลขหัวข้อระบบนับให้ตอนแสดงผล
+            required: [title, sections]
+            properties:
+                title: { type: string, minLength: 1, maxLength: 300 }
+                subtitle: { type: string, maxLength: 300 }
+                sections: { type: array, maxItems: 30, items: { $ref: '#/components/schemas/StatementSection' } }
+        EstimateTotals:
+            type: object
+            required: [categories, material, labor, subtotal, overhead, profit, beforeVat, vat, grandTotal]
+            properties:
+                categories:
+                    type: array
+                    items:
+                        type: object
+                        required: [id, material, labor, total]
+                        properties:
+                            id: { type: string }
+                            material: { type: number }
+                            labor: { type: number }
+                            total: { type: number }
+                material: { type: number, description: รวมค่าวัสดุ (เฉพาะหมวดที่รวมในสรุป) }
+                labor: { type: number }
+                subtotal: { type: number, description: วัสดุ + ค่าแรง }
+                overhead: { type: number, description: ค่าดำเนินการ }
+                profit: { type: number, description: กำไร }
+                beforeVat: { type: number, description: รวมก่อนภาษีมูลค่าเพิ่ม (วัสดุ + ค่าแรง + ค่าดำเนินการ + กำไร) }
+                vat: { type: number, description: ภาษีมูลค่าเพิ่ม }
+                grandTotal: { type: number, description: รวมเป็นเงินทั้งสิ้น (รวมภาษีมูลค่าเพิ่ม) }
+                pricePerSqm: { type: [number, 'null'], description: ราคาเฉลี่ยต่อ ตร.ม. (null เมื่อไม่ระบุพื้นที่) }
+        Estimate:
+            allOf:
+                - $ref: '#/components/schemas/EstimateInput'
+                - type: object
+                  required: [id, status, overheadPercent, profitPercent, vatPercent, notes, statement, totals, createdBy, createdAt, updatedAt]
+                  properties:
+                      id: { type: string, examples: [EST-6910-0001] }
+                      totals: { $ref: '#/components/schemas/EstimateTotals' }
+                      source: { $ref: '#/components/schemas/EstimateSource' }
+                      createdBy: { $ref: '#/components/schemas/UserRef' }
+                      createdAt: { type: string, format: date-time }
+                      updatedBy: { $ref: '#/components/schemas/UserRef' }
+                      updatedAt: { type: string, format: date-time }
+        EstimateMaterial:
+            type: object
+            description: รายการวัสดุที่คำนวณจากปริมาณงาน (เผื่อเสียแล้ว) ใช้ส่งเข้า BOQ วัสดุของโครงการ
+            required: [name, unit, quantity, basis]
+            properties:
+                materialCode: { type: string, description: รหัสในรายการวัสดุ (ถ้าจับคู่ได้) }
+                name: { type: string }
+                unit: { type: string }
+                quantity: { type: number }
+                basis: { type: string, description: ที่มาของจำนวน เช่น 34.2 ลบ.ม. + เผื่อ 5% }
+        EstimateSource:
+            type: object
+            description: BOQ ที่ระบบถอดจากโมเดล IFC
+            required: [kind, projectCode, modelId, fileName, analyzedAt, elements, seconds, warnings, materials, components]
+            properties:
+                kind: { type: string, enum: [ifc] }
+                projectCode: { type: string }
+                modelId: { type: string }
+                modelTitle: { type: string }
+                fileName: { type: string }
+                application: { type: string, description: โปรแกรมที่ส่งออก เช่น Autodesk Revit 2027 }
+                schema: { type: string, examples: [IFC2X3] }
+                analyzedAt: { type: string, format: date-time }
+                elements: { type: integer, description: จำนวนชิ้นงานที่ถอด }
+                seconds: { type: number }
+                warnings: { type: array, items: { type: string } }
+                materials: { type: array, items: { $ref: '#/components/schemas/EstimateMaterial' } }
+                components:
+                    type: array
+                    description: สรุปชิ้นงานในโมเดลตามชนิด (ตรวจสอบที่มาของตัวเลข)
+                    items:
+                        type: object
+                        required: [storey, kind, label, count, volume, area, length, weight]
+                        properties:
+                            storey: { type: string }
+                            kind: { type: string }
+                            label: { type: string, examples: [คาน 0.20x0.40 m] }
+                            material: { type: string }
+                            count: { type: integer }
+                            volume: { type: number }
+                            area: { type: number }
+                            length: { type: number }
+                            weight: { type: number }
+                appliedAt: { type: string, format: date-time, description: ส่งรายการวัสดุเข้า BOQ วัสดุของโครงการล่าสุด }
+        EstimateFromModelInput:
+            type: object
+            required: [projectCode, modelId]
+            properties:
+                projectCode: { type: string }
+                modelId: { type: string, description: เวอร์ชันแบบ 3 มิติของโครงการที่มีไฟล์ต้นฉบับ .ifc }
+                title: { type: string, maxLength: 200 }
+                concreteGrade: { type: number, description: กำลังอัดคอนกรีต (ksc) เมื่อวัสดุในโมเดลไม่ระบุ — ค่าตั้งต้น 210 }
+        EstimateSummary:
+            type: object
+            required: [id, title, status, grandTotal, itemCount, updatedAt]
+            properties:
+                id: { type: string }
+                title: { type: string }
+                projectCode: { type: string }
+                location: { type: string }
+                ownerName: { type: string }
+                status: { type: string, enum: [draft, final] }
+                area: { type: number }
+                grandTotal: { type: number }
+                pricePerSqm: { type: [number, 'null'] }
+                itemCount: { type: integer }
+                fromModel: { type: boolean, description: ถอดจากโมเดล IFC }
+                updatedAt: { type: string, format: date-time }
+        EstimateCreateInput:
+            type: object
+            required: [title]
+            properties:
+                title: { type: string, minLength: 1, maxLength: 200 }
+                projectCode: { type: string }
+                template: { type: string, enum: [standard, blank], description: standard = หมวดงานมาตรฐาน 6 หมวด, blank = ว่าง }
+                copyFrom: { type: string, description: คัดลอกจาก BOQ เดิม (id) — มีค่านี้ไม่ใช้ template }
+        EstimateRate:
+            type: object
+            required: [category, description, unit, materialPrice, laborPrice]
+            properties:
+                category: { type: string }
+                group: { type: string }
+                description: { type: string }
+                unit: { type: string }
+                materialPrice: { type: number }
+                laborPrice: { type: number }
         RentalSource:
             type: string
             description: rent = เช่าจากภายนอก (ต้องอนุมัติ), borrow = ยืมจากคลังบริษัท (ไม่ต้องอนุมัติ)

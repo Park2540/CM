@@ -18,6 +18,9 @@ import { WarrantyList } from './app/pages/warranty/warranty-list';
 import { MaterialList } from './app/pages/procurement/material-list';
 import { PurchaseOrderPrint } from './app/pages/procurement/purchase-order-print';
 import { Warehouse } from './app/pages/procurement/warehouse';
+import { EstimateEditor } from './app/pages/estimates/estimate-editor';
+import { EstimateList } from './app/pages/estimates/estimate-list';
+import { EstimatePrint } from './app/pages/estimates/estimate-print';
 
 export const appRoutes: Routes = [
     {
@@ -35,6 +38,8 @@ export const appRoutes: Routes = [
             { path: 'projects/:code', component: ProjectManagement },
             { path: 'projects/:code/setup', component: ProjectSetup },
             { path: 'warranty', component: WarrantyList },
+            { path: 'estimates', component: EstimateList },
+            { path: 'estimates/:id', component: EstimateEditor },
             { path: 'inventory/materials', component: MaterialList },
             { path: 'inventory/warehouse', component: Warehouse },
             { path: 'approvals', component: ApprovalCenter },
@@ -45,6 +50,7 @@ export const appRoutes: Routes = [
     },
     // หน้าพิมพ์เอกสาร: ไม่มีเมนูระบบ
     { path: 'print/purchase-order/:code/:id', component: PurchaseOrderPrint, canActivate: [authGuard] },
+    { path: 'print/estimate/:id', component: EstimatePrint, canActivate: [authGuard] },
     { path: 'notfound', component: Notfound },
     { path: 'auth', loadChildren: () => import('./app/pages/auth/auth.routes') },
     { path: '**', redirectTo: '/notfound' }

@@ -63,6 +63,7 @@ npm run api:types            # สร้าง src/api/schema.ts ใหม่จ
 | แบบบ้าน | `project_models` (แบบ 3 มิติ), `project_houses` (รายละเอียด ภาพแปลน ทัศนียภาพ) |
 | จัดซื้อ/เช่า | `purchase_requests` (ขอซื้อ → อนุมัติ → ใบสั่งซื้อรวม VAT → อนุมัติ (วงเงินเดียวกับใบขอซื้อ) → ตรวจรับที่หน้างาน), `rentals` (เช่าต้องอนุมัติ ยืมคลังบริษัทไม่ต้อง) |
 | วัสดุและคลัง | `materials` (รายการวัสดุ), `project_boq` (BOQ รายโครงการ), `stock_movements` (ของเหลือเข้าคลังหลัก / เบิกจากคลังหลัก), `company_profile` — ใช้จริง = รับ + เบิก − คืนคลัง เทียบ BOQ ที่ `GET /projects/{code}/material-usage` |
+| ถอดปริมาณ/BOQ | `estimates` (หมวดงาน → กลุ่ม → รายการ ราคาวัสดุ/ค่าแรง ถอดปริมาณได้ในแต่ละรายการ สรุปราคา + ค่าดำเนินการ) |
 | การอนุมัติ | `approvals`, `approval_settings` |
 | อื่น ๆ | `audit_logs`, `uploads` |
 

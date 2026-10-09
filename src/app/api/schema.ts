@@ -875,6 +875,140 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/estimates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** ใบถอดปริมาณ/BOQ ทั้งหมด (แก้ไขล่าสุดก่อน) */
+        get: operations["listEstimates"];
+        put?: never;
+        /** สร้าง BOQ ใหม่ (สิทธิ์ estimate.manage) */
+        post: operations["createEstimate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/estimates/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** BOQ พร้อมยอดรวม */
+        get: operations["getEstimate"];
+        /** บันทึก BOQ ทั้งฉบับ (สิทธิ์ estimate.manage) — หลังบ้านคำนวณปริมาณจากการถอดและยอดรวมใหม่ */
+        put: operations["saveEstimate"];
+        post?: never;
+        /** ลบ BOQ (สิทธิ์ estimate.manage) */
+        delete: operations["deleteEstimate"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/estimates/from-model": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * ถอด BOQ และรายการวัสดุจากโมเดล IFC ของโครงการ (สิทธิ์ estimate.manage) — สร้าง BOQ ฉบับร่าง
+         * @description ใช้ปริมาณในไฟล์ (BaseQuantities) ถ้ามี ไม่มีคำนวณจากรูปทรง: คอนกรีต (ลบ.ม.) ไม้แบบ (ตร.ม. ผิวข้าง/ล่าง) เหล็กเสริม (กก. จากแนวเหล็ก)
+         *     เหล็กรูปพรรณ (กก. = ปริมาตร × 7,850) แผ่นพื้นสำเร็จ (ตร.ม.) เสาเข็ม (ต้น) หลังคา (ตร.ม.) — ราคาต่อหน่วยจากคลังราคา
+         */
+        post: operations["createEstimateFromModel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/estimates/{id}/apply-materials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** ส่งรายการวัสดุของ BOQ (ถอดจากโมเดล) เข้า BOQ วัสดุของโครงการ — แทนที่ทั้งชุด (สิทธิ์ project.manage) */
+        post: operations["applyEstimateMaterials"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/estimates/{id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** ส่งออก BOQ เป็นไฟล์ Excel (.xlsx) — sheet สรุปราคา + sheet ละหมวดงาน (ช่องราคารวมเป็นสูตร) + ถอดปริมาณ + รายการวัสดุจากโมเดล */
+        get: operations["exportEstimate"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/overhead-statement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** แม่แบบเอกสารชี้แจงค่าดำเนินการของบริษัท (BOQ ใหม่คัดลอกแม่แบบนี้) */
+        get: operations["getStatementTemplate"];
+        /** บันทึกแม่แบบเอกสารชี้แจงค่าดำเนินการ (สิทธิ์ project.manage) — ไม่กระทบ BOQ ที่สร้างไปแล้ว */
+        put: operations["saveStatementTemplate"];
+        post?: never;
+        /** คืนแม่แบบเป็นค่าตั้งต้นของระบบ (สิทธิ์ project.manage) */
+        delete: operations["resetStatementTemplate"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/estimate-rates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** คลังราคาต่อหน่วย (วัสดุ + ค่าแรง) ใช้เพิ่มรายการใน BOQ — รวมรายการจาก BOQ ทุกฉบับ ราคาล่าสุดก่อน */
+        get: operations["listEstimateRates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/projects/{code}/rentals": {
         parameters: {
             query?: never;
@@ -1616,9 +1750,10 @@ export interface components {
          *     - payment.record: บันทึก/ยกเลิกการรับชำระเงินงวดงานของลูกค้า
          *     - procurement.manage: จัดซื้อและเช่า: ออกใบสั่งซื้อ รับของ รับ/คืนอุปกรณ์ที่เช่า/ยืม แก้รายการวัสดุ
          *     - procurement.receive: ตรวจรับของที่หน้างาน รับ/คืนอุปกรณ์เช่า ส่งของเหลือเข้าคลังหลัก/เบิกจากคลัง (ผู้จัดการโครงการ วิศวกร โฟร์แมน เจ้าของบริษัท)
+         *     - estimate.manage: ถอดปริมาณและจัดทำ BOQ/ใบประมาณราคา
          * @enum {string}
          */
-        Permission: "progress.update" | "personnel.sensitive" | "finance.company" | "approval.any" | "project.create" | "project.manage" | "user.manage" | "payment.record" | "procurement.manage" | "procurement.receive";
+        Permission: "progress.update" | "personnel.sensitive" | "finance.company" | "approval.any" | "project.create" | "project.manage" | "user.manage" | "payment.record" | "procurement.manage" | "procurement.receive" | "estimate.manage";
         CurrentUser: {
             id: string;
             name: string;
@@ -2250,6 +2385,279 @@ export interface components {
             taxId: string;
             phone: string;
             email?: string;
+        };
+        /**
+         * @description วิธีถอดปริมาณ
+         *     - volume: กว้าง × ยาว × สูง/ลึก × จำนวน (ลบ.ม.)
+         *     - area: กว้าง × ยาว × จำนวน (ตร.ม.)
+         *     - length: ยาว × จำนวน (เมตร)
+         *     - count: จำนวน
+         *     - rebar: น้ำหนักเหล็กเส้น = ยาวต่อเส้น × จำนวนเส้น × น้ำหนักต่อเมตรตามขนาด (กก.)
+         *     - steel: เหล็กรูปพรรณ = ยาว × จำนวน × กก./ม. (กก.)
+         *     - model: ปริมาณจากโมเดล IFC (ค่าใน count) — label บอกชิ้นงานที่นับ
+         * @enum {string}
+         */
+        TakeoffMethod: "volume" | "area" | "length" | "count" | "rebar" | "steel" | "model";
+        TakeoffLine: {
+            id: string;
+            /** @example F1 ฐานราก 1.20x1.20 ม. */
+            label?: string;
+            method: components["schemas"]["TakeoffMethod"];
+            /** @description กว้าง (ม.) */
+            width?: number;
+            /** @description ยาว (ม.) */
+            length?: number;
+            /** @description สูง/ลึก/หนา (ม.) */
+            height?: number;
+            /** @description จำนวน (ชิ้น/ต้น/เส้น) */
+            count: number;
+            /** @description ขนาดเหล็กเส้น (มม.) สำหรับ rebar */
+            diameter?: number;
+            /** @description น้ำหนักต่อเมตร สำหรับ steel */
+            kgPerMeter?: number;
+            /** @description บรรทัดหัก (เช่น หักช่องเปิด) */
+            deduct?: boolean;
+            /** @description ผลของบรรทัด (หลังบ้านคำนวณ) */
+            result?: number;
+        };
+        EstimateItem: {
+            id: string;
+            /**
+             * @description heading = หัวข้อย่อยในหมวด (เช่น งานเหล็กเสริมคอนกรีต) ไม่มีปริมาณ
+             * @enum {string}
+             */
+            kind: "item" | "heading";
+            description: string;
+            unit?: string;
+            /** @description ปริมาณ (มีบรรทัดถอดปริมาณ = หลังบ้านคำนวณจาก takeoff × (1 + waste%)) */
+            quantity: number;
+            /** @description ราคาวัสดุต่อหน่วย */
+            materialPrice: number;
+            /** @description ราคาค่าแรงต่อหน่วย */
+            laborPrice: number;
+            /** @description เผื่อเสีย (%) ใช้กับปริมาณจากการถอด */
+            waste?: number;
+            /** @description รายการย่อยใต้หัวข้อ (แสดงเยื้อง) */
+            indent?: boolean;
+            takeoff?: components["schemas"]["TakeoffLine"][];
+            note?: string;
+        };
+        EstimateGroup: {
+            id: string;
+            /** @example ฐานราก-ต่อม่อ */
+            title: string;
+            items: components["schemas"]["EstimateItem"][];
+        };
+        EstimateCategory: {
+            id: string;
+            /** @example งานโครงสร้างคอนกรีตเสริมเหล็ก */
+            name: string;
+            /** @description ไม่รวมในสรุปราคา (เช่น งานเสนอเพิ่ม) */
+            excluded?: boolean;
+            groups: components["schemas"]["EstimateGroup"][];
+        };
+        EstimateInput: {
+            /** @example บ้านพักอาศัย ค.ส.ล. 1 ชั้น */
+            title: string;
+            /** @description โครงการที่เกี่ยวข้อง (ไม่บังคับ) */
+            projectCode?: string;
+            location?: string;
+            /** @description เจ้าของโครงการ */
+            ownerName?: string;
+            /** @description ผู้เสนอราคา */
+            estimator?: string;
+            /** Format: date */
+            estimateDate?: string;
+            /** @description พื้นที่ทั้งหมด (ตร.ม.) ใช้คำนวณราคาเฉลี่ยต่อ ตร.ม. */
+            area?: number;
+            /** @description ค่าดำเนินการ (%) คิดจากค่าวัสดุ + ค่าแรง */
+            overheadPercent?: number;
+            /** @description กำไรของบริษัท (%) คิดจากค่าวัสดุ + ค่าแรง */
+            profitPercent?: number;
+            /** @description ภาษีมูลค่าเพิ่ม (%) คิดจากราคารวมก่อนภาษี — BOQ ใหม่ตั้งต้น 7 */
+            vatPercent?: number;
+            /**
+             * @description draft = ร่าง
+             * @enum {string}
+             */
+            status?: "draft" | "final";
+            /** @description หมายเหตุท้ายสรุป เช่น ไม่รวมปั๊มน้ำ ถังเก็บน้ำ */
+            notes?: string[];
+            categories: components["schemas"]["EstimateCategory"][];
+            statement?: components["schemas"]["OverheadStatement"];
+        };
+        ResponsibilityRow: {
+            id: string;
+            /** @example ค่าไฟฟ้าระหว่างก่อสร้าง */
+            item: string;
+            /** @description ผู้รับเหมารับผิดชอบ */
+            contractor: boolean;
+            /** @description เจ้าของโครงการรับผิดชอบ */
+            owner: boolean;
+            note?: string;
+        };
+        /**
+         * @description เนื้อหาในหัวข้อ
+         *     - paragraph: ย่อหน้า (text)
+         *     - list: รายการ (items) — style number = 1. 2. 3., bullet = จุด, clause = เลขตามหัวข้อ (3.1 3.2 …) มีหัวรายการ (title) ได้
+         *     - responsibility: ตารางแบ่งความรับผิดชอบค่าใช้จ่าย (rows)
+         */
+        StatementBlock: {
+            id: string;
+            /** @enum {string} */
+            kind: "paragraph" | "list" | "responsibility";
+            text?: string;
+            /** @enum {string} */
+            style?: "number" | "bullet" | "clause";
+            title?: string;
+            items?: string[];
+            rows?: components["schemas"]["ResponsibilityRow"][];
+        };
+        StatementSubsection: {
+            id: string;
+            title: string;
+            blocks: components["schemas"]["StatementBlock"][];
+        };
+        StatementSection: {
+            id: string;
+            title: string;
+            blocks: components["schemas"]["StatementBlock"][];
+            subsections: components["schemas"]["StatementSubsection"][];
+        };
+        /** @description เอกสารชี้แจงรายละเอียดค่าดำเนินการก่อสร้าง (แนบท้าย BOQ) — เลขหัวข้อระบบนับให้ตอนแสดงผล */
+        OverheadStatement: {
+            title: string;
+            subtitle?: string;
+            sections: components["schemas"]["StatementSection"][];
+        };
+        EstimateTotals: {
+            categories: {
+                id: string;
+                material: number;
+                labor: number;
+                total: number;
+            }[];
+            /** @description รวมค่าวัสดุ (เฉพาะหมวดที่รวมในสรุป) */
+            material: number;
+            labor: number;
+            /** @description วัสดุ + ค่าแรง */
+            subtotal: number;
+            /** @description ค่าดำเนินการ */
+            overhead: number;
+            /** @description กำไร */
+            profit: number;
+            /** @description รวมก่อนภาษีมูลค่าเพิ่ม (วัสดุ + ค่าแรง + ค่าดำเนินการ + กำไร) */
+            beforeVat: number;
+            /** @description ภาษีมูลค่าเพิ่ม */
+            vat: number;
+            /** @description รวมเป็นเงินทั้งสิ้น (รวมภาษีมูลค่าเพิ่ม) */
+            grandTotal: number;
+            /** @description ราคาเฉลี่ยต่อ ตร.ม. (null เมื่อไม่ระบุพื้นที่) */
+            pricePerSqm?: number | null;
+        };
+        Estimate: components["schemas"]["EstimateInput"] & {
+            /** @example EST-6910-0001 */
+            id: string;
+            totals: components["schemas"]["EstimateTotals"];
+            source?: components["schemas"]["EstimateSource"];
+            createdBy: components["schemas"]["UserRef"];
+            /** Format: date-time */
+            createdAt: string;
+            updatedBy?: components["schemas"]["UserRef"];
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        /** @description รายการวัสดุที่คำนวณจากปริมาณงาน (เผื่อเสียแล้ว) ใช้ส่งเข้า BOQ วัสดุของโครงการ */
+        EstimateMaterial: {
+            /** @description รหัสในรายการวัสดุ (ถ้าจับคู่ได้) */
+            materialCode?: string;
+            name: string;
+            unit: string;
+            quantity: number;
+            /** @description ที่มาของจำนวน เช่น 34.2 ลบ.ม. + เผื่อ 5% */
+            basis: string;
+        };
+        /** @description BOQ ที่ระบบถอดจากโมเดล IFC */
+        EstimateSource: {
+            /** @enum {string} */
+            kind: "ifc";
+            projectCode: string;
+            modelId: string;
+            modelTitle?: string;
+            fileName: string;
+            /** @description โปรแกรมที่ส่งออก เช่น Autodesk Revit 2027 */
+            application?: string;
+            /** @example IFC2X3 */
+            schema?: string;
+            /** Format: date-time */
+            analyzedAt: string;
+            /** @description จำนวนชิ้นงานที่ถอด */
+            elements: number;
+            seconds: number;
+            warnings: string[];
+            materials: components["schemas"]["EstimateMaterial"][];
+            /** @description สรุปชิ้นงานในโมเดลตามชนิด (ตรวจสอบที่มาของตัวเลข) */
+            components: {
+                storey: string;
+                kind: string;
+                /** @example คาน 0.20x0.40 m */
+                label: string;
+                material?: string;
+                count: number;
+                volume: number;
+                area: number;
+                length: number;
+                weight: number;
+            }[];
+            /**
+             * Format: date-time
+             * @description ส่งรายการวัสดุเข้า BOQ วัสดุของโครงการล่าสุด
+             */
+            appliedAt?: string;
+        };
+        EstimateFromModelInput: {
+            projectCode: string;
+            /** @description เวอร์ชันแบบ 3 มิติของโครงการที่มีไฟล์ต้นฉบับ .ifc */
+            modelId: string;
+            title?: string;
+            /** @description กำลังอัดคอนกรีต (ksc) เมื่อวัสดุในโมเดลไม่ระบุ — ค่าตั้งต้น 210 */
+            concreteGrade?: number;
+        };
+        EstimateSummary: {
+            id: string;
+            title: string;
+            projectCode?: string;
+            location?: string;
+            ownerName?: string;
+            /** @enum {string} */
+            status: "draft" | "final";
+            area?: number;
+            grandTotal: number;
+            pricePerSqm?: number | null;
+            itemCount: number;
+            /** @description ถอดจากโมเดล IFC */
+            fromModel?: boolean;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        EstimateCreateInput: {
+            title: string;
+            projectCode?: string;
+            /**
+             * @description standard = หมวดงานมาตรฐาน 6 หมวด
+             * @enum {string}
+             */
+            template?: "standard" | "blank";
+            /** @description คัดลอกจาก BOQ เดิม (id) — มีค่านี้ไม่ใช้ template */
+            copyFrom?: string;
+        };
+        EstimateRate: {
+            category: string;
+            group?: string;
+            description: string;
+            unit: string;
+            materialPrice: number;
+            laborPrice: number;
         };
         /**
          * @description rent = เช่าจากภายนอก (ต้องอนุมัติ), borrow = ยืมจากคลังบริษัท (ไม่ต้องอนุมัติ)
@@ -4838,6 +5246,290 @@ export interface operations {
             };
             403: components["responses"]["Forbidden"];
             422: components["responses"]["ValidationError"];
+        };
+    };
+    listEstimates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EstimateSummary"][];
+                };
+            };
+        };
+    };
+    createEstimate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EstimateCreateInput"];
+            };
+        };
+        responses: {
+            /** @description สร้างแล้ว */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Estimate"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationError"];
+        };
+    };
+    getEstimate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Estimate"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    saveEstimate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EstimateInput"];
+            };
+        };
+        responses: {
+            /** @description บันทึกแล้ว */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Estimate"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationError"];
+        };
+    };
+    deleteEstimate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ลบแล้ว */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    createEstimateFromModel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EstimateFromModelInput"];
+            };
+        };
+        responses: {
+            /** @description สร้างแล้ว */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Estimate"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationError"];
+        };
+    };
+    applyEstimateMaterials: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description บันทึกแล้ว */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectBoq"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    exportEstimate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ไฟล์ Excel */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getStatementTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OverheadStatement"];
+                };
+            };
+        };
+    };
+    saveStatementTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OverheadStatement"];
+            };
+        };
+        responses: {
+            /** @description บันทึกแล้ว */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OverheadStatement"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["ValidationError"];
+        };
+    };
+    resetStatementTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description คืนค่าแล้ว */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OverheadStatement"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    listEstimateRates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EstimateRate"][];
+                };
+            };
         };
     };
     listRentals: {
