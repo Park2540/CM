@@ -476,7 +476,7 @@ export class Dashboard {
     });
 
     errorText(error: unknown) {
-        return problemMessage(error);
+        return problemMessage(error); 
     }
 
     openProject(code: string) {

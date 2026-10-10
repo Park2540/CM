@@ -29,8 +29,9 @@ function send<T>(res: import('express').Response, result: { ok: T } | { status: 
     fail(result.status as 403, result.title, result.detail, result.errors);
 }
 
-estimatesRouter.get('/estimates', (_req, res) => {
-    res.json(listEstimates());
+estimatesRouter.get('/estimates', (req, res) => {
+    const projectCode = typeof req.query['projectCode'] === 'string' ? req.query['projectCode'] : '';
+    res.json(projectCode ? listEstimates().filter((estimate) => estimate.projectCode === projectCode) : listEstimates());
 });
 
 estimatesRouter.post('/estimates', (req, res) => {
@@ -105,7 +106,7 @@ estimatesRouter.get('/estimates/:id', (req, res) => {
 estimatesRouter.get('/estimates/:id/export', async (req, res) => {
     const estimate = getEstimate(req.params['id']!);
     if (!estimate) fail(404, 'ไม่พบ BOQ');
-    const file = await estimateWorkbook(estimate!, { company: companyProfile.name });
+    const file = await estimateWorkbook(estimate!, { company: companyProfile });
     recordAudit({ module: 'project', action: 'ส่งออก BOQ เป็น Excel', target: estimate!.id, detail: estimate!.title });
     res.type('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
         .setHeader('Content-Disposition', `attachment; filename="BOQ-${estimate!.id}.xlsx"; filename*=UTF-8''${encodeURIComponent(estimateFileName(estimate!))}`)

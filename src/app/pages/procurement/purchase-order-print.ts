@@ -1,20 +1,18 @@
 import { DecimalPipe } from '@angular/common';
-import { HttpErrorResponse } from '@angular/common/http';
 import { Component, computed, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { catchError, map, of } from 'rxjs';
 import { ButtonModule } from 'primeng/button';
-import { DialogModule } from 'primeng/dialog';
-import { InputTextModule } from 'primeng/inputtext';
-import { ApiProblem, problemMessage } from '@/app/api/api';
+import { problemMessage } from '@/app/api/api';
 import { apiResource } from '@/app/api/api-resource';
 import { ApprovalService } from '@/app/pages/service/approval.service';
 import { AuthService } from '@/app/pages/service/auth.service';
 import { CompanyProfile, ProcurementService } from '@/app/pages/service/procurement.service';
 import { ProjectService } from '@/app/pages/service/project.service';
 import { ThaiDatePipe } from '@/app/pages/projects/thai-date.pipe';
+import { CompanyLetterhead } from '@/app/pages/shared/company-letterhead';
+import { CompanyProfileDialog } from '@/app/pages/shared/company-profile-dialog';
 
 const DIGITS = ['', 'หนึ่ง', 'สอง', 'สาม', 'สี่', 'ห้า', 'หก', 'เจ็ด', 'แปด', 'เก้า'];
 const PLACES = ['', 'สิบ', 'ร้อย', 'พัน', 'หมื่น', 'แสน'];
@@ -52,13 +50,13 @@ export function bahtText(amount: number): string {
 @Component({
     selector: 'app-purchase-order-print',
     standalone: true,
-    imports: [ButtonModule, DecimalPipe, DialogModule, FormsModule, InputTextModule, ThaiDatePipe],
+    imports: [ButtonModule, CompanyLetterhead, CompanyProfileDialog, DecimalPipe, ThaiDatePipe],
     template: `
         <div class="toolbar no-print">
             <span class="font-semibold">ใบสั่งซื้อ {{ order()?.poNumber }}</span>
             <span class="flex-1"></span>
             @if (canEditCompany()) {
-                <button pButton type="button" [text]="true" icon="pi pi-building" label="แก้ไขข้อมูลบริษัท" (click)="openCompany()"></button>
+                <button pButton type="button" [text]="true" icon="pi pi-building" label="แก้ไขข้อมูลบริษัท" (click)="editingCompany.set(true)"></button>
             }
             <button pButton type="button" icon="pi pi-print" label="พิมพ์ / บันทึก PDF" [disabled]="!order()" (click)="print()"></button>
         </div>
@@ -71,12 +69,7 @@ export function bahtText(amount: number): string {
                     <div class="watermark" aria-hidden="true">{{ po.status === 'pending' ? 'รออนุมัติ' : 'ไม่อนุมัติ' }}</div>
                 }
                 <header class="head">
-                    <div>
-                        <div class="company">{{ company().name }}</div>
-                        <div>{{ company().address }}</div>
-                        <div>เลขประจำตัวผู้เสียภาษี {{ company().taxId }}{{ company().branch ? ' (' + company().branch + ')' : '' }}</div>
-                        <div>โทร {{ company().phone }}{{ company().email ? ' · ' + company().email : '' }}</div>
-                    </div>
+                    <app-company-letterhead class="letterhead" [company]="company()" />
                     <div class="title-box">
                         <div class="title">ใบสั่งซื้อ</div>
                         <div class="subtitle">PURCHASE ORDER</div>
@@ -197,40 +190,8 @@ export function bahtText(amount: number): string {
             <div class="sheet"><p>กำลังโหลด...</p></div>
         }
 
-        @if (companyForm(); as form) {
-            <p-dialog [visible]="true" (visibleChange)="!$event && !saving() && companyForm.set(null)" [modal]="true" [draggable]="false" [style]="{ width: 'min(34rem, 96vw)' }" header="ข้อมูลบริษัท (หัวกระดาษใบสั่งซื้อ)">
-                <div class="flex flex-col gap-3">
-                    <label class="text-sm font-semibold">ชื่อบริษัท <span class="text-red-600">*</span>
-                        <input pInputText class="w-full mt-1 font-normal" maxlength="200" [(ngModel)]="form.name" [attr.aria-invalid]="!!companyErrors()['name']" />
-                    </label>
-                    <div class="grid grid-cols-2 gap-3">
-                        <label class="text-sm font-semibold">เลขประจำตัวผู้เสียภาษี
-                            <input pInputText class="w-full mt-1 font-normal" inputmode="numeric" maxlength="17" [(ngModel)]="form.taxId" [attr.aria-invalid]="!!companyErrors()['taxId']" />
-                        </label>
-                        <label class="text-sm font-semibold">สาขา
-                            <input pInputText class="w-full mt-1 font-normal" maxlength="100" placeholder="สำนักงานใหญ่" [(ngModel)]="form.branch" />
-                        </label>
-                    </div>
-                    <label class="text-sm font-semibold">ที่อยู่
-                        <input pInputText class="w-full mt-1 font-normal" maxlength="500" [(ngModel)]="form.address" />
-                    </label>
-                    <div class="grid grid-cols-2 gap-3">
-                        <label class="text-sm font-semibold">โทร
-                            <input pInputText class="w-full mt-1 font-normal" maxlength="50" [(ngModel)]="form.phone" />
-                        </label>
-                        <label class="text-sm font-semibold">อีเมล
-                            <input pInputText type="email" class="w-full mt-1 font-normal" maxlength="100" [(ngModel)]="form.email" />
-                        </label>
-                    </div>
-                </div>
-                @if (companyError()) {
-                    <div class="rounded-lg px-3 py-2 mt-4 text-sm bg-red-50 text-red-800" role="alert">{{ companyError() }}</div>
-                }
-                <ng-template #footer>
-                    <button pButton type="button" label="ยกเลิก" [text]="true" severity="secondary" [disabled]="saving()" (click)="companyForm.set(null)"></button>
-                    <button pButton type="button" icon="pi pi-check" label="บันทึก" [loading]="saving()" (click)="saveCompany(form)"></button>
-                </ng-template>
-            </p-dialog>
+        @if (editingCompany()) {
+            <app-company-profile-dialog [company]="company()" (saved)="companyResource.set($event); editingCompany.set(false)" (closed)="editingCompany.set(false)" />
         }
     `,
     styles: `
@@ -284,9 +245,8 @@ export function bahtText(amount: number): string {
             padding-bottom: 0.75rem;
             border-bottom: 2px solid #111;
         }
-        .company {
-            font-size: 18px;
-            font-weight: 700;
+        .letterhead {
+            align-self: flex-start;
         }
         .title-box {
             text-align: right;
@@ -457,31 +417,5 @@ export class PurchaseOrderPrint {
 
     // ---------- ข้อมูลบริษัท ----------
     readonly canEditCompany = computed(() => this.auth.can('user.manage'));
-    readonly companyForm = signal<CompanyProfile | null>(null);
-    readonly saving = signal(false);
-    readonly companyErrors = signal<Record<string, string>>({});
-    readonly companyError = signal('');
-
-    openCompany() {
-        this.companyErrors.set({});
-        this.companyError.set('');
-        this.companyForm.set({ ...this.company() });
-    }
-
-    saveCompany(form: CompanyProfile) {
-        this.saving.set(true);
-        this.service.saveCompany(form).subscribe({
-            next: (company) => {
-                this.saving.set(false);
-                this.companyResource.set(company);
-                this.companyForm.set(null);
-            },
-            error: (error) => {
-                this.saving.set(false);
-                const problem = error instanceof HttpErrorResponse ? (error.error as Partial<ApiProblem> | null) : null;
-                if (problem?.errors) this.companyErrors.set(problem.errors);
-                this.companyError.set(problemMessage(error, 'บันทึกไม่สำเร็จ'));
-            }
-        });
-    }
+    readonly editingCompany = signal(false);
 }

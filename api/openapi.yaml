@@ -975,6 +975,8 @@ paths:
             tags: [estimates]
             summary: ใบถอดปริมาณ/BOQ ทั้งหมด (แก้ไขล่าสุดก่อน)
             operationId: listEstimates
+            parameters:
+                - { name: projectCode, in: query, schema: { type: string }, description: เฉพาะ BOQ ของโครงการนี้ (แสดงในแท็บเอกสารของโครงการ) }
             responses:
                 '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/EstimateSummary' } } } } }
         post:

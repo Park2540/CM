@@ -120,8 +120,9 @@ export const newId = (prefix: string) => `${prefix}${Math.random().toString(36).
 export class EstimateService {
     private readonly http = inject(HttpClient);
 
-    list(): Observable<EstimateSummary[]> {
-        return this.http.get<EstimateSummary[]>(apiUrl('/estimates'));
+    /** projectCode = เฉพาะ BOQ ของโครงการนั้น */
+    list(projectCode?: string): Observable<EstimateSummary[]> {
+        return this.http.get<EstimateSummary[]>(apiUrl('/estimates'), projectCode ? { params: { projectCode } } : {});
     }
 
     get(id: string): Observable<Estimate> {

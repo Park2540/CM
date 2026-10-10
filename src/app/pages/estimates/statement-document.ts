@@ -2,15 +2,18 @@ import { DecimalPipe, NgTemplateOutlet } from '@angular/common';
 import { Component, input } from '@angular/core';
 import { Estimate, StatementBlock, clauseStarts } from '@/app/pages/service/estimate.service';
 import { ThaiDatePipe } from '@/app/pages/projects/thai-date.pipe';
+import { CompanyProfile } from '@/app/pages/service/procurement.service';
+import { CompanyLetterhead } from '@/app/pages/shared/company-letterhead';
 
 /** เอกสารชี้แจงรายละเอียดค่าดำเนินการ (แนบท้าย BOQ) — รูปแบบพิมพ์ A4 แนวตั้ง เลขหัวข้อนับอัตโนมัติ */
 @Component({
     selector: 'app-statement-document',
     standalone: true,
-    imports: [DecimalPipe, NgTemplateOutlet, ThaiDatePipe],
+    imports: [CompanyLetterhead, DecimalPipe, NgTemplateOutlet, ThaiDatePipe],
     template: `
         @let est = estimate();
         @let doc = est.statement!;
+        <app-company-letterhead class="doc-letterhead" [company]="company()" />
         <h1 class="doc-title">{{ doc.title }}</h1>
         @if (doc.subtitle) {
             <p class="doc-subtitle">{{ doc.subtitle }}</p>
@@ -19,7 +22,7 @@ import { ThaiDatePipe } from '@/app/pages/projects/thai-date.pipe';
             <dt>ชื่อโครงการ</dt><dd>{{ est.title }}</dd>
             <dt>สถานที่ก่อสร้าง</dt><dd>{{ est.location || dots }}</dd>
             <dt>เจ้าของโครงการ</dt><dd>{{ est.ownerName || dots }}</dd>
-            <dt>ผู้รับเหมาก่อสร้าง</dt><dd>{{ company() || dots }}</dd>
+            <dt>ผู้รับเหมาก่อสร้าง</dt><dd>{{ company()?.name || dots }}</dd>
             <dt>เลขที่เอกสาร BOQ</dt><dd>{{ est.id }}{{ est.estimateDate ? ' ลงวันที่ ' : '' }}{{ est.estimateDate ? (est.estimateDate | thaiDate) : '' }}</dd>
         </dl>
         <p class="doc-amount">
@@ -99,6 +102,11 @@ import { ThaiDatePipe } from '@/app/pages/projects/thai-date.pipe';
             font-size: 13px;
             line-height: 1.6;
             color: #111;
+        }
+        .doc-letterhead {
+            padding-bottom: 0.5rem;
+            margin-bottom: 0.75rem;
+            border-bottom: 3px solid #5b8bd6;
         }
         .doc-title {
             margin: 0;
@@ -216,7 +224,7 @@ import { ThaiDatePipe } from '@/app/pages/projects/thai-date.pipe';
 })
 export class StatementDocument {
     readonly estimate = input.required<Estimate>();
-    readonly company = input('');
+    readonly company = input<CompanyProfile | undefined>();
     readonly dots = '.................................................';
     readonly clauses = clauseStarts;
     readonly asBlocks = (blocks: StatementBlock[]) => blocks;

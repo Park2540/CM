@@ -5250,7 +5250,10 @@ export interface operations {
     };
     listEstimates: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description เฉพาะ BOQ ของโครงการนี้ (แสดงในแท็บเอกสารของโครงการ) */
+                projectCode?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;

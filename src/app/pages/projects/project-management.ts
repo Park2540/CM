@@ -20,6 +20,7 @@ import { ProjectUpdatesTab } from './components/project-updates-tab';
 import { ProjectRecordsService, SitePhoto } from '@/app/pages/service/project-records.service';
 import { HousePlanService } from '@/app/pages/service/house-plan.service';
 import { CurrentWorkCard, HoldPointsCard, MilestonesCard, OwnerAction, OwnerActionsCard, PaymentSummaryCard, RecentPhotosCard, TeamCard } from './components/project-cards';
+import { ProjectBoqCard } from './components/project-boq-card';
 import { ProjectDocumentsTab } from './components/project-documents-tab';
 import { ProjectTeamTab } from './components/project-team-tab';
 import { PaymentChange, ProjectPaymentsTab } from './components/project-payments-tab';
@@ -31,6 +32,7 @@ import { ProjectChangeOrdersTab } from './components/project-change-orders-tab';
 import { ProjectProcurementTab } from './components/project-procurement-tab';
 import { ProjectSiteMap } from './components/project-site-map';
 import { ChangeOrderService } from '@/app/pages/service/change-order.service';
+import { EstimateService } from '@/app/pages/service/estimate.service';
 import { ProjectModel } from '@/app/pages/service/project-model.service';
 import { PROJECT_TABS, ProjectTab } from './components/project-ui';
 import { ThaiDatePipe } from './thai-date.pipe';
@@ -56,6 +58,7 @@ const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
         ToastModule,
         OwnerActionsCard,
         PaymentSummaryCard,
+        ProjectBoqCard,
         ProjectDocumentsTab,
         ProjectPaymentsTab,
         ProjectPhotosTab,
@@ -129,6 +132,18 @@ const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
                             <dd class="m-0 mt-1 font-semibold">฿{{ project.revisedValue ?? project.value | number: '1.0-0' }}</dd>
                             @if (project.changeOrderTotal) {
                                 <dd class="m-0 text-xs text-muted-color">สัญญาเดิม ฿{{ project.value | number: '1.0-0' }} · งานเพิ่ม-ลด {{ project.changeOrderTotal > 0 ? '+' : '−' }}฿{{ abs(project.changeOrderTotal) | number: '1.0-0' }}</dd>
+                            }
+                            @if (boqCompare(); as boq) {
+                                <dd class="m-0 mt-0.5 text-xs">
+                                    <a class="text-muted-color hover:text-primary" [routerLink]="['/estimates', boq.id]" [title]="'BOQ ' + boq.id + ' · ' + boq.title + ' (ส่งลูกค้าแล้ว)'">BOQ ฿{{ boq.total | number: '1.0-0' }}</a>
+                                    @if (boq.diff === 0) {
+                                        <span class="block text-muted-color">เท่ากับมูลค่าสัญญา</span>
+                                    } @else {
+                                        <span class="block" [class]="boq.diff > 0 ? 'text-orange-600 dark:text-orange-300 font-semibold' : 'text-emerald-700 dark:text-emerald-300'">
+                                            {{ boq.diff > 0 ? 'สูงกว่า' : 'ต่ำกว่า' }}สัญญา ฿{{ abs(boq.diff) | number: '1.0-0' }} ({{ abs(boq.percent) | number: '1.1-1' }}%)
+                                        </span>
+                                    }
+                                </dd>
                             }
                         </div>
                         <div>
@@ -285,6 +300,7 @@ const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
                             <app-project-procurement-tab [projectCode]="project.code" [phases]="timeline.phases" (notify)="messages.add({ severity: 'success', summary: $event })" />
                         }
                         @case ('documents') {
+                            <app-project-boq-card [projectCode]="project.code" [refreshKey]="refreshKey()" />
                             <app-project-documents-tab [projectCode]="project.code" [refreshKey]="refreshKey()" />
                         }
                     }
@@ -500,6 +516,7 @@ export class ProjectManagement {
     private readonly recordsService = inject(ProjectRecordsService);
     private readonly housePlanService = inject(HousePlanService);
     private readonly changeOrderService = inject(ChangeOrderService);
+    private readonly estimateService = inject(EstimateService);
     private readonly thaiDate = new ThaiDatePipe();
 
     readonly getProjectSeverity = getProjectSeverity;
@@ -568,6 +585,22 @@ export class ProjectManagement {
     readonly refreshKey = signal(0);
     // ข้อมูลประกอบของโครงการ โหลดใหม่เมื่อมีการอัปเดตงาน (refreshKey) เพราะสถานะงวดและภาพเปลี่ยนตาม
     private readonly projectParams = computed(() => (this.planned() ? { code: this.code(), refresh: this.refreshKey() } : undefined));
+    /** BOQ ที่ทำเสร็จ (ส่งลูกค้าแล้ว) ฉบับล่าสุดของโครงการ — เทียบกับมูลค่าสัญญาที่หัวโครงการ */
+    private readonly boqResource = apiResource({
+        params: () => (this.code() ? { code: this.code(), refresh: this.refreshKey() } : undefined),
+        stream: ({ params }) => this.estimateService.list(params.code),
+        defaultValue: []
+    });
+    readonly boqCompare = computed(() => {
+        const project = this.projectResource.value();
+        // รายการจากหลังบ้านเรียงแก้ไขล่าสุดก่อน
+        const boq = this.boqResource.value().find((item) => item.status === 'final');
+        if (!project || !boq) return null;
+        const contract = project.revisedValue ?? project.value;
+        if (contract === null || contract === undefined) return null;
+        const diff = Math.round((boq.grandTotal - contract) * 100) / 100;
+        return { id: boq.id, title: boq.title, total: boq.grandTotal, diff, percent: contract ? (diff / contract) * 100 : 0 };
+    });
     private readonly installmentsResource = apiResource({ params: this.projectParams, stream: ({ params }) => this.recordsService.installments(params.code), defaultValue: [] });
     readonly teamResource = apiResource({ params: this.projectParams, stream: ({ params }) => this.recordsService.team(params.code), defaultValue: [] });
     private readonly recentPhotosResource = apiResource({

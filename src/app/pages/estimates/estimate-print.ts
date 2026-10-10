@@ -9,17 +9,23 @@ import { apiResource } from '@/app/api/api-resource';
 import { EstimateCategory, EstimateService, itemLabor, itemMaterial, saveEstimateExcel } from '@/app/pages/service/estimate.service';
 import { ThaiDatePipe } from '@/app/pages/projects/thai-date.pipe';
 import { ProcurementService } from '@/app/pages/service/procurement.service';
+import { AuthService } from '@/app/pages/service/auth.service';
+import { CompanyLetterhead } from '@/app/pages/shared/company-letterhead';
+import { CompanyProfileDialog } from '@/app/pages/shared/company-profile-dialog';
 import { StatementDocument } from './statement-document';
 
 /** พิมพ์ BOQ: รายละเอียดบัญชีแสดงปริมาณงานและราคา (หน้าละหมวดงาน) + สรุปราคางาน — A4 แนวนอน + เอกสารชี้แจงค่าดำเนินการ — A4 แนวตั้ง */
 @Component({
     selector: 'app-estimate-print',
     standalone: true,
-    imports: [ButtonModule, DecimalPipe, NgTemplateOutlet, StatementDocument, ThaiDatePipe],
+    imports: [ButtonModule, CompanyLetterhead, CompanyProfileDialog, DecimalPipe, NgTemplateOutlet, StatementDocument, ThaiDatePipe],
     template: `
         <div class="toolbar no-print">
             <span class="font-semibold">{{ estimate()?.id }} · {{ estimate()?.title }}</span>
             <span class="flex-1"></span>
+            @if (canEditCompany()) {
+                <button pButton type="button" [text]="true" icon="pi pi-building" label="แก้ไขข้อมูลบริษัท" [disabled]="!company.value()" (click)="editingCompany.set(true)"></button>
+            }
             <label class="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" [checked]="withStatement()" (change)="withStatement.set($any($event.target).checked)" />แนบคำชี้แจงค่าดำเนินการ</label>
             @if (exportError()) {
                 <span class="text-red-600 text-sm">{{ exportError() }}</span>
@@ -151,11 +157,12 @@ import { StatementDocument } from './statement-document';
 
             @if (withStatement() && est.statement) {
                 <article class="sheet portrait">
-                    <app-statement-document [estimate]="est" [company]="company.value()?.name ?? ''" />
+                    <app-statement-document [estimate]="est" [company]="company.value()" />
                 </article>
             }
 
             <ng-template #header>
+                <app-company-letterhead class="letterhead" [company]="company.value()" />
                 <h1 class="title">รายละเอียดบัญชีแสดงปริมาณงานและราคา</h1>
                 <div class="meta">
                     <div><span class="label">โครงการ</span>: {{ est.title }}</div>
@@ -187,6 +194,10 @@ import { StatementDocument } from './statement-document';
             </ng-template>
         } @else {
             <div class="sheet"><p>กำลังโหลด...</p></div>
+        }
+
+        @if (editingCompany() && company.value(); as current) {
+            <app-company-profile-dialog [company]="current" (saved)="company.set($event); editingCompany.set(false)" (closed)="editingCompany.set(false)" />
         }
     `,
     styles: `
@@ -223,6 +234,9 @@ import { StatementDocument } from './statement-document';
             width: 210mm;
             min-height: 297mm;
             padding: 15mm 16mm;
+        }
+        .letterhead {
+            margin-bottom: 0.4rem;
         }
         .title {
             margin: 0 0 0.5rem;
@@ -368,6 +382,9 @@ export class EstimatePrint {
     private readonly procurement = inject(ProcurementService);
     readonly company = apiResource({ stream: () => this.procurement.company() });
     readonly withStatement = signal(true);
+    private readonly auth = inject(AuthService);
+    readonly canEditCompany = computed(() => this.auth.can('user.manage'));
+    readonly editingCompany = signal(false);
     readonly material = itemMaterial;
     readonly labor = itemLabor;
 

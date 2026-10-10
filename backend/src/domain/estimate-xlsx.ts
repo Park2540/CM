@@ -7,10 +7,43 @@
  * - sheet "คำชี้แจงค่าดำเนินการ": เอกสารชี้แจงรายละเอียดค่าดำเนินการ (แนบท้าย BOQ) พร้อมช่องลงนาม
  * ทุกช่องคำนวณปัดทศนิยม 2 ตำแหน่งต่อรายการเหมือนหลังบ้าน ยอดใน Excel จึงตรงกับในระบบ
  */
+import { existsSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import ExcelJS from 'exceljs';
 import type { ApiSchemas } from '../api/api.js';
 
 type Estimate = ApiSchemas['Estimate'];
+type Company = ApiSchemas['CompanyProfile'];
+
+/** โลโก้บริษัท (PNG แปลงจาก public/pp-prime-logo.svg — Excel ฝัง SVG ไม่ได้) */
+const LOGO_PATH = fileURLToPath(new URL('../../assets/company-logo.png', import.meta.url));
+const LOGO = existsSync(LOGO_PATH) ? readFileSync(LOGO_PATH) : null;
+/** จำนวนแถวหัวกระดาษบริษัทบนสุดของทุก sheet */
+const LETTERHEAD_ROWS = 3;
+
+/** หัวกระดาษ: โลโก้ (ลอยอยู่มุมซ้ายบน) + ชื่อบริษัท ที่อยู่ เลขผู้เสียภาษี โทร อีเมล ในคอลัมน์ B */
+function writeLetterhead(sheet: ExcelJS.Worksheet, company: Company | undefined, logo: number | null) {
+    const lines: Array<[string, Partial<ExcelJS.Font>]> = [
+        [company?.name ?? '', { size: 14, bold: true }],
+        [company?.address ?? '', {}],
+        [
+            [company?.taxId ? `เลขประจำตัวผู้เสียภาษี ${company.taxId}${company.branch ? ` (${company.branch})` : ''}` : '', company?.phone ? `โทร ${company.phone}` : '', company?.email ? `อีเมล ${company.email}` : '']
+                .filter(Boolean)
+                .join('  ·  '),
+            {}
+        ]
+    ];
+    lines.forEach(([text, font], index) => {
+        const row = sheet.getRow(index + 1);
+        row.height = index === 0 ? 22 : 17;
+        const cell = row.getCell(2);
+        cell.value = text;
+        cell.font = { name: FONT, size: 10, color: { argb: 'FF333333' }, ...font };
+        // เว้นที่ให้โลโก้ที่ล้นจากคอลัมน์ A
+        cell.alignment = { vertical: 'middle', indent: logo === null ? 0 : 3 };
+    });
+    if (logo !== null) sheet.addImage(logo, { tl: { col: 0.1, row: 0.2 }, ext: { width: 80, height: 56 }, editAs: 'oneCell' });
+}
 type Line = ApiSchemas['TakeoffLine'];
 
 const FONT = 'Tahoma';
@@ -78,14 +111,17 @@ function setupSheet(sheet: ExcelJS.Worksheet) {
 }
 
 /** หัวกระดาษ (ชื่อเอกสาร + ข้อมูลโครงการ) + หัวตาราง 2 แถว — คืนเลขแถวสุดท้ายของหัวตาราง */
-function writeHeader(sheet: ExcelJS.Worksheet, estimate: Estimate): number {
-    sheet.mergeCells('A1:I1');
-    const title = sheet.getCell('A1');
+function writeHeader(sheet: ExcelJS.Worksheet, estimate: Estimate, company: Company | undefined, logo: number | null): number {
+    writeLetterhead(sheet, company, logo);
+    const T = LETTERHEAD_ROWS + 1; // แถวชื่อเอกสาร
+    const H = T + 5; // แถวแรกของหัวตาราง (2 แถว)
+    sheet.mergeCells(`A${T}:I${T}`);
+    const title = sheet.getCell(`A${T}`);
     title.value = 'รายละเอียดบัญชีแสดงปริมาณงานและราคา';
     title.font = { name: FONT, size: 16, bold: true };
     title.alignment = { horizontal: 'center', vertical: 'middle' };
     title.border = BOX;
-    sheet.getRow(1).height = 28;
+    sheet.getRow(T).height = 28;
 
     const meta: Array<[string, string, string, string]> = [
         ['โครงการ', estimate.title, 'วันที่', thaiDate(estimate.estimateDate)],
@@ -93,7 +129,7 @@ function writeHeader(sheet: ExcelJS.Worksheet, estimate: Estimate): number {
         ['สถานที่ก่อสร้าง', estimate.location ?? '', 'ผู้เสนอราคา', estimate.estimator ?? '']
     ];
     meta.forEach(([leftLabel, leftValue, rightLabel, rightValue], index) => {
-        const row = sheet.getRow(2 + index);
+        const row = sheet.getRow(T + 1 + index);
         sheet.mergeCells(row.number, 2, row.number, 5);
         sheet.mergeCells(row.number, 7, row.number, 9);
         row.getCell(1).value = leftLabel;
@@ -104,13 +140,13 @@ function writeHeader(sheet: ExcelJS.Worksheet, estimate: Estimate): number {
         row.getCell(1).font = row.getCell(6).font = { name: FONT, size: 11, bold: true };
     });
 
-    const top = sheet.getRow(6);
-    const bottom = sheet.getRow(7);
+    const top = sheet.getRow(H);
+    const bottom = sheet.getRow(H + 1);
     top.values = ['ลำดับ', 'รายการ', 'หน่วย', 'ปริมาณ', 'ราคาวัสดุ', '', 'ราคาค่าแรง', '', 'รวมราคา'];
     bottom.values = ['', '', '', '', 'ราคา/หน่วย', 'ราคารวม', 'ราคา/หน่วย', 'ราคารวม', ''];
-    for (const col of ['A', 'B', 'C', 'D', 'I']) sheet.mergeCells(`${col}6:${col}7`);
-    sheet.mergeCells('E6:F6');
-    sheet.mergeCells('G6:H6');
+    for (const col of ['A', 'B', 'C', 'D', 'I']) sheet.mergeCells(`${col}${H}:${col}${H + 1}`);
+    sheet.mergeCells(`E${H}:F${H}`);
+    sheet.mergeCells(`G${H}:H${H}`);
     for (const row of [top, bottom]) {
         row.eachCell({ includeEmpty: true }, (cell, col) => {
             if (col > 9) return;
@@ -121,9 +157,9 @@ function writeHeader(sheet: ExcelJS.Worksheet, estimate: Estimate): number {
         });
     }
     // หัวตารางพิมพ์ซ้ำทุกหน้า และตรึงไว้ตอนเลื่อน
-    sheet.pageSetup.printTitlesRow = '6:7';
-    sheet.views = [{ state: 'frozen', ySplit: 7 }];
-    return 7;
+    sheet.pageSetup.printTitlesRow = `${H}:${H + 1}`;
+    sheet.views = [{ state: 'frozen', ySplit: H + 1 }];
+    return H + 1;
 }
 
 /** แถวในตาราง (เส้นขอบแนวตั้ง + รูปแบบตัวเลข) */
@@ -144,8 +180,11 @@ function styleBodyRow(row: ExcelJS.Row, options: { bold?: boolean; fill?: ExcelJ
 
 const round2 = (value: number) => Math.round(value * 100) / 100;
 
-export async function estimateWorkbook(estimate: Estimate, options: { company?: string } = {}): Promise<Buffer> {
+export async function estimateWorkbook(estimate: Estimate, options: { company?: Company } = {}): Promise<Buffer> {
     const workbook = new ExcelJS.Workbook();
+    // ExcelJS ต้องการ Buffer แบบ Node รุ่นเก่า — ส่งเป็น ArrayBuffer ของไฟล์แทน
+    const logo = LOGO ? workbook.addImage({ buffer: LOGO.buffer.slice(LOGO.byteOffset, LOGO.byteOffset + LOGO.byteLength) as ArrayBuffer, extension: 'png' }) : null;
+    const company = options.company;
     workbook.creator = estimate.estimator || 'CM Planning';
     workbook.created = new Date();
     workbook.title = estimate.title;
@@ -162,7 +201,7 @@ export async function estimateWorkbook(estimate: Estimate, options: { company?: 
         const sheetName = name(category.name);
         const sheet = workbook.addWorksheet(sheetName, category.excluded ? { properties: { tabColor: { argb: 'FF9CA3AF' } } } : {});
         setupSheet(sheet);
-        let r = writeHeader(sheet, estimate) + 1;
+        let r = writeHeader(sheet, estimate, company, logo) + 1;
 
         const catRow = sheet.getRow(r++);
         catRow.getCell(2).value = category.name + (category.excluded ? ' (ไม่รวมในสรุปราคา)' : '');
@@ -224,7 +263,7 @@ export async function estimateWorkbook(estimate: Estimate, options: { company?: 
 
     // ---------- สรุปราคา ----------
     setupSheet(summary);
-    let r = writeHeader(summary, estimate) + 1;
+    let r = writeHeader(summary, estimate, company, logo) + 1;
     const headRow = summary.getRow(r++);
     headRow.getCell(2).value = 'สรุปราคาค่าก่อสร้าง';
     styleBodyRow(headRow, { bold: true });
@@ -398,7 +437,7 @@ export async function estimateWorkbook(estimate: Estimate, options: { company?: 
         }
     }
 
-    writeStatement(workbook.addWorksheet(name('คำชี้แจงค่าดำเนินการ'), { properties: { tabColor: { argb: 'FF7C3AED' } } }), estimate, options.company ?? '');
+    writeStatement(workbook.addWorksheet(name('คำชี้แจงค่าดำเนินการ'), { properties: { tabColor: { argb: 'FF7C3AED' } } }), estimate, company, logo);
 
     workbook.views = [{ x: 0, y: 0, width: 20000, height: 12000, firstSheet: 0, activeTab: 0, visibility: 'visible' }];
     return Buffer.from(await workbook.xlsx.writeBuffer());
@@ -415,7 +454,7 @@ const lineCount = (text: string, width: number) =>
 
 type StatementBlocks = ApiSchemas['StatementBlock'][];
 
-function writeStatement(sheet: ExcelJS.Worksheet, estimate: Estimate, company: string) {
+function writeStatement(sheet: ExcelJS.Worksheet, estimate: Estimate, company: Company | undefined, logo: number | null) {
     const statement: ApiSchemas['OverheadStatement'] = estimate.statement!;
     const TEXT_WIDTH = 82;
     sheet.columns = [{ width: 7 }, { width: TEXT_WIDTH }, { width: 12 }, { width: 15 }, { width: 22 }];
@@ -433,6 +472,8 @@ function writeStatement(sheet: ExcelJS.Worksheet, estimate: Estimate, company: s
     };
     const numberCell = (row: ExcelJS.Row) => (row.getCell(1).alignment = { horizontal: 'right', vertical: 'top' });
 
+    writeLetterhead(sheet, company, logo);
+    sheet.addRow([]);
     add(['', statement.title], { size: 15, bold: true }).getCell(2).alignment = { horizontal: 'center' };
     if (statement.subtitle) add(['', statement.subtitle], { bold: true }).getCell(2).alignment = { horizontal: 'center' };
     sheet.addRow([]);
@@ -441,7 +482,7 @@ function writeStatement(sheet: ExcelJS.Worksheet, estimate: Estimate, company: s
         ['ชื่อโครงการ', estimate.title],
         ['สถานที่ก่อสร้าง', estimate.location ?? ''],
         ['เจ้าของโครงการ', estimate.ownerName ?? ''],
-        ['ผู้รับเหมาก่อสร้าง', company],
+        ['ผู้รับเหมาก่อสร้าง', company?.name ?? ''],
         ['เลขที่เอกสาร BOQ', estimate.id + (estimate.estimateDate ? ` ลงวันที่ ${thaiDate(estimate.estimateDate)}` : '')]
     ];
     for (const [label, value] of meta) add(['', `${label}: ${value || blank}`]);

@@ -1,6 +1,6 @@
 import { DecimalPipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, HostListener, computed, inject, linkedSignal, signal } from '@angular/core';
+import { Component, HostListener, computed, inject, linkedSignal, signal, untracked } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -737,7 +737,14 @@ export class EstimateEditor {
 
     /** แท็บเริ่มต้น: ?tab=model (หลังถอดจากโมเดล) หรือหมวดแรก */
     private readonly initialTab = this.route.snapshot.queryParamMap.get('tab');
-    readonly tab = linkedSignal<string>(() => (this.initialTab === 'model' && this.estimate()?.source ? 'model' : (this.draft()?.categories[0]?.id ?? 'summary')));
+    // ตั้งแท็บใหม่เฉพาะตอนเปิด BOQ ฉบับอื่น (ผูกกับรหัส BOQ) — ไม่รีเซ็ตทุกครั้งที่แก้ข้อมูลในฉบับร่าง
+    readonly tab = linkedSignal<string | undefined, string>({
+        source: () => this.estimate()?.id,
+        computation: () => {
+            const estimate = untracked(this.estimate);
+            return this.initialTab === 'model' && estimate?.source ? 'model' : (estimate?.categories[0]?.id ?? 'summary');
+        }
+    });
     readonly activeCategory = computed(() => this.draft()?.categories.find((category) => category.id === this.tab()));
     readonly categoryIndex = computed(() => this.draft()?.categories.findIndex((category) => category.id === this.tab()) ?? -1);
     readonly includedCount = computed(() => this.draft()?.categories.filter((category) => !category.excluded).length ?? 0);
